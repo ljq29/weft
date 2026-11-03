@@ -25,6 +25,8 @@ const document: WorkflowDocument = {
   settings: {},
   variables: [],
   notes: [],
+  nodes: [],
+  edges: [],
   viewport: { x: 0, y: 0, zoom: 1 },
 };
 

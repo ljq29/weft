@@ -1,8 +1,12 @@
+import json
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 import simpleeval
 from weft_sdk import CachePolicy, Lane, Node, Port
+
+from weft.triggers.chat import ChatSessionStore
 
 
 class TriggerNode(Node):
@@ -59,6 +63,54 @@ class TriggerNode(Node):
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("Trigger is executed from its frozen trigger event")
+
+
+class ChatOutputNode(Node):
+    type = "flow.chat_output"
+    category = "flow"
+    name = "Chat Output"
+    description = "将 Message 或 Variable 作为助手消息推送到聊天会话"
+    lane = Lane.TRUSTED_SERVICE
+    inputs = (Port("message", "message", "消息输入"), Port("variable", "variable", "变量输入"))
+    outputs = (Port("message", "message", "助手消息"),)
+    params_schema = {
+        "type": "object",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {},
+    }
+
+    def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+        content: Any = ""
+        messages = inputs.get("message", [])
+        if messages:
+            assistant = next(
+                (item for item in reversed(messages) if item.get("role") == "assistant"),
+                messages[-1],
+            )
+            content = assistant.get("content", "")
+        elif "variable" in inputs:
+            value = inputs["variable"]
+            if isinstance(value, dict):
+                content = value.get("final_text", value.get("response", value))
+            else:
+                content = value
+        if not isinstance(content, str):
+            content = json.dumps(content, ensure_ascii=False)
+        session_id = ctx.session_id
+        message_id = f"m_{ctx.run_id}_{ctx.node_id}"
+        record = {
+            "session_id": session_id,
+            "source_node_id": ctx.node_id,
+            "message_id": message_id,
+            "role": "assistant",
+            "content": content,
+            "streaming": False,
+            "ts": datetime.now(UTC).isoformat(),
+        }
+        if session_id:
+            ChatSessionStore(ctx.root).append(record)
+        ctx.emit_event("chat.message", record)
+        return {"message": [{"role": "assistant", "content": content}]}
 
 
 class IfNode(Node):

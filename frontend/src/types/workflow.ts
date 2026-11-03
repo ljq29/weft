@@ -44,4 +44,21 @@ export interface WorkflowDocument {
   variables: { name: string; type: string; value: unknown }[];
   notes: unknown[];
   viewport: { x: number; y: number; zoom: number };
+  nodes: {
+    id: string;
+    type: string;
+    node_version: number;
+    name: string;
+    position: { x: number; y: number };
+    params: Record<string, unknown>;
+    comment?: string;
+  }[];
+  edges: {
+    id: string;
+    source: string;
+    sourcePort: string;
+    target: string;
+    targetPort: string;
+    order: number;
+  }[];
 }

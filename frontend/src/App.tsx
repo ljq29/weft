@@ -10,12 +10,16 @@ import {
 } from "@xyflow/react";
 import type { Connection, Edge, NodeChange } from "@xyflow/react";
 import { api } from "./api/client";
+import { AuditPanel } from "./panels/AuditPanel";
 import { WeftNode } from "./canvas/WeftNode";
 import { connectRuns } from "./api/ws";
 import { LogPanel } from "./panels/LogPanel";
 import { PortView } from "./panels/PortView";
 import { NodePanel } from "./panels/NodePanel";
 import { SchemaForm } from "./panels/SchemaForm";
+import { SettingsPanel } from "./panels/SettingsPanel";
+import { TracePanel } from "./panels/TracePanel";
+import { ChatPanel } from "./panels/ChatPanel";
 import { useRunStore } from "./stores/runStore";
 import { toDocument, useWorkflowStore } from "./stores/workflowStore";
 import type { FlowNode } from "./stores/workflowStore";
@@ -56,6 +60,8 @@ function Editor() {
   } | null>(null);
   const setNodeTypes = useWorkflowStore((state) => state.setNodeTypes);
   const [error, setError] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [name, setName] = useState("weekly");
   const [parent, setParent] = useState("C:/flows");
   const [root, setRoot] = useState("");
@@ -379,6 +385,22 @@ function Editor() {
         />
         <button onClick={() => void create()}>新建工作流</button>
         <button onClick={() => void open()}>打开工作流</button>
+        <button
+          onClick={() => {
+            setSettingsOpen(true);
+          }}
+        >
+          设置
+        </button>
+        {store.document && (
+          <button
+            onClick={() => {
+              setChatOpen(true);
+            }}
+          >
+            聊天
+          </button>
+        )}
         {store.document && (
           <span>
             {store.document.name}
@@ -460,6 +482,10 @@ function Editor() {
               }}
             />
           )}
+          {selectedNode && (
+            <TracePanel entries={run.traces[selectedNode.id] ?? []} />
+          )}
+          {selectedNode && <AuditPanel runId={run.runId} />}
           {selectedNode && Object.hasOwn(run.errors, selectedNode.id) && (
             <pre className="error-details">
               {JSON.stringify(run.errors[selectedNode.id], null, 2)}
@@ -504,6 +530,27 @@ function Editor() {
             重置
           </button>
         </div>
+      )}
+      {chatOpen && store.document && (
+        <ChatPanel
+          workflowId={store.document.id}
+          enabled={Boolean(
+            (
+              store.document.nodes.find((node) => node.type === "flow.trigger")
+                ?.params.chat as { enabled?: boolean } | undefined
+            )?.enabled,
+          )}
+          onClose={() => {
+            setChatOpen(false);
+          }}
+        />
+      )}
+      {settingsOpen && (
+        <SettingsPanel
+          onClose={() => {
+            setSettingsOpen(false);
+          }}
+        />
       )}
       {preview && store.document && (
         <PortView

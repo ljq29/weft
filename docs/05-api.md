@@ -142,6 +142,8 @@
 {"op": "unsubscribe", "topics": [...]}
 
 // 服务端 → 客户端（统一信封）
+{"topic": "system", "event": "subscribed", "data": {"topics": ["run:r_..."]}}
+// subscribe 生效后先返回 ACK；以下为运行事件
 {"topic": "run:r_...", "event": "node.started", "ts": "...", "data": {...}}
 ```
 

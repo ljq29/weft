@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
-from weft_sdk import CachePolicy, ExternalInput, Node, Port
+from weft_sdk import CachePolicy, ExternalInput, Node, Port, ToolCapability
 
 
 def schema(properties: dict[str, Any], required: list[str] | None = None) -> dict[str, Any]:
@@ -225,6 +225,8 @@ class RowFilter(TableNode):
     category = "table"
     name = "Row Filter"
     description = "按单条件筛选行"
+    tool_capability = ToolCapability.READ_ONLY
+    tool_exposed_params = ["column", "operator", "value"]
     inputs = (Port("in", "table", "输入表格"), Port("variables", "variable", "流变量"))
     params_schema = schema(
         {

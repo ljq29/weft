@@ -49,6 +49,8 @@ def test_websocket_authenticate_subscribe_and_receive() -> None:
         with api.websocket_connect("/api/ws") as socket:
             socket.send_json({"op": "authenticate", "token": TOKEN})
             socket.send_json({"op": "subscribe", "topics": ["run:r_1"]})
+            acknowledgement = socket.receive_json()
+            assert acknowledgement["event"] == "subscribed"
             app.state.bus.publish(
                 {
                     "event": "node.status",

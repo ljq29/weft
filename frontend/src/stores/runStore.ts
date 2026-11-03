@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
+import type { TraceEntry } from "../panels/TracePanel";
 
 function text(value: unknown, fallback = ""): string {
   if (typeof value === "string") return value;
@@ -28,6 +29,7 @@ interface RunState {
   errors: Record<string, NodeError>;
   logs: LogEntry[];
   iterations: Record<string, { index: number; total: number }>;
+  traces: Record<string, TraceEntry[]>;
   started: (runId: string) => void;
   apply: (event: RunEvent) => void;
   snapshot: (record: {
@@ -43,8 +45,16 @@ export const useRunStore = create<RunState>()(
     errors: {},
     logs: [],
     iterations: {},
+    traces: {},
     started: (runId) => {
-      set({ runId, statuses: {}, errors: {}, logs: [], iterations: {} });
+      set({
+        runId,
+        statuses: {},
+        errors: {},
+        logs: [],
+        iterations: {},
+        traces: {},
+      });
     },
     apply: ({ event, data }) => {
       set((state) => {
@@ -53,6 +63,22 @@ export const useRunStore = create<RunState>()(
         const errors = { ...state.errors };
         let logs = state.logs;
         let iterations = state.iterations;
+        let traces = state.traces;
+        if (event === "node.stream")
+          traces = {
+            ...traces,
+            [nodeId]: [...(traces[nodeId] ?? []), { type: "stream", ...data }],
+          };
+        if (event === "node.tool_call")
+          traces = {
+            ...traces,
+            [nodeId]: [...(traces[nodeId] ?? []), { type: "tool", ...data }],
+          };
+        if (event === "node.llm_trace")
+          traces = {
+            ...traces,
+            [nodeId]: [...(traces[nodeId] ?? []), { type: "llm", ...data }],
+          };
         if (event === "node.iteration")
           iterations = {
             ...iterations,
@@ -76,7 +102,7 @@ export const useRunStore = create<RunState>()(
               message: text(data.message),
             },
           ];
-        return { statuses, errors, logs, iterations };
+        return { statuses, errors, logs, iterations, traces };
       });
     },
     snapshot: (record) => {
@@ -91,7 +117,14 @@ export const useRunStore = create<RunState>()(
       set({ statuses, errors });
     },
     reset: () => {
-      set({ runId: "", statuses: {}, errors: {}, logs: [], iterations: {} });
+      set({
+        runId: "",
+        statuses: {},
+        errors: {},
+        logs: [],
+        iterations: {},
+        traces: {},
+      });
     },
   })),
 );

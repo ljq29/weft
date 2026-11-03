@@ -4,6 +4,10 @@
 
 |类型|名称|分类|执行 lane|缓存策略|说明|
 | --- | --- | --- | --- | --- | --- |
+|`agent.llm_call`|LLM Call|agent|trusted_service|volatile|通过主机 LLMProxy 执行流式文本或 JSON 补全|
+|`agent.loop`|Agent Loop|agent|trusted_service|volatile|执行可停止、可审计的 ReAct 工具调用循环|
+|`agent.node_tool`|Node as Tool|agent|trusted_service|side_effect|把显式授权的节点包装为受控 Agent 工具|
+|`agent.prompt_template`|Prompt Template|agent|trusted_service|volatile|用受限 Jinja2 模板组合变量与只读表格|
 |`code.python`|Python Script|code|trusted_worker|side_effect|在可信 Worker 中执行用户 Python 代码|
 |`excel.cell_update`|Excel Cell Update|excel|trusted_service|side_effect|原子更新若干不连续单元格，默认禁止公式|
 |`excel.connect`|Excel Connect|excel|trusted_service|side_effect|连接可见 Excel 或创建独立的可见/隐藏实例|
@@ -19,6 +23,7 @@
 |`file.move`|File Move|file|trusted_worker|side_effect|移动文件或目录|
 |`file.path_join`|Path Join|file|trusted_worker|pure|拼接并规范化路径|
 |`file.rename`|File Rename|file|trusted_worker|side_effect|重命名文件或目录|
+|`flow.chat_output`|Chat Output|flow|trusted_service|side_effect|将 Message 或 Variable 作为助手消息推送到聊天会话|
 |`flow.if`|If|flow|trusted_service|pure|按受限 Python 表达式选择分支|
 |`flow.loop_end`|Loop End|flow|trusted_service|side_effect|收集循环体输出|
 |`flow.loop_start`|Loop Start|flow|trusted_service|side_effect|按行、按块或计数启动循环|
@@ -53,6 +58,222 @@
 |`table.write_csv`|Write CSV|table|trusted_worker|side_effect|将表格写入 CSV 文件|
 |`table.write_json`|Write JSON|table|trusted_worker|side_effect|将表格写入 JSON 数组或 JSON Lines|
 |`table.write_parquet`|Write Parquet|table|trusted_worker|side_effect|将表格写入 Parquet 文件|
+
+## LLM Call (`agent.llm_call`)
+
+通过主机 LLMProxy 执行流式文本或 JSON 补全
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "llm": {
+      "type": "string",
+      "description": "命名 LLM 配置"
+    },
+    "system_prompt": {
+      "type": "string",
+      "description": "系统提示模板"
+    },
+    "user_prompt": {
+      "type": "string",
+      "description": "用户提示模板"
+    },
+    "table_max_rows": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "表格最大行数"
+    },
+    "temperature": {
+      "type": "number",
+      "description": "采样温度"
+    },
+    "max_tokens": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "最大输出 token"
+    },
+    "output": {
+      "type": "string",
+      "enum": [
+        "text",
+        "json"
+      ],
+      "description": "输出类型"
+    },
+    "json_schema": {
+      "type": "object",
+      "description": "可选 JSON Schema"
+    }
+  },
+  "required": [
+    "llm",
+    "user_prompt"
+  ]
+}
+```
+
+## Agent Loop (`agent.loop`)
+
+执行可停止、可审计的 ReAct 工具调用循环
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "llm": {
+      "type": "string",
+      "description": "命名 LLM 配置"
+    },
+    "system_prompt": {
+      "type": "string",
+      "description": "系统提示模板"
+    },
+    "task": {
+      "type": "string",
+      "description": "任务模板"
+    },
+    "max_turns": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "最大轮数"
+    },
+    "on_max_turns": {
+      "type": "string",
+      "enum": [
+        "fail",
+        "return_partial"
+      ],
+      "description": "达到最大轮数时的行为"
+    },
+    "stop_on_text": {
+      "type": "string",
+      "description": "优先于工具调用的停止正则"
+    },
+    "tool_choice": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "required"
+      ],
+      "description": "工具选择"
+    },
+    "tool_timeout": {
+      "type": "number",
+      "minimum": 0.001,
+      "description": "工具超时秒数"
+    }
+  },
+  "required": [
+    "llm",
+    "task"
+  ]
+}
+```
+
+## Node as Tool (`agent.node_tool`)
+
+把显式授权的节点包装为受控 Agent 工具
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "target_node": {
+      "type": "string",
+      "description": "目标节点 ID"
+    },
+    "tool_name": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "description": "工具名"
+    },
+    "description": {
+      "type": "string",
+      "description": "工具用途"
+    },
+    "exposed_params": {
+      "type": "array",
+      "description": "允许模型填写的参数白名单"
+    },
+    "result_format": {
+      "type": "string",
+      "enum": [
+        "table_markdown",
+        "json",
+        "text"
+      ],
+      "description": "结果格式"
+    },
+    "allow_side_effects": {
+      "type": "boolean",
+      "description": "显式授权副作用"
+    },
+    "require_confirmation": {
+      "type": "boolean",
+      "description": "每次调用需要确认"
+    },
+    "tool_timeout": {
+      "type": "number",
+      "minimum": 0.001,
+      "description": "工具超时秒数"
+    }
+  },
+  "required": [
+    "target_node",
+    "tool_name",
+    "description"
+  ]
+}
+```
+
+## Prompt Template (`agent.prompt_template`)
+
+用受限 Jinja2 模板组合变量与只读表格
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "template": {
+      "type": "string",
+      "description": "Jinja2 模板文本"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "inline",
+        "file"
+      ],
+      "description": "模板来源"
+    },
+    "path": {
+      "type": "string",
+      "description": "prompts/*.md 模板路径"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "system",
+        "user"
+      ],
+      "description": "消息角色"
+    },
+    "table_max_rows": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "表格最大行数"
+    }
+  },
+  "required": [
+    "template"
+  ]
+}
+```
 
 ## Python Script (`code.python`)
 
@@ -565,6 +786,18 @@
     }
   },
   "required": []
+}
+```
+
+## Chat Output (`flow.chat_output`)
+
+将 Message 或 Variable 作为助手消息推送到聊天会话
+
+```json
+{
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {}
 }
 ```
 

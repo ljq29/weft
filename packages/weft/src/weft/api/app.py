@@ -42,6 +42,15 @@ class RunRequest(BaseModel):
     overrides: dict[str, Any] = {}
 
 
+class ChatRequest(BaseModel):
+    message: str
+    session_id: str | None = None
+
+
+class ChatClearRequest(BaseModel):
+    clear_memory: bool = False
+
+
 class BrowseRequest(BaseModel):
     path: str
     dirs_only: bool = False
@@ -63,6 +72,7 @@ def create_app(
     app.state.session = session
     app.state.roots = {}
     app.state.bus = EventBus()
+    from weft.agent.node_tool import NodeTool
     from weft.excel import ExcelWorkerSupervisor
 
     excel_worker = ExcelWorkerSupervisor()
@@ -70,11 +80,17 @@ def create_app(
         lambda root, run_id: WorkerPool(WorkflowEnvironment(root), run_id),
         excel_worker=excel_worker,
     )
+    engine.node_tool_factory = lambda prepared, descriptor, agent_node: NodeTool(
+        prepared, engine, descriptor, agent_node
+    )
     engine.event_sink = app.state.bus.publish
     app.state.engine = engine
     app.state.excel = excel_worker
     app.router.add_event_handler("shutdown", engine.close)
     app.state.coordinator = RunCoordinator(engine)
+    from weft.triggers.chat import ChatSource
+
+    app.state.chat = ChatSource(app.state.coordinator)
     app.state.registry = builtin_registry()
     allowed_hosts = (
         {f"{host}:{port}", f"localhost:{port}"} if host == "127.0.0.1" else {f"{host}:{port}"}
@@ -108,6 +124,35 @@ def create_app(
     @app.get("/api/system/version")
     def version() -> dict[str, Any]:
         return {"version": __version__, "schema_version": 1}
+
+    from weft.agent.client import LLMClient
+    from weft.agent.proxy import LLMProxy
+    from weft.agent.settings import LLMConfigError, SettingsStore
+
+    settings_store = SettingsStore()
+    app.state.settings = settings_store
+    llm_proxy = LLMProxy(settings_store)
+    app.state.llm_proxy = llm_proxy
+    engine.llm_client = LLMClient(llm_proxy)
+    app.state.llm = engine.llm_client
+
+    @app.get("/api/settings")
+    def get_settings() -> dict[str, Any]:
+        return settings_store.masked()
+
+    @app.put("/api/settings")
+    def update_settings(settings: dict[str, Any]) -> Any:
+        try:
+            return settings_store.update(settings)
+        except LLMConfigError as exception:
+            return error("INVALID_SETTINGS", str(exception), 400)
+
+    @app.post("/api/settings/llm/{name}/test")
+    async def test_llm(name: str) -> Any:
+        try:
+            return await llm_proxy.test(name)
+        except Exception as exception:
+            return error("LLM_CONNECTION_FAILED", str(exception), 400)
 
     @app.post("/api/fs/browse")
     def browse(request: BrowseRequest) -> dict[str, Any]:
@@ -187,12 +232,18 @@ def create_app(
     def put_workflow(workflow_id: str, document: WorkflowDocument, request: Request) -> Any:
         if request.headers.get("x-weft-client") != "ui":
             return error("FORBIDDEN", "缺少 UI 操作标记", 403)
+        from weft.agent.node_tool import validate_node_tools
+
+        try:
+            validate_node_tools(document, app.state.registry)
+        except (ValueError, PermissionError) as exc:
+            return error("NODE_TOOL_NOT_AUTHORIZED", str(exc), 400)
         root = root_for(app, workflow_id)
         try:
             saved = WorkflowStore(root).save(
                 document,
                 document.revision,
-                run_active=workflow_id in app.state.coordinator.active,
+                run_active=workflow_run_active(app, workflow_id),
             )
             return saved.model_dump(mode="json")
         except ValueError as exc:
@@ -210,7 +261,7 @@ def create_app(
             saved = WorkflowStore(root).save(
                 document,
                 expected,
-                run_active=workflow_id in app.state.coordinator.active,
+                run_active=workflow_run_active(app, workflow_id),
             )
             return saved.model_dump(mode="json")
         except ValueError as exc:
@@ -324,6 +375,38 @@ def create_app(
         )
         return {"run_id": result.run_id, "disposition": result.disposition}
 
+    @app.post("/api/workflows/{workflow_id}/chat", status_code=202)
+    async def chat(workflow_id: str, request: ChatRequest) -> Any:
+        from weft.triggers.chat import ChatDisabledError
+
+        root = root_for(app, workflow_id)
+        try:
+            result = await app.state.chat.send(
+                WorkflowStore(root).load(),
+                root,
+                app.state.registry,
+                request.message,
+                request.session_id,
+            )
+        except ChatDisabledError as exception:
+            return error("CHAT_DISABLED", str(exception), 400)
+        except ValueError as exception:
+            return error("INVALID_CHAT_MESSAGE", str(exception), 400)
+        return JSONResponse(result, status_code=200 if result["disposition"] == "dropped" else 202)
+
+    @app.get("/api/workflows/{workflow_id}/chat/{session_id}")
+    def chat_history(workflow_id: str, session_id: str) -> Any:
+        from weft.triggers.chat import ChatSessionStore
+
+        return ChatSessionStore(root_for(app, workflow_id)).history(session_id)
+
+    @app.post("/api/workflows/{workflow_id}/chat/{session_id}/clear")
+    def clear_chat(workflow_id: str, session_id: str, request: ChatClearRequest) -> Any:
+        from weft.triggers.chat import ChatSessionStore
+
+        ChatSessionStore(root_for(app, workflow_id)).clear(session_id, request.clear_memory)
+        return {"cleared": True}
+
     @app.get("/api/workflows/{workflow_id}/runs")
     def runs(workflow_id: str, limit: int = 20) -> list[dict[str, Any]]:
         root = root_for(app, workflow_id)
@@ -375,6 +458,13 @@ def create_app(
     def reset_node(workflow_id: str, node_id: str) -> dict[str, bool]:
         CacheManager(root_for(app, workflow_id)).reset(node_id)
         return {"reset": True}
+
+    @app.get("/api/runs/{run_id}/audit")
+    def run_audit(run_id: str) -> list[dict[str, Any]]:
+        path = run_root(app, run_id) / ".runs" / run_id / "audit.jsonl"
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
     @app.get("/api/workflows/{workflow_id}/nodes/{node_id}/ports/{port}")
     def current_port_view(
@@ -428,6 +518,13 @@ def create_app(
                 command = await socket.receive_json()
                 if command.get("op") == "subscribe":
                     topics.update(command.get("topics", []))
+                    await socket.send_json(
+                        {
+                            "topic": "system",
+                            "event": "subscribed",
+                            "data": {"topics": sorted(topics)},
+                        }
+                    )
                 elif command.get("op") == "unsubscribe":
                     topics.difference_update(command.get("topics", []))
         except WebSocketDisconnect:
@@ -499,6 +596,13 @@ def error(code: str, message: str, status: int) -> JSONResponse:
     return JSONResponse(
         status_code=status, content={"error": {"code": code, "message": message, "detail": {}}}
     )
+
+
+def workflow_run_active(app: FastAPI, workflow_id: str) -> bool:
+    run_id = app.state.coordinator.active.get(workflow_id)
+    if run_id is None:
+        return False
+    return app.state.engine.runs[run_id].record.status in {"queued", "running", "waiting"}
 
 
 def root_for(app: FastAPI, workflow_id: str) -> Path:

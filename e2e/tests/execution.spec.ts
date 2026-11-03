@@ -16,6 +16,17 @@ async function request(path: string, method = "GET", body?: unknown) {
   if (!response.ok) throw new Error(`${method} ${path}: ${response.status} ${await response.text()}`);
   return response.json();
 }
+async function saveDocument(id: string, document: any) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await request(`/workflows/${id}`, "PUT", document);
+    } catch (error) {
+      if (!String(error).includes(" 409 ") || attempt === 2) throw error;
+      const current = await request(`/workflows/${id}`);
+      document.revision = current.revision;
+    }
+  }
+}
 
 test("US-EXE-01/AC-1, US-EXE-05/AC-4, US-EXE-06/AC-1,4,5: run and preview CSV in browser", async ({ page }, testInfo) => {
   page.on("response", (response) => {
@@ -46,7 +57,7 @@ test("US-EXE-01/AC-1, US-EXE-05/AC-4, US-EXE-06/AC-1,4,5: run and preview CSV in
   }));
   writeFileSync(resolve(root, "pyproject.toml"), `${readFileSync(resolve(root, "pyproject.toml"), "utf8")}\n[tool.uv.sources]\nweft-worker = { path = "${resolve(projectRoot, "packages/weft-worker").replaceAll("\\", "/")}" }\nweft-sdk = { path = "${resolve(projectRoot, "packages/weft-sdk").replaceAll("\\", "/")}" }\n`);
   execFileSync("uv", ["sync"], { cwd: root, env: { ...process.env, UV_INDEX_URL: "https://pypi.tuna.tsinghua.edu.cn/simple" } });
-  await request(`/workflows/${document.id}`, "PUT", document);
+  await saveDocument(document.id, document);
   page.once("dialog", (dialog) => void dialog.accept(root));
   await page.getByRole("button", { name: "打开工作流" }).click();
   await expect(page.locator(".weft-node")).toHaveCount(5);

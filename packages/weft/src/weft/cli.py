@@ -85,12 +85,26 @@ def run_workflow(path: Path, variables: list[str], wait: bool) -> int:
     environment.sync()
     registry = builtin_registry()
     registry.load_directory(root / "nodes")
+    from weft.agent.client import LLMClient
+    from weft.agent.node_tool import NodeTool, validate_node_tools
+    from weft.agent.proxy import LLMProxy
+    from weft.agent.settings import SettingsStore
     from weft.excel import ExcelWorkerSupervisor
 
     excel_worker = ExcelWorkerSupervisor()
-    engine = Engine(lambda root, run_id: WorkerPool(environment, run_id), excel_worker=excel_worker)
+    llm_client = LLMClient(LLMProxy(SettingsStore()))
+    engine = Engine(
+        lambda root, run_id: WorkerPool(environment, run_id),
+        excel_worker=excel_worker,
+        llm_client=llm_client,
+    )
+    engine.node_tool_factory = lambda prepared, descriptor, agent_node: NodeTool(
+        prepared, engine, descriptor, agent_node
+    )
+    document = WorkflowStore(root).load()
+    validate_node_tools(document, registry)
     prepared = engine.prepare(
-        WorkflowStore(root).load(),
+        document,
         root,
         registry,
         trigger={"source": "manual", "ts": "", "payload": {"overrides": overrides}},

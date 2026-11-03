@@ -92,6 +92,7 @@ class PreparedRun:
     registry: Any
     record: RunRecord
     iteration_index: int | None = None
+    chat_links: dict[str, list[dict[str, str]]] = field(default_factory=dict)
     cancel_event: asyncio.Event = field(default_factory=asyncio.Event)
     on_finished: Any = None
 

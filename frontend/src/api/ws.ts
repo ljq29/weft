@@ -15,6 +15,7 @@ export function connectRuns(workflowId: string): () => void {
       data: Record<string, unknown>;
     };
     useRunStore.getState().apply(message);
+    window.dispatchEvent(new CustomEvent("weft-chat", { detail: message }));
   });
   const unsubscribe = useRunStore.subscribe(
     (state) => state.runId,

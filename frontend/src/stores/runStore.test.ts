@@ -53,4 +53,23 @@ describe("T2.3 execution visualization", () => {
       total: 10,
     });
   });
+
+  it("US-AGT-03/AC-5; US-AGT-10/AC-1,2: stores LLM and tool timeline events", () => {
+    useRunStore.getState().apply({
+      event: "node.llm_trace",
+      data: {
+        node_id: "n_agent",
+        turn: 1,
+        prompt_tokens: 3,
+        completion_tokens: 1,
+        latency_ms: 20,
+      },
+    });
+    useRunStore.getState().apply({
+      event: "node.tool_call",
+      data: { node_id: "n_agent", tool: "lookup", duration_ms: 5 },
+    });
+    expect(useRunStore.getState().traces.n_agent).toHaveLength(2);
+    expect(useRunStore.getState().traces.n_agent[0].prompt_tokens).toBe(3);
+  });
 });

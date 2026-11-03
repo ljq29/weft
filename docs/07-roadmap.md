@@ -163,27 +163,27 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## M4 Agent
 
-- [ ] **T4.1 LLMProxy/LLMClient + mock 服务器**
+- [x] **T4.1 LLMProxy/LLMClient + mock 服务器**
 【依赖】T1.8 + T0.4 结论
 【产出】主机 LLMProxy、OpenAI 兼容客户端、命名配置、测试连接、mock；key 只在主机侧读取，volatile LLM 节点
 【验收】US-AGT-01/AC-1..4；US-AGT-02/AC-5；US-EXE-04/AC-10；pi 的沙箱内代理验收留在 T5.4，不在本卡虚标
 
-- [ ] **T4.2 LLM Call + Prompt Template + 统一插值**
+- [x] **T4.2 LLM Call + Prompt Template + 统一插值**
 【依赖】T4.1
 【产出】两节点共用 Jinja2 沙箱子集、`{{ var }}` 与只读 `tables.<port> | table` 表格 filter
 【验收】US-AGT-02/AC-1..4；US-AGT-09/AC-1..4
 
-- [ ] **T4.3 Agent Loop + ToolDispatcher + 审计**
+- [x] **T4.3 Agent Loop + ToolDispatcher + 审计**
 【依赖】T4.2
 【产出】ReAct、停止正则优先、max_turns 默认失败/显式 partial、工具去重/超时/错误回填、打码 audit、默认不含完整 prompt 的 trace、事件与轨迹面板
 【验收】US-AGT-03/AC-1..5；US-SBX-07/AC-1..3；US-AGT-10/AC-1..3
 
-- [ ] **T4.4 授权 Node as Tool**
+- [x] **T4.4 授权 Node as Tool**
 【依赖】T4.3
 【产出】tool_capability/参数白名单、冻结参数与 Run 输入快照、ephemeral、同 Run pool/lane 槽位与排队、Run 取消继承、禁止 Python/Shell/任意代码、副作用逐次确认、防递归
 【验收】US-AGT-04/AC-1..7
 
-- [ ] **T4.5 Chat 面板与聊天触发**
+- [x] **T4.5 Chat 面板与聊天触发**
 【依赖】T4.3
 【产出】REST 发送→ChatSource、WS 认证与推送、run/session/source/message 去重映射、独立 `.runs/chat/` 会话及保留策略
 【验收】US-AGT-07/AC-1..5；US-TRG-03/AC-1,2
@@ -299,7 +299,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## 文档状态（不代表实现完成）
 
-当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）、M2（T2.1–T2.5）与 M3（T3.1–T3.4）已完成；真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过，真实 Excel 的场景 A 主链路也已通过。T0.2 因未安装 Sandboxie 而未完成，T0.4 已验证 pi/LLMProxy 但沙箱断网仍待验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
+当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）、M2（T2.1–T2.5）、M3（T3.1–T3.4）与 M4（T4.1–T4.5）的实现及自动化验收已完成；真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过，真实 Excel 的场景 A 主链路也已通过。场景 B 的真实模型人工抽查尚未执行，不能视为已验证。T0.2 因未安装 Sandboxie 而未完成，T0.4 已验证 pi/LLMProxy 但沙箱断网仍待验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
 
 以下事项仍需真机验证，不能当成既成事实：
 

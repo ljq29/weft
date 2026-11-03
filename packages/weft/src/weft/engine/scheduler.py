@@ -57,11 +57,17 @@ def schema_with_variables(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 class Engine:
-    def __init__(self, worker_pool_factory: Any = None, excel_worker: Any = None) -> None:
+    def __init__(
+        self, worker_pool_factory: Any = None, excel_worker: Any = None, llm_client: Any = None
+    ) -> None:
         self.runs: dict[str, PreparedRun] = {}
         self.worker_pool_factory = worker_pool_factory
         self.worker_pools: dict[str, Any] = {}
         self.excel_worker = excel_worker
+        self.llm_client = llm_client
+        self.confirmation_handler: Any = None
+        self.node_tool_factory: Any = None
+        self.service_slots = {"trusted_service": asyncio.Semaphore(4)}
         self.event_sink: Any = None
 
     def close(self) -> None:
@@ -100,6 +106,17 @@ class Engine:
             nodes={node.id: NodeRecord() for node in workflow.nodes},
         )
         prepared = PreparedRun(root, workflow, registry, record)
+        for node in workflow.nodes:
+            if node.type != "flow.chat_output":
+                continue
+            for edge in workflow.edges:
+                if edge.target == node.id:
+                    prepared.chat_links.setdefault(edge.source, []).append(
+                        {
+                            "source_node_id": node.id,
+                            "message_id": f"m_{run_id}_{node.id}",
+                        }
+                    )
         self.runs[run_id] = prepared
         run_dir = root / ".runs" / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -242,6 +259,9 @@ class Engine:
                     "message": [{"role": "user", "content": event["payload"]["message"]}]
                     if event["source"] == "chat"
                     else [],
+                    "table": pl.DataFrame(event["payload"].get("events", []))
+                    if event["source"] == "file" and event["payload"].get("events")
+                    else pl.DataFrame({"path": [], "kind": [], "ts": []}),
                 }
                 activated = None
             else:
@@ -399,6 +419,107 @@ class Engine:
             )
         )
 
+    def _tool_inputs(self, prepared: PreparedRun, target_id: str) -> dict[str, Any]:
+        inputs: dict[str, Any] = {}
+        edges = sorted(
+            (
+                Edge.model_validate(edge)
+                for edge in prepared.workflow.edges
+                if edge.target == target_id
+            ),
+            key=lambda edge: edge.order,
+        )
+        for edge in edges:
+            source = prepared.record.nodes[edge.source]
+            value = source.outputs.get(edge.sourcePort)
+            if source.status != "executed" or value is None:
+                raise ValueError(f"Upstream of '{edge.source}' not executed")
+            inputs[edge.targetPort] = self._read_value(prepared, value)
+        return inputs
+
+    def _ephemeral_input_refs(
+        self, prepared: PreparedRun, execution_id: str, inputs: dict[str, Any]
+    ) -> dict[str, Any]:
+        refs: dict[str, Any] = {}
+        directory = prepared.root / ".runs" / prepared.record.run_id / "ipc" / execution_id
+        for port, value in inputs.items():
+            if isinstance(value, pl.DataFrame):
+                directory.mkdir(parents=True, exist_ok=True)
+                path = directory / f"{port}.arrow"
+                arrow = value.to_arrow()
+                with path.open("wb") as stream:
+                    with pa.ipc.new_file(stream, arrow.schema) as writer:
+                        writer.write_table(arrow)
+                reference = ValueRef(
+                    kind="table",
+                    path=path.relative_to(prepared.root),
+                    hash=hash_file(path),
+                    rows=value.height,
+                    cols=value.width,
+                )
+            elif value is None:
+                reference = ValueRef(kind="none")
+            else:
+                reference = ValueRef.from_json(value, directory)
+                if reference.path is not None:
+                    reference = reference.model_copy(
+                        update={"path": reference.path.relative_to(prepared.root)}
+                    )
+            refs[port] = reference.model_dump(mode="json")
+        return refs
+
+    async def execute_single(
+        self,
+        prepared: PreparedRun,
+        target_id: str,
+        params: dict[str, Any],
+        inputs: dict[str, Any],
+        timeout: float = 120,
+    ) -> dict[str, Any]:
+        node = next(item for item in prepared.workflow.nodes if item.id == target_id)
+        declaration = prepared.registry.get(node.type)
+        execution_id = f"tool-{uuid.uuid4().hex}"
+        variables = {variable.name: variable.value for variable in prepared.workflow.variables}
+
+        async def execute() -> dict[str, Any]:
+            if declaration.lane == "trusted_worker" and self.worker_pool_factory is not None:
+                pool = self.worker_pools.get(prepared.record.run_id)
+                if pool is None:
+                    pool = self.worker_pool_factory(prepared.root, prepared.record.run_id)
+                    self.worker_pools[prepared.record.run_id] = pool
+                input_refs = self._ephemeral_input_refs(prepared, execution_id, inputs)
+                result = await pool.execute(execution_id, node.type, params, input_refs, variables)
+                if "error" in result:
+                    raise RuntimeError(result["error"]["message"])
+                return {
+                    port: self._read_value(prepared, ValueRef.model_validate(reference))
+                    for port, reference in result["outputs"].items()
+                }
+            async with self.service_slots["trusted_service"]:
+                return await asyncio.to_thread(
+                    self._execute_sync, prepared, declaration, node, inputs, variables, params
+                )
+
+        async with asyncio.timeout(timeout):
+            operation = asyncio.create_task(execute())
+            cancellation = asyncio.create_task(prepared.cancel_event.wait())
+            try:
+                done, _ = await asyncio.wait(
+                    [operation, cancellation], return_when=asyncio.FIRST_COMPLETED
+                )
+                if cancellation in done:
+                    pool = self.worker_pools.get(prepared.record.run_id)
+                    if pool is not None:
+                        await pool.cancel(execution_id)
+                    operation.cancel()
+                    raise Cancelled
+                return operation.result()
+            finally:
+                for task in (operation, cancellation):
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(operation, cancellation, return_exceptions=True)
+
     def _execute_sync(
         self,
         prepared: PreparedRun,
@@ -425,6 +546,24 @@ class Engine:
             ),
             cancelled=prepared.cancel_event.is_set,
             excel=ExcelClient(self.excel_worker) if self.excel_worker is not None else None,
+            llm=self.llm_client,
+            stream=lambda delta: self._event(
+                prepared,
+                "node.stream",
+                node.id,
+                {"delta": delta, "chat_links": prepared.chat_links.get(node.id, [])},
+            ),
+            usage=lambda values: self._record_usage(prepared, values),
+            node_id=node.id,
+            session_id=prepared.record.trigger.get("session_id", ""),
+            event=lambda event, data: self._event(prepared, event, node.id, data),
+            node_tool=(
+                lambda descriptor, agent_node: self.node_tool_factory(
+                    prepared, descriptor, agent_node
+                )
+            )
+            if self.node_tool_factory is not None
+            else None,
         ):
             return declaration.execute(weft_ctx, inputs, params)
 
@@ -458,7 +597,15 @@ class Engine:
             content = self._read_value(prepared, value)
             if value.kind == "json" and edge.targetPort == "variables":
                 variables.update(content)
-            inputs[edge.targetPort] = content
+            target = next(node for node in prepared.workflow.nodes if node.id == node_id)
+            declaration = prepared.registry.get(target.type)
+            port_kind = next(
+                (port.kind for port in declaration.inputs if port.name == edge.targetPort), None
+            )
+            if port_kind == "tool":
+                inputs.setdefault(edge.targetPort, []).append(content)
+            else:
+                inputs[edge.targetPort] = content
         return inputs, variables
 
     def _read_value(self, prepared: PreparedRun, value: ValueRef) -> Any:
@@ -561,6 +708,11 @@ class Engine:
         record.status = status
         record.finished_at = now()
         self._event(prepared, "node.status", node_id, {"status": status})
+
+    def _record_usage(self, prepared: PreparedRun, values: dict[str, int]) -> None:
+        for key, value in values.items():
+            if key in prepared.record.usage:
+                prepared.record.usage[key] += value
 
     def _event(
         self, prepared: PreparedRun, event: str, node_id: str, data: dict[str, Any] | None = None
