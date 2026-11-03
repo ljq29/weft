@@ -22,6 +22,7 @@ class StoryIndex:
     valid: frozenset[str]
     manual: frozenset[str]
     by_story: dict[str, frozenset[str]]
+    p1: frozenset[str]
 
 
 @dataclass(frozen=True)
@@ -43,13 +44,16 @@ def parse_user_stories(text: str) -> StoryIndex:
     valid: set[str] = set()
     manual: set[str] = set()
     by_story: dict[str, set[str]] = {}
+    p1: set[str] = set()
     story_id: str | None = None
     manual_only_story = False
+    story_is_p1 = False
     for line in text.splitlines():
         heading = re.match(r"^### (US-[A-Z]{3}-\d{2})\s", line)
         if heading:
             story_id = heading.group(1)
             by_story[story_id] = set()
+            story_is_p1 = "[P1]" in line
             manual_only_story = "[manual]" in line and not any(tag in line for tag in TEST_TAGS)
             continue
         acceptance = re.match(r"^\s*-\s*(AC-\d+)\b(.*)", line)
@@ -57,12 +61,15 @@ def parse_user_stories(text: str) -> StoryIndex:
             reference = f"{story_id}/{acceptance.group(1)}"
             valid.add(reference)
             by_story[story_id].add(reference)
+            if story_is_p1 or "[P1]" in acceptance.group(2):
+                p1.add(reference)
             if manual_only_story or "[manual]" in acceptance.group(2):
                 manual.add(reference)
     return StoryIndex(
         valid=frozenset(valid),
         manual=frozenset(manual),
         by_story={key: frozenset(value) for key, value in by_story.items()},
+        p1=frozenset(p1),
     )
 
 
@@ -85,6 +92,8 @@ def expand_roadmap_references(text: str, stories: StoryIndex) -> frozenset[str]:
             references.update(stories.by_story.get(f"US-{epic}-{number:02d}", ()))
     for story in STORY_REFERENCE.findall(text):
         references.update(stories.by_story.get(story, ()))
+    if "全部 P0 AC" in text:
+        references.difference_update(stories.p1)
     return frozenset(references)
 
 

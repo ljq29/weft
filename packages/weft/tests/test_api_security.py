@@ -64,7 +64,7 @@ def test_websocket_authenticate_subscribe_and_receive() -> None:
 
 
 def test_workflow_crud_run_and_error_contract(tmp_path: Path) -> None:
-    """US-DES-01/AC-1,2, US-DES-07/AC-4: workflow CRUD, CAS and run APIs work end to end."""
+    """US-DES-01/AC-1,2, US-DES-07/AC-4, US-EXE-06/AC-3: CRUD, runs and JSON ports."""
     with client() as api:
         created = api.post(
             "/api/workflows",
@@ -124,6 +124,10 @@ def test_workflow_crud_run_and_error_contract(tmp_path: Path) -> None:
                 break
             time.sleep(0.01)
         assert record["status"] == "succeeded"
+        variable = api.get(f"/api/runs/{run_id}/nodes/n_00000001/ports/variable", headers=auth())
+        message = api.get(f"/api/runs/{run_id}/nodes/n_00000001/ports/message", headers=auth())
+        assert variable.json()["source"] == "manual"
+        assert message.json() == []
         missing_port = api.get(
             f"/api/runs/{run_id}/nodes/n_00000001/ports/missing",
             headers=auth(),

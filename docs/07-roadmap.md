@@ -113,23 +113,23 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 【产出】`05-api.md` §1–5、§11 中 M2 所需端点与事件；随机 UI 会话令牌、Host/Origin 校验、WS authenticate 后订阅、403 与统一错误码
 【验收】US-SBX-09/AC-4,5；US-EXE-05/AC-5；API 集成测试覆盖每个端点的成功与主要错误路径
 
-- [ ] **T2.2 画布编辑**
+- [x] **T2.2 画布编辑**
 【依赖】T2.1
 【产出】React Flow 画布：节点面板、拖拽、连线（后端校验）、参数表单（JSON Schema 生成）、变量绑定控件、自动保存、undo/redo、复制粘贴、导航、小地图
 【验收】US-DES-01..04、US-DES-06..08、US-DES-11 的全部 AC（e2e 用 Playwright）
 
-- [ ] **T2.3 执行可视化**
+- [x] **T2.3 执行可视化**
 【依赖】T2.2
 【产出】状态灯、右键执行菜单（到此/从此/仅此/重置）、日志面板、端口视图（Arrow 流直读、record batch 分页、显式全量稳定排序）、错误详情
 【验收】US-DES-05；US-EXE-05/AC-1,3,4；US-EXE-06/AC-1,3,4,5；US-EXE-07/AC-1,2
 【Demo】浏览器中从零搭建 M1 工作流并运行、调试
 
-- [ ] **T2.4 循环节点与 UI**
+- [x] **T2.4 循环节点与 UI**
 【依赖】T2.3
 【产出】`Loop Start/End`（Row/Chunk/Counting × concat/last/variables）、引擎虚拟循环节点、迭代进度显示、配对校验；Counting 使用上界排他的半开区间
 【验收】US-EXE-10/AC-1..4；US-EXE-11/AC-1..4
 
-- [ ] **T2.5 第二批表格节点**
+- [x] **T2.5 第二批表格节点**
 【依赖】T2.3
 【产出】`Joiner`、动态命名端口 `Concatenate`、`GroupBy`、`Pivot/Unpivot`、`Duplicate Filter`、`Missing Value`、`Type Cast`、AST 白名单 `Polars Expression`、`Math Formula`、`String Manipulation`、`Table to Variables`、`Variables to Table`、`Table Creator`、`Table View`、`Python Script`、`Path Join`、`File Copy/Move/Rename/Delete`
 【验收】US-DES-03/AC-6；US-TBL-03..07、US-TBL-08/AC-1..7、US-TBL-10 的全部 P0 AC
@@ -299,7 +299,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## 文档状态（不代表实现完成）
 
-当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）与 T2.1 已完成，真实 Worker 的 CSV 闭环在内嵌 CLI 与服务模式均通过，API/WS 本机安全边界测试通过；T0.2 因未安装 Sandboxie 而未完成，T0.4 已验证 pi/LLMProxy 但沙箱断网仍待验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
+当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）与 M2（T2.1–T2.5）已完成，真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过；T0.2 因未安装 Sandboxie 而未完成，T0.4 已验证 pi/LLMProxy 但沙箱断网仍待验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
 
 以下事项仍需真机验证，不能当成既成事实：
 

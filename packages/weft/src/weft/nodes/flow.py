@@ -154,3 +154,60 @@ class WaitNode(Node):
             ctx.check_cancelled()
             time.sleep(min(0.05, deadline - time.monotonic()))
         return {}
+
+
+class LoopStartNode(Node):
+    type = "flow.loop_start"
+    category = "flow"
+    name = "Loop Start"
+    description = "按行、按块或计数启动循环"
+    lane = Lane.TRUSTED_SERVICE
+    inputs = (Port("in", "table", "循环输入表"),)
+    outputs = (Port("table", "table", "当前行或块"), Port("variables", "variable", "当前迭代变量"))
+    params_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+            "mode": {
+                "type": "string",
+                "enum": ["row", "chunk", "counting"],
+                "description": "循环模式",
+            },
+            "loop_id": {"type": "string", "description": "Loop End 配对标识"},
+            "chunk_size": {"type": "integer", "minimum": 1, "description": "每块行数"},
+            "from": {"type": "integer", "description": "计数起点"},
+            "to": {"type": "integer", "description": "计数排他上界"},
+            "step": {"type": "integer", "description": "计数步长"},
+        },
+        "required": ["mode", "loop_id"],
+    }
+
+    def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+        raise RuntimeError("Loop Start is executed by the loop scheduler")
+
+
+class LoopEndNode(Node):
+    type = "flow.loop_end"
+    category = "flow"
+    name = "Loop End"
+    description = "收集循环体输出"
+    lane = Lane.TRUSTED_SERVICE
+    inputs = (Port("in", "table", "循环体表格"), Port("variables", "variable", "循环体变量"))
+    outputs = (Port("out", "table", "收集后的表格"),)
+    params_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+            "loop_id": {"type": "string", "description": "Loop Start 配对标识"},
+            "mode": {
+                "type": "string",
+                "enum": ["concat", "last", "variables"],
+                "description": "收集模式",
+            },
+            "on_error": {"type": "string", "enum": ["fail", "skip"], "description": "迭代失败策略"},
+        },
+        "required": ["loop_id", "mode"],
+    }
+
+    def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+        raise RuntimeError("Loop End is executed by the loop scheduler")

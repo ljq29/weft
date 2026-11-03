@@ -320,6 +320,7 @@ class VariableNode(Node):
     name = "Variable"
     description = "定义流变量"
     cache_policy = CachePolicy.PURE
+    inputs = (Port("variables", "variable", "上游流变量"),)
     outputs = (Port("variables", "variable", "流变量"),)
     params_schema = schema({"values": prop("array", "变量定义列表")}, ["values"])
 

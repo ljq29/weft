@@ -105,3 +105,38 @@ def test_list_files_directory_fingerprint_invalidates_cache(tmp_path: Path) -> N
         assert reference.rows == 2
 
     asyncio.run(scenario())
+
+
+def test_node_failure_preserves_upstream_and_input_snapshot(tmp_path: Path) -> None:
+    """US-EXE-07/AC-1,2: failures stop downstream and retain table input snapshots."""
+
+    async def scenario() -> None:
+        (tmp_path / "data").mkdir()
+        (tmp_path / "data" / "input.csv").write_text("amount\n1\n2\n", encoding="utf-8")
+        document = make_workflow(
+            [
+                node("n_00000001", "flow.trigger", {}),
+                node("n_00000002", "table.read_csv", {"path": "data/input.csv"}),
+                node(
+                    "n_00000003",
+                    "table.row_filter",
+                    {"column": "missing", "operator": ">", "value": "1"},
+                ),
+                node("n_00000004", "table.write_csv", {"path": "out/result.csv"}),
+            ],
+            [
+                edge("e_00000001", "n_00000002", "out", "n_00000003"),
+                edge("e_00000002", "n_00000003", "out", "n_00000004"),
+            ],
+        )
+        engine = Engine()
+        record = await engine.run(engine.prepare(document, tmp_path, builtin_registry()))
+        assert record.status == "failed"
+        assert record.nodes["n_00000002"].status == "executed"
+        assert record.nodes["n_00000003"].status == "failed"
+        assert record.nodes["n_00000004"].status == "skipped_upstream"
+        error = record.nodes["n_00000003"].error
+        assert error["traceback"]
+        assert error["input_snapshot"]["in"] == [{"amount": 1}, {"amount": 2}]
+
+    asyncio.run(scenario())

@@ -155,6 +155,29 @@ def _validate_acyclic(document: WorkflowDocument) -> list[ValidationIssue]:
         for node in document.nodes
         if node.type in {"flow.loop_start", "flow.loop_end"}
     }
+    successors: dict[str, set[str]] = defaultdict(set)
+    for raw_edge in document.edges:
+        edge = Edge.model_validate(raw_edge)
+        successors[edge.source].add(edge.target)
+    for start in document.nodes:
+        if start.type != "flow.loop_start":
+            continue
+        pair = start.params.get("loop_id")
+        end = next(
+            (
+                node.id
+                for node in document.nodes
+                if node.type == "flow.loop_end" and node.params.get("loop_id") == pair
+            ),
+            None,
+        )
+        pending = list(successors[start.id])
+        while pending:
+            current = pending.pop()
+            if current == end or current in loop_nodes:
+                continue
+            loop_nodes[current] = f"loop:{pair}"
+            pending.extend(successors[current])
     adjacency: dict[str, set[str]] = defaultdict(set)
     nodes = {node.id for node in document.nodes}
     for raw_edge in document.edges:

@@ -91,6 +91,9 @@ class Node:
             port for group in self.dynamic_inputs for port in group.instantiate(params)
         )
 
+    def instantiated_outputs(self, params: dict[str, Any]) -> tuple[Port, ...]:
+        return self.outputs
+
     def manifest(self, params: dict[str, Any]) -> dict[str, Any]:
         return {
             "type": self.type,
@@ -102,7 +105,7 @@ class Node:
             "cache_policy": self.cache_policy.value,
             "tool_capability": self.tool_capability.value,
             "inputs": [port.__dict__ for port in self.instantiated_inputs(params)],
-            "outputs": [port.__dict__ for port in self.outputs],
+            "outputs": [port.__dict__ for port in self.instantiated_outputs(params)],
             "params_schema": self.params_schema,
             "ui_hints": self.ui_hints,
             "tool_exposed_params": list(self.tool_exposed_params),

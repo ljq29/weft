@@ -104,7 +104,7 @@ def test_real_worker_pool_parallel_arrow_isolation_and_shutdown(
 
 @pytest.mark.integration
 def test_worker_cooperative_cancellation(workflow_env: WorkflowEnvironment) -> None:
-    """US-EXE-08/AC-2: cancellation reaches executing user code in the worker subprocess."""
+    """US-EXE-08/AC-2, US-TBL-08/AC-7: user code receives worker cancellation."""
 
     async def scenario() -> None:
         pool = WorkerPool(workflow_env, "r_cancel", size=1)

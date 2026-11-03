@@ -1,0 +1,47 @@
+export type PortType =
+  "table" | "excel" | "variable" | "message" | "tool" | "flow";
+
+export interface PortDecl {
+  name: string;
+  kind: PortType;
+  description: string;
+}
+
+export interface NodeTypeDecl {
+  type: string;
+  name: string;
+  description: string;
+  category: string;
+  cache_policy: string;
+  inputs: PortDecl[];
+  outputs: PortDecl[];
+  params_schema: Record<string, unknown>;
+}
+
+export interface WorkflowNodeData extends Record<string, unknown> {
+  nodeId: string;
+  type: string;
+  name: string;
+  params: Record<string, unknown>;
+  inputs: PortDecl[];
+  outputs: PortDecl[];
+  comment: string;
+  status: string;
+  error?: { message: string; traceback?: string };
+  iteration?: { index: number; total: number };
+  workflowId?: string;
+}
+
+export interface WorkflowDocument {
+  schema_version: number;
+  revision: number;
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  modified_at: string;
+  settings: Record<string, unknown>;
+  variables: { name: string; type: string; value: unknown }[];
+  notes: unknown[];
+  viewport: { x: number; y: number; zoom: number };
+}

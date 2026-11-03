@@ -39,11 +39,17 @@ class NodeRegistry:
                 PortDeclaration(port.name, PortType(port.kind))
                 for port in node.instantiated_inputs(params or {})
             ],
-            outputs=[PortDeclaration(port.name, PortType(port.kind)) for port in node.outputs],
+            outputs=[
+                PortDeclaration(port.name, PortType(port.kind))
+                for port in node.instantiated_outputs(params or {})
+            ],
         )
 
     def declarations(self) -> dict[str, NodeDeclaration]:
         return {node.type: self.declaration(node.type) for node in self.all()}
+
+    def declarations_for(self, workflow: Any) -> dict[str, NodeDeclaration]:
+        return {node.type: self.declaration(node.type, node.params) for node in workflow.nodes}
 
     def load_directory(self, directory: Path) -> None:
         for path in sorted(directory.glob("*.py")):
@@ -68,12 +74,29 @@ def implementation_hash(node_type: type[Node]) -> str:
 
 def builtin_registry() -> NodeRegistry:
     from weft_worker.builtin import BUILTIN_NODES
+    from weft_worker.builtin_extra import BUILTIN_EXTRA_NODES
 
-    from weft.nodes.flow import IfNode, MergeNode, SwitchNode, TriggerNode, WaitNode
+    from weft.nodes.flow import (
+        IfNode,
+        LoopEndNode,
+        LoopStartNode,
+        MergeNode,
+        SwitchNode,
+        TriggerNode,
+        WaitNode,
+    )
 
     registry = NodeRegistry()
-    for node_type in (TriggerNode, IfNode, SwitchNode, MergeNode, WaitNode):
+    for node_type in (
+        TriggerNode,
+        IfNode,
+        SwitchNode,
+        MergeNode,
+        WaitNode,
+        LoopStartNode,
+        LoopEndNode,
+    ):
         registry.register(node_type)
-    for builtin_type in BUILTIN_NODES:
+    for builtin_type in (*BUILTIN_NODES, *BUILTIN_EXTRA_NODES):
         registry.register(builtin_type)
     return registry

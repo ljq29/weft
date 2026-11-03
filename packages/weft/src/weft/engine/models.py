@@ -91,6 +91,7 @@ class PreparedRun:
     workflow: WorkflowDocument
     registry: Any
     record: RunRecord
+    iteration_index: int | None = None
     cancel_event: asyncio.Event = field(default_factory=asyncio.Event)
     on_finished: Any = None
 

@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import os
 import secrets
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import polars as pl
 import pyarrow as pa
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi import Path as RoutePath
@@ -38,6 +40,11 @@ class CreateRequest(BaseModel):
 class RunRequest(BaseModel):
     scope: dict[str, Any] | None = None
     overrides: dict[str, Any] = {}
+
+
+class BrowseRequest(BaseModel):
+    path: str
+    dirs_only: bool = False
 
 
 def create_app(
@@ -71,7 +78,10 @@ def create_app(
         if request_host not in allowed_hosts:
             return error("FORBIDDEN", "Host 不受信任", 403)
         origin = request.headers.get("origin")
-        if origin and origin not in {f"http://{item}" for item in allowed_hosts}:
+        allowed_origins = {f"http://{item}" for item in allowed_hosts}
+        if dev_origin := os.environ.get("WEFT_DEV_ORIGIN"):
+            allowed_origins.add(dev_origin)
+        if origin and origin not in allowed_origins:
             return error("FORBIDDEN", "Origin 不受信任", 403)
         if request.url.path.startswith("/api") and not (
             request.url.path.startswith("/api/workflows/") and request.url.path.endswith("/trigger")
@@ -83,9 +93,23 @@ def create_app(
                 return error("UNAUTHORIZED", "令牌缺失或无效", 401)
         return await call_next(request)
 
+    @app.get("/health")
+    def health() -> dict[str, bool]:
+        return {"ok": True}
+
     @app.get("/api/system/version")
     def version() -> dict[str, Any]:
         return {"version": __version__, "schema_version": 1}
+
+    @app.post("/api/fs/browse")
+    def browse(request: BrowseRequest) -> dict[str, Any]:
+        path = Path(request.path).resolve()
+        entries = [
+            {"name": item.name, "path": str(item), "is_dir": item.is_dir()}
+            for item in sorted(path.iterdir())
+            if item.is_dir() or not request.dirs_only
+        ]
+        return {"path": str(path), "entries": entries}
 
     @app.get("/api/workflows")
     def workflows() -> list[dict[str, Any]]:
@@ -224,7 +248,28 @@ def create_app(
 
     @app.post("/api/workflows/{workflow_id}/nodes/{node_id}/column-hints")
     def column_hints(workflow_id: str, node_id: str) -> dict[str, list[str]]:
-        return {}
+        root = root_for(app, workflow_id)
+        document = WorkflowStore(root).load()
+        result: dict[str, list[str]] = {}
+        for edge in document.edges:
+            if edge.target != node_id:
+                continue
+            for path in sorted(root.glob(".runs/r_*/meta.json"), reverse=True):
+                meta = json.loads(path.read_text(encoding="utf-8"))
+                source = meta["nodes"].get(edge.source)
+                if not source:
+                    continue
+                reference = source["outputs"].get(edge.sourcePort)
+                if not reference or reference["kind"] != "table":
+                    continue
+                table_path = Path(reference["path"])
+                if not table_path.is_absolute():
+                    table_path = root / table_path
+                with pa.memory_map(str(table_path)) as stream:
+                    schema = pa.ipc.open_file(stream).schema
+                result[edge.targetPort] = schema.names
+                break
+        return result
 
     @app.get("/api/workflows/{workflow_id}/nodes/{node_id}/status")
     def node_status(workflow_id: str, node_id: str) -> dict[str, Any]:
@@ -241,9 +286,10 @@ def create_app(
         return {"status": "configured", "from_cache": False, "last_run_id": None}
 
     @app.get("/api/workflows/{workflow_id}/validate")
-    def validate(workflow_id: str) -> Any:
-        document = WorkflowStore(root_for(app, workflow_id)).load()
-        report = validate_workflow(document, app.state.registry.declarations())
+    @app.post("/api/workflows/{workflow_id}/validate")
+    def validate(workflow_id: str, document: WorkflowDocument | None = None) -> Any:
+        document = document or WorkflowStore(root_for(app, workflow_id)).load()
+        report = validate_workflow(document, app.state.registry.declarations_for(document))
         return {
             "errors": [issue.__dict__ for issue in report.errors],
             "warnings": [issue.__dict__ for issue in report.warnings],
@@ -322,6 +368,24 @@ def create_app(
         CacheManager(root_for(app, workflow_id)).reset(node_id)
         return {"reset": True}
 
+    @app.get("/api/workflows/{workflow_id}/nodes/{node_id}/ports/{port}")
+    def current_port_view(
+        workflow_id: str,
+        node_id: str,
+        port_name: str = RoutePath(alias="port"),
+        offset: int = 0,
+        limit: int = 100,
+        sort_by: str = "",
+        desc: bool = False,
+    ) -> Any:
+        root = root_for(app, workflow_id)
+        for path in sorted(root.glob(".runs/r_*/meta.json"), reverse=True):
+            meta = json.loads(path.read_text(encoding="utf-8"))
+            reference = meta["nodes"].get(node_id, {}).get("outputs", {}).get(port_name)
+            if reference:
+                return port_response(reference, root, offset, limit, sort_by, desc)
+        return error("PORT_NOT_EXECUTED", "节点未执行", 404)
+
     @app.get("/api/runs/{run_id}/nodes/{node_id}/ports/{port}")
     def port_view(
         run_id: str,
@@ -329,24 +393,14 @@ def create_app(
         port_name: str = RoutePath(alias="port"),
         offset: int = 0,
         limit: int = 100,
+        sort_by: str = "",
+        desc: bool = False,
     ) -> Any:
         record = app.state.engine.runs[run_id].record.nodes[node_id]
         if port_name not in record.outputs:
             return error("PORT_NOT_EXECUTED", "节点未执行", 404)
-        value = record.outputs[port_name]
-        if value.kind != "table":
-            return value.inline
-        path = run_root(app, run_id) / value.path if not value.path.is_absolute() else value.path
-        with pa.memory_map(str(path)) as source:
-            table = pa.ipc.open_file(source).read_all().slice(offset, limit)
-        buffer = io.BytesIO()
-        with pa.ipc.new_stream(buffer, table.schema) as writer:
-            writer.write_table(table)
-        return StreamingResponse(
-            iter([buffer.getvalue()]),
-            media_type="application/vnd.apache.arrow.stream",
-            headers={"X-Weft-Total-Rows": str(record.outputs[port_name].rows)},
-        )
+        value = record.outputs[port_name].model_dump(mode="json")
+        return port_response(value, run_root(app, run_id), offset, limit, sort_by, desc)
 
     @app.websocket("/api/ws")
     async def websocket(socket: WebSocket) -> None:
@@ -375,6 +429,37 @@ def create_app(
             app.state.bus.unsubscribe(queue)
 
     return app
+
+
+def port_response(
+    value: dict[str, Any],
+    root: Path,
+    offset: int,
+    limit: int,
+    sort_by: str,
+    desc: bool,
+) -> Any:
+    if value["kind"] != "table":
+        return value.get("inline")
+    path = Path(value["path"])
+    if not path.is_absolute():
+        path = root / path
+    with pa.memory_map(str(path)) as source:
+        table = pa.ipc.open_file(source).read_all()
+    if sort_by:
+        frame = pl.from_arrow(table)
+        if not isinstance(frame, pl.DataFrame):
+            raise TypeError("Table preview requires a DataFrame")
+        table = frame.sort(sort_by, descending=desc, maintain_order=True).to_arrow()
+    table = table.slice(offset, limit)
+    buffer = io.BytesIO()
+    with pa.ipc.new_stream(buffer, table.schema) as writer:
+        writer.write_table(table)
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="application/vnd.apache.arrow.stream",
+        headers={"X-Weft-Total-Rows": str(value["rows"])},
+    )
 
 
 def merge_patch(document: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:

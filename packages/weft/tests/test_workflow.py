@@ -188,7 +188,7 @@ def test_edges_must_reference_existing_nodes_and_ports() -> None:
 
 
 def test_port_compatibility_and_single_input_cardinality() -> None:
-    """T1.1: incompatible ports and multiple ordinary incoming edges are errors."""
+    """US-DES-03/AC-2,3: incompatible ports and multiple ordinary incoming edges are errors."""
     document = WorkflowDocument.model_validate(document_dict())
     document.edges = [
         {
@@ -243,7 +243,7 @@ def test_exactly_one_trigger_and_no_shadow_trigger() -> None:
 
 
 def test_loop_pairing_and_cycle_validation() -> None:
-    """T1.1: unmatched Loop nodes and residual cycles are validation errors."""
+    """US-DES-03/AC-4, US-EXE-11/AC-4: reject unmatched loops and residual cycles."""
     document = WorkflowDocument.model_validate(document_dict())
     document.nodes[1].type = "flow.loop_start"
     report = validate_workflow(document, declarations())
@@ -301,3 +301,30 @@ def test_dynamic_ports_have_an_execution_manifest() -> None:
     )
     assert [port.name for port in manifest.ports] == ["in_1", "in_2", "out"]
     assert manifest.node_id == "n_00000002"
+
+
+def test_dynamic_named_ports_keep_single_input_cardinality() -> None:
+    """US-DES-03/AC-6: dynamic ports stay single-input and Merge has named partial inputs."""
+    document = WorkflowDocument.model_validate(document_dict())
+    document.nodes[1].type = "table.concatenate"
+    document.edges = [
+        {
+            "id": f"e_{index:08x}",
+            "source": "n_00000001",
+            "sourcePort": "table",
+            "target": "n_00000002",
+            "targetPort": "in_1",
+            "order": index - 1,
+        }
+        for index in range(1, 3)
+    ]
+    dynamic = declarations()
+    dynamic["table.concatenate"] = NodeDeclaration(
+        node_type="table.concatenate",
+        inputs=[PortDeclaration("in_1", "table"), PortDeclaration("in_2", "table")],
+    )
+    report = validate_workflow(document, dynamic)
+    assert "PORT_CARDINALITY" in {issue.code for issue in report.errors}
+    merge = dynamic["flow.merge"]
+    assert [port.name for port in merge.inputs] == ["left", "right"]
+    assert merge.accepts_partial_inputs is True

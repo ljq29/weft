@@ -143,3 +143,21 @@ def test_execute_to_from_single_and_reset(tmp_path: Path) -> None:
         assert not (tmp_path / ".runs" / "cache").exists()
 
     asyncio.run(scenario())
+
+
+def test_missing_flow_variable_fails_node(tmp_path: Path) -> None:
+    """US-DES-06/AC-4: a missing variable fails the consuming node with its name."""
+
+    async def scenario() -> None:
+        document = make_workflow(
+            [
+                node("n_00000001", "flow.trigger", {}),
+                node("n_00000002", "flow.if", {"condition": {"$var": "missing"}}),
+            ]
+        )
+        engine = Engine()
+        record = await engine.run(engine.prepare(document, tmp_path, builtin_registry()))
+        assert record.nodes["n_00000002"].status == "failed"
+        assert record.nodes["n_00000002"].error["message"] == "Flow variable 'missing' not found"
+
+    asyncio.run(scenario())

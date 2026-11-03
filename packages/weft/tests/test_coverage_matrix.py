@@ -66,3 +66,16 @@ def test_test_tags_expand_comma_separated_acceptance_criteria() -> None:
     report = coverage["evaluate_coverage"](stories, roadmap, tests)
     assert not report.missing
     assert not report.unknown
+
+
+def test_p0_story_range_excludes_p1_acceptance_criteria() -> None:
+    """T0.1: a roadmap card explicitly limited to P0 does not pull in later P1 work."""
+    stories = """### US-TBL-05 Example [P0/P1] [unit]
+
+- AC-1 P0 case.
+- AC-2 [P1] Later case.
+"""
+    roadmap = "- [x] **T2.5 Example**\n【验收】US-TBL-03..05 的全部 P0 AC\n"
+    report = coverage["evaluate_coverage"](stories, roadmap, [])
+    assert report.missing["T2.5"] == frozenset({"US-TBL-05/AC-1"})
+    assert "US-TBL-05/AC-2" not in report.missing["T2.5"]

@@ -13,6 +13,8 @@ htmlcov/
 node_modules/
 dist/
 coverage/
+e2e/test-results/
+e2e/playwright-report/
 
 # Weft runtime
 .runs/

@@ -17,7 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 def test_cli_csv_closed_loop_cache_and_variable_override(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """US-EXE-01/AC-1, US-TRG-01/AC-1, US-TRG-02/AC-2: real CLI runs the CSV closed loop."""
+    """US-EXE-01/AC-1, US-TRG-01/AC-1, US-TRG-02/AC-2, US-DES-06/AC-3: real CSV CLI."""
     root = tmp_path / "minimal_csv.weft"
     monkeypatch.setenv("WEFT_CONFIG_DIR", str(tmp_path / "config"))
     (root / "nodes").mkdir(parents=True)
@@ -44,12 +44,12 @@ weft-sdk = {{ path = "{(PROJECT_ROOT / "packages/weft-sdk").as_posix()}" }}
         ("n_00000005", "table.write_csv", {"path": "out/result.csv"}),
     ]
     edges = []
-    for index in range(1, len(nodes)):
+    for index in range(2, len(nodes)):
         edges.append(
             {
                 "id": f"e_{index:08x}",
                 "source": nodes[index - 1][0],
-                "sourcePort": "out" if index > 1 else "variable",
+                "sourcePort": "out",
                 "target": nodes[index][0],
                 "targetPort": "in",
                 "order": 0,

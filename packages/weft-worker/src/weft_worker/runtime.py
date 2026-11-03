@@ -31,8 +31,11 @@ class WorkerRuntime:
         self.root = Path(params["root"])
         self.run_id = params["run_id"]
         from weft_worker.builtin import BUILTIN_NODES
+        from weft_worker.builtin_extra import BUILTIN_EXTRA_NODES
 
-        self.nodes = {node.type: node for node in (item() for item in BUILTIN_NODES)}
+        self.nodes = {
+            node.type: node for node in (item() for item in (*BUILTIN_NODES, *BUILTIN_EXTRA_NODES))
+        }
         for path in sorted((self.root / "nodes").glob("*.py")):
             spec = importlib.util.spec_from_file_location(f"weft_user_{path.stem}", path)
             if spec is None or spec.loader is None:

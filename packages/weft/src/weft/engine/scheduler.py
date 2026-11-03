@@ -27,10 +27,33 @@ from weft.engine.cache_key import (
     hash_file,
 )
 from weft.engine.errors import UnconfiguredNodesError
+from weft.engine.loops import execute_loop, region
 from weft.engine.models import NodeRecord, NodeStatus, PreparedRun, RunRecord, now
 from weft.workflow.models import Edge, WorkflowDocument
 from weft.workflow.models import Node as WorkflowNode
+from weft.workflow.validation import validate_workflow
 from weft.workflow.values import ValueRef
+
+
+def schema_with_variables(schema: dict[str, Any]) -> dict[str, Any]:
+    original = dict(schema)
+    if isinstance(original.get("properties"), dict):
+        original["properties"] = {
+            key: schema_with_variables(value) for key, value in original["properties"].items()
+        }
+    if isinstance(original.get("items"), dict):
+        original["items"] = schema_with_variables(original["items"])
+    return {
+        "anyOf": [
+            original,
+            {
+                "type": "object",
+                "properties": {"$var": {"type": "string"}},
+                "required": ["$var"],
+                "additionalProperties": False,
+            },
+        ]
+    }
 
 
 class Engine:
@@ -88,9 +111,14 @@ class Engine:
         record.status = "running"
         record.started_at = now()
         self._write_meta(prepared)
+        self._event(prepared, "run.started", "", {"status": "running"})
         predecessors = self._predecessors(prepared.workflow)
         scope_nodes = self._scope_nodes(prepared.workflow, record.scope)
         remaining = set(record.nodes)
+        for loop_start in prepared.workflow.nodes:
+            if loop_start.type == "flow.loop_start":
+                body, end_id = region(prepared.workflow, loop_start)
+                remaining.difference_update(body | {end_id})
         inflight: dict[str, asyncio.Task[None]] = {}
         try:
             while remaining or inflight:
@@ -98,7 +126,17 @@ class Engine:
                     node_id
                     for node_id in remaining
                     if all(
-                        predecessor not in remaining and predecessor not in inflight
+                        predecessor not in remaining
+                        and predecessor not in inflight
+                        and record.nodes[predecessor].status
+                        in {
+                            "executed",
+                            "failed",
+                            "cancelled",
+                            "out_of_scope",
+                            "skipped_branch",
+                            "skipped_upstream",
+                        }
                         for predecessor in predecessors[node_id]
                     )
                 ]
@@ -146,6 +184,7 @@ class Engine:
         pool = self.worker_pools.pop(prepared.record.run_id, None)
         if pool is not None:
             pool.close()
+        self._event(prepared, "run.finished", "", {"status": record.status, "usage": record.usage})
         self._write_meta(prepared)
         record.finished.set()
         if prepared.on_finished is not None:
@@ -164,6 +203,7 @@ class Engine:
         declaration = prepared.registry.get(node.type)
         cache = CacheManager(prepared.root)
         cache_key: str | None = None
+        inputs: dict[str, Any] = {}
         try:
             inputs, variables = self._inputs(prepared, node_id)
             params = self._resolve_params(node.params, variables)
@@ -191,7 +231,10 @@ class Engine:
                 }
                 activated = None
             else:
-                if declaration.lane == "trusted_worker" and self.worker_pool_factory is not None:
+                if node.type == "flow.loop_start":
+                    await execute_loop(self, prepared, node)
+                    result = {}
+                elif declaration.lane == "trusted_worker" and self.worker_pool_factory is not None:
                     pool = self.worker_pools.get(prepared.record.run_id)
                     if pool is None:
                         pool = self.worker_pool_factory(prepared.root, prepared.record.run_id)
@@ -219,6 +262,8 @@ class Engine:
                     list(activated_raw) if isinstance(activated_raw, (list, tuple)) else None
                 )
             output_dir = prepared.root / ".runs" / prepared.record.run_id / "outputs" / node_id
+            if prepared.iteration_index is not None:
+                output_dir = output_dir / f"iteration-{prepared.iteration_index}"
             for port, value in outputs.items():
                 reference: ValueRef
                 if isinstance(value, ValueRef):
@@ -280,6 +325,12 @@ class Engine:
                 "type": type(error).__name__,
                 "message": str(error),
                 "traceback": traceback.format_exc(),
+                "input_snapshot": {
+                    port: value.head(20).to_dicts()
+                    if isinstance(value, pl.DataFrame)
+                    else repr(value)
+                    for port, value in inputs.items()
+                },
             }
             prepared.record.status = "failed"
             self._event(prepared, "node.failed", node_id, {"message": str(error)})
@@ -330,7 +381,7 @@ class Engine:
                 tuple(external_hashes),
                 user_code_hash,
                 hash_file(lock) if lock.exists() else "",
-                None,
+                prepared.iteration_index,
             )
         )
 
@@ -409,7 +460,7 @@ class Engine:
             if set(value) == {"$var"}:
                 name = value["$var"]
                 if name not in variables:
-                    raise KeyError(f"Flow variable '{name}' not found")
+                    raise ValueError(f"Flow variable '{name}' not found")
                 return variables[name]
             return {key: self._resolve_params(item, variables) for key, item in value.items()}
         if isinstance(value, list):
@@ -440,12 +491,14 @@ class Engine:
     def _precheck(
         self, workflow: WorkflowDocument, registry: Any, variables: dict[str, Any]
     ) -> None:
-        errors = []
+        errors = [
+            {"node_id": issue.node_id, "message": issue.message}
+            for issue in validate_workflow(workflow, registry.declarations_for(workflow)).errors
+        ]
         for node in workflow.nodes:
             try:
                 declaration = registry.get(node.type)
-                params = self._resolve_params(node.params, variables)
-                jsonschema.validate(params, declaration.params_schema)
+                jsonschema.validate(node.params, schema_with_variables(declaration.params_schema))
             except Exception as error:
                 errors.append({"node_id": node.id, "message": str(error)})
         if errors:
