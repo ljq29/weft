@@ -6,10 +6,10 @@
 | --------| --------------------------------|
 |版本|v0.1（草稿）|
 |状态|待确认|
-|上游|`02-user-stories.md`​、​`04-data-model.md`|
+|上游|`02-user-stories.md`、`04-data-model.md`|
 |消费方|前端 UI、CLI、外部 HTTP 触发方|
 
-约定：前缀 ​`/api`​；请求/响应均为 ​`application/json`（除注明 Arrow 流处）；时间为 ISO 8601 带时区；错误统一结构：
+约定：前缀 `/api`；请求/响应均为 `application/json`（除注明 Arrow 流处）；时间为 ISO 8601 带时区；错误统一结构：
 
 ```jsonc
 // 非 2xx 响应体
@@ -20,12 +20,15 @@
 | -----------| ------------------------------------------------------------|
 |400|参数/校验错误（含受保护文件 apply）|
 |401|token 缺失或错误|
+|403|缺少 `X-Weft-Client: ui`，或 Host/Origin 校验失败；令牌本身缺失/无效仍为 401|
 |404|资源不存在（HTTP 触发未启用也返回 404，见 US-TRG-06 AC-3）|
-|409|状态冲突（运行期改图、revision/CAS 不一致、`CHANGE_CONFLICT`、队列满）；重复 apply 为幂等成功而非冲突|
+|409|状态冲突（运行期改图、revision/CAS 不一致、队列满）；批量 apply 的逐项 `CHANGE_CONFLICT` 通过 200 结果返回，重复 apply 幂等|
 |422|workflow.json schema 校验失败（detail 含逐条错误）|
 |202|异步接受（触发运行）|
 
-鉴权：监听 ​`127.0.0.1`​ 时除 ​`/trigger`​ 外免鉴权；监听非本机时全部要求 ​`Authorization: Bearer <global_token>`​（US-SBX-09）。图结构修改接口要求头 ​`X-Weft-Client: ui`（US-AGT-11 AC-2）。
+鉴权与浏览器边界：服务启动时生成随机 UI 会话令牌，自动打开的启动 URL 携带该令牌；前端仅将其保存在 `sessionStorage`，REST 使用 `Authorization: Bearer <ui_session_token>`，WS 连接后先发送 `{"op":"authenticate","token":"..."}`，认证成功才能订阅。CLI 从仅当前用户可读的会话文件取得令牌。监听 `127.0.0.1` 时，除使用工作流 Bearer token 的 `/trigger` 外，其余 `/api/*` 均要求 UI 会话令牌；监听非本机时改用 `Authorization: Bearer <global_token>`（US-SBX-09）。
+
+所有请求校验 Host 是否属于配置的本机监听地址；浏览器请求还须校验 Origin 为当前 UI 同源地址，失败返回 403。无 Origin 的非浏览器请求必须持有对应 Bearer token。图结构修改接口还要求头 `X-Weft-Client: ui`；该头只用于区分 UI 改图操作，不替代鉴权（US-AGT-11 AC-2）。
 
 ---
 
@@ -33,32 +36,32 @@
 
 |方法|路径|说明|
 | --------| ------| -----------------------------------------------------------------------------------|
-|GET|`/api/workflows`|已打开的工作流列表：​`[{id, name, path, dirty, env_status}]`|
-|POST|`/api/workflows`|新建：​`{name, parent_dir}`​ → 201 ​`{id, path}`；同名目录存在 → 409|
-|POST|`/api/workflows/open`|打开已有目录：​`{path}`​ → ​`{id, env_status: ok\|syncing\|error}`​；触发 ​`uv sync`（US-PKG-02）|
-|GET|`/api/workflows/{id}`|返回完整 ​`workflow.json` 文档|
+|GET|`/api/workflows`|已打开的工作流列表：`[{id, name, path, dirty, env_status}]`|
+|POST|`/api/workflows`|新建：`{name, parent_dir}` → 201 `{id, path}`；同名目录存在 → 409|
+|POST|`/api/workflows/open`|打开已有目录：`{path}` → `{id, env_status: ok\|syncing\|error}`；触发 `uv sync`（US-PKG-02）|
+|GET|`/api/workflows/{id}`|返回完整 `workflow.json` 文档|
 |PUT|`/api/workflows/{id}`|整文档保存（前端自动保存用），携带读取时的 `revision`；成功递增 revision，CAS 冲突或 Run 活跃时改图结构 → 409；校验失败 422|
 |PATCH|`/api/workflows/{id}`|局部更新（JSON Merge Patch + 读取时 `revision`）：位置、注释等非结构字段在 Run 活跃时允许，仅影响下一 Run；CAS 冲突 → 409|
-|DELETE|`/api/workflows/{id}`|从服务关闭（不删目录）；​`?purge_cache=true` 顺带清缓存|
-|GET|`/api/workflows/{id}/validate`|返回校验结果 ​`{errors: [...], warnings: [...]}`​（规则见 ​`04-data-model.md` §2）|
-|GET|`/api/workflows/{id}/env`|环境状态：​`{status, python, uv_output}`|
-|POST|`/api/workflows/{id}/env/sync`|手动触发 ​`uv sync`​；进度经 WS ​`env.progress`|
+|DELETE|`/api/workflows/{id}`|从服务关闭（不删目录）；`?purge_cache=true` 顺带清缓存|
+|GET|`/api/workflows/{id}/validate`|返回校验结果 `{errors: [...], warnings: [...]}`（规则见 `04-data-model.md` §2）|
+|GET|`/api/workflows/{id}/env`|环境状态：`{status, python, uv_output}`|
+|POST|`/api/workflows/{id}/env/sync`|手动触发 `uv sync`；进度经 WS `env.progress`|
 
 ## 2. 节点类型
 
 |方法|路径|说明|
 | ------| ------| --------------------------------------------------------------------------|
-|GET|`/api/nodes/types`|全部可用节点类型（内置 + 当前工作流 ​`user.*`​）：​`[{type, node_version, category, name, description, lane, inputs, outputs, params_schema, ui_hints}]`（US-DES-04 AC-4）|
+|GET|`/api/nodes/types`|全部可用节点类型（内置 + 当前工作流 `user.*`）：`[{type, node_version, category, name, description, lane, inputs, outputs, params_schema, ui_hints}]`（US-DES-04 AC-4）|
 |GET|`/api/nodes/types/{type}`|单个类型详情|
-|POST|`/api/workflows/{id}/nodes/{node_id}/column-hints`|返回该节点各输入端口上游缓存的列名（表单下拉用）：​`{port: [col, ...]}`；上游未执行 → 空|
+|POST|`/api/workflows/{id}/nodes/{node_id}/column-hints`|返回该节点各输入端口上游缓存的列名（表单下拉用）：`{port: [col, ...]}`；上游未执行 → 空|
 
 ## 3. 运行
 
 |方法|路径|说明|
 | ------| ------| ------------------------------------------------------------------|
-|POST|`/api/workflows/{id}/runs`|发起运行：​`{scope: {kind: all\|to_node\|from_node\|single, node_id?}, overrides?: {k: v}}`​ → 202 ​`{run_id, queued: bool}`；未配置节点存在 → 400（detail 列出）|
+|POST|`/api/workflows/{id}/runs`|发起运行：`{scope: {kind: all\|to_node\|from_node\|single, node_id?}, overrides?: {k: v}}`。立即执行或入队 → 202 `{run_id, disposition: started\|queued}`；`drop` 策略丢弃 → 200 `{run_id: null, disposition: dropped}` 并记录日志；队列满 → 409 `RUN_QUEUE_FULL`。未配置节点存在 → 400（detail 列出）|
 |GET|`/api/workflows/{id}/runs?status=&limit=20`|运行历史（US-EXE-09）|
-|GET|`/api/runs/{run_id}`|Run 详情 = ​`meta.json`​ 内容（​`04-data-model.md` §6）|
+|GET|`/api/runs/{run_id}`|Run 详情 = `meta.json` 内容（`04-data-model.md` §6）|
 |POST|`/api/runs/{run_id}/cancel`|取消 → 202；已终态 → 409|
 |POST|`/api/runs/{run_id}/confirm`|`{request_id, decision: approve\|reject, modified_args?}`（US-AGT-12）|
 |GET|`/api/runs/{run_id}/log?offset=0&limit=500&level=&node_id=`|分页日志|
@@ -78,9 +81,9 @@
 |方法|路径|说明|
 | ------| ------| ------------------------------------------------------------------------------------------------------|
 |GET|`/api/workflows/{id}/nodes/{node_id}/ports/{port}`|读取最近一次有效执行的端口输出。Table：`?offset=0&limit=100&sort_by=&desc=` → `Content-Type: application/vnd.apache.arrow.stream`（切片后的 Arrow IPC）+ 头 `X-Weft-Total-Rows`；其他类型 → JSON|
-|GET|`/api/runs/{run_id}/nodes/{node_id}/ports/{port}`|同上，但严格读取 `.runs/<run_id>/outputs/` 与 `meta.json` 中的 ValueRef；不读临时 IPC 或当前全局缓存|
+|GET|`/api/runs/{run_id}/nodes/{node_id}/ports/{port}`|同上，但严格读取 `meta.json` 中的 ValueRef：内联小 JSON 直接读取，文件值只从 `.runs/<run_id>/outputs/` 读取；不读临时 IPC 或当前全局缓存|
 
-未执行 → 404 ​`PORT_NOT_EXECUTED`（US-EXE-06 AC-5）。
+未执行 → 404 `PORT_NOT_EXECUTED`（US-EXE-06 AC-5）。v1 不预建排序索引：未指定 `sort_by` 时按 Arrow record batch 定位分页；指定排序时允许全量读取并稳定排序，响应仍受分页大小限制。该成本必须在 UI 与性能记录中说明，不把排序分页宣称为常量时间操作。
 
 ## 6. 沙箱变更审批
 
@@ -88,15 +91,15 @@
 | ------| ------| ------------------------------------------------------------------------------------------|
 |GET|`/api/runs/{run_id}/changes`|`changes.json` 内容（`04-data-model.md` §8），含 `audit_complete`、基线哈希、重命名与逐项状态|
 |GET|`/api/runs/{run_id}/changes/diff?path=`|文本文件 unified diff：`{old: str\|null, new: str\|null, diff: str}`；二进制 → 400|
-|POST|`/api/runs/{run_id}/changes/apply`|`{paths: [...], overwrite_conflicts?: bool}` → `{results: [{path, status, error?}]}`；含 protected 路径整体 400。apply 前重算目标哈希，变化则该项 `CHANGE_CONFLICT`（409）；只有用户查看新 diff 后显式 `overwrite_conflicts: true` 才覆盖。普通路径逐项返回，重复 apply 幂等|
+|POST|`/api/runs/{run_id}/changes/apply`|`{paths: [...], overwrite_conflicts?: bool}`。请求已处理 → 200 `{results: [{path, status: applied\|conflict\|failed, error?}]}`，部分成功与部分冲突可以同时存在；含 protected 路径等整体请求错误 → 400。apply 前重算目标哈希，变化则该项 `status: conflict, error: {code: CHANGE_CONFLICT}`；只有用户查看新 diff 后显式 `overwrite_conflicts: true` 才覆盖。重复 apply 幂等|
 |POST|`/api/runs/{run_id}/changes/discard`|丢弃全部未应用变更；已应用项保持已应用记录|
 
 ## 7. 触发
 
 |方法|路径|说明|
 | ------| ------| --------------------------------------------------------------------------|
-|POST|`/api/workflows/{id}/trigger`|外部 HTTP 触发（US-TRG-06）。`Authorization: Bearer <workflow_token>`；body 任意 JSON；`?wait=true` 同步等待 → `{run_id, status, outputs}`，未执行 P0 `HTTP Response` 节点时 outputs 为 `{}`|
-|POST|`/api/workflows/{id}/trigger/token`|生成/轮换 workflow token（仅 UI），返回明文一次|
+|POST|`/api/workflows/{id}/trigger`|外部 HTTP 触发（US-TRG-06）。`Authorization: Bearer <workflow_token>`；body 任意 JSON。立即执行/入队 → 202 `{run_id, disposition}`，drop → 200 `{run_id: null, disposition: dropped}`，队列满 → 409。`?wait=true` 同步等待至多 `trigger.http_wait_timeout_s` → `{run_id, status, outputs}`；唯一已执行的 `HTTP Response` 节点提供 `outputs: {status_code, headers, body}`，未执行时 outputs 为 `{}`；同一 Run 执行多个响应节点则运行失败|
+|POST|`/api/workflows/{id}/trigger/token`|生成/轮换 workflow token（需 UI 会话鉴权），返回明文一次|
 |GET|`/api/workflows/{id}/triggers/status`|各来源状态：`{manual: {enabled}, schedule: {enabled, next_fire_times: [...]}, watch: {enabled, health: ok\|error, error?}, ...}`；TriggerManager 从 Trigger 节点 params 派生运行视图|
 
 ## 8. 聊天
@@ -105,7 +108,7 @@
 
 |方法|路径|说明|
 | ------| ------| ------------------------------------------------------------------------------------|
-|POST|`/api/workflows/{id}/chat`|`{message, session_id?}` → 202 `{run_id, session_id}`；未启用 chat 触发 → 400 `CHAT_DISABLED`（面板据此显示提示，US-TRG-03 AC-2）|
+|POST|`/api/workflows/{id}/chat`|`{message, session_id?}` → 202 `{run_id, session_id, disposition: started\|queued}`；drop → 200 `{run_id: null, session_id, disposition: dropped}`；队列满 → 409。未启用 chat 触发 → 400 `CHAT_DISABLED`（面板据此显示提示，US-TRG-03 AC-2）|
 |GET|`/api/workflows/{id}/chat/{session_id}`|读取 `.runs/chat/<session_id>.jsonl` 的 UI 会话记录（含历次 Run 的 Chat Output），不等于 P1 Memory 节点数据|
 |POST|`/api/workflows/{id}/chat/{session_id}/clear`|清空 UI 会话记录；是否同时清空 P1 Memory 由独立 `clear_memory: bool`（默认 false）控制|
 
@@ -121,18 +124,19 @@
 
 |方法|路径|说明|
 | -----------| ------| ----------------------------------------------------------|
-|GET / PUT|`/api/settings`|用户级配置（api_key 读取时掩码；PUT 时 ​`"***"` 表示不变更）|
+|GET / PUT|`/api/settings`|用户级配置（api_key 读取时掩码；PUT 时 `"***"` 表示不变更）|
 |POST|`/api/settings/llm/{name}/test`|测试连接（US-AGT-01 AC-2）|
 |GET|`/api/system/doctor`|`weft doctor` 的 JSON 输出|
 |GET|`/api/system/version`|`{version, schema_version}`|
-|POST|`/api/fs/browse`|服务端文件选择器：​`{path, dirs_only}` → 目录列表（表单路径选择用）|
+|POST|`/api/fs/browse`|服务端文件选择器：`{path, dirs_only}` → 目录列表（表单路径选择用）|
 
 ## 11. WebSocket
 
-`WS /api/ws`（单连接多路复用，连接后客户端发送订阅）：
+`WS /api/ws`（单连接多路复用，连接后先认证再订阅）：
 
 ```jsonc
 // 客户端 → 服务端
+{"op": "authenticate", "token": "<ui_session_token>"}
 {"op": "subscribe",   "topics": ["workflow:wf_8f3a", "run:r_2025..."]}
 {"op": "unsubscribe", "topics": [...]}
 
@@ -140,15 +144,15 @@
 {"topic": "run:r_...", "event": "node.started", "ts": "...", "data": {...}}
 ```
 
-事件目录（​`data` 字段）：
+事件目录（`data` 字段）：
 
 |event|data|对应 AC|
 | -------------| --------------------------------------------------------------| ----------------|
 |`run.started`|`{run_id, scope}`|US-EXE-05|
 |`run.finished`|`{run_id, status, usage}`||
-|`run.queued`​ / ​`run.dequeued`|`{run_id, position}`|US-EXE-13|
-|`node.status`|`{node_id, status}`（configured/running/executed/failed/skipped/cancelled）|US-DES-05|
-|`node.started`​ / ​`node.finished`|`{node_id, duration_ms?, from_cache?}`||
+|`run.queued` / `run.dequeued`|`{run_id, position}`|US-EXE-13|
+|`node.status`|`{node_id, status}`（unconfigured/configured/running/executed/failed/skipped/cancelled）|US-DES-05|
+|`node.started` / `node.finished`|`{node_id, duration_ms?, from_cache?}`||
 |`node.failed`|`{node_id, error: {type, message}}`（完整 traceback 走 REST）|US-EXE-07|
 |`node.progress`|`{node_id, fraction, message?}`||
 |`node.log`|`{node_id, level, message}`||
@@ -170,5 +174,3 @@
 - 0.x 阶段 REST/WS 允许破坏性变更；1.0 起只新增端点、事件和可选字段，删除、重命名或改变语义需升主版本。
 - `schema_version` 只描述工作流数据格式与迁移，不是 API 兼容性的替代品；`/api/system/version` 同时返回服务版本与 schema_version。
 - CLI 的 `--json` 输出结构与对应 REST 响应一致。
-
-‍

@@ -34,5 +34,5 @@ pnpm -C frontend dev             # 前端 dev server
 3. Engine 只暴露执行接口，trigger/agent 在上层调用，由组合根注入；Engine 不 import 具体 triggers/agent。`weft-sdk` 不依赖 `weft`/`weft-worker`，主服务与 Worker 同版本，禁止主机 `PYTHONPATH` 隐式复用 Worker。
 4. COM 只在 ExcelWorker 线程；沙箱/COM/路径相关代码必须带 Fake 实现与契约测试，但 Fake/Linux 绿灯不能替代 win_real。
 5. 业务规则只在后端。副作用节点不得缓存执行；LLM 与实时 Excel Read 禁止跨 Run 复用；NodeTool 仅开放显式授权节点，原始 LLM key 只能由沙箱外代理读取。
-6. 行为变更必须同步对应文档。`NoneSandbox` 语义仍待讨论，不擅自替换；`X-Weft-Client: ui` 暂不作为权限控制优化对象。
+6. 行为变更必须同步对应文档。`NoneSandbox` 仅提供受控影子目录文件工具，禁止任意 bash/pi；本机 UI/API/WS 使用随机会话令牌并校验 Host/Origin，`X-Weft-Client: ui` 不替代鉴权。
 7. 测试 docstring 首行标注 `US-XXX-NN/AC-M`；不写无断言凑数测试，不覆盖不存在的 AC 引用。

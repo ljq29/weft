@@ -26,5 +26,5 @@ Weft 是本地优先的 Windows 可视化工作流工具，融合表格数据流
 
 - P0 表示完整 v1 必须交付，不等于首个公开版全部交付。M0–M3 为首个公开 MVP，M4–M6 为后续预览，M7 才形成完整 v1。
 - Sandboxie、Excel 多实例/COM 超时、pi 本地 LLM 代理等关键假设必须先通过 M0 Windows 真机 spike。
-- `NoneSandbox` 的隔离语义仍待讨论；`X-Weft-Client: ui` 当前只是既定接口约束，暂不作为权限控制优化对象。
+- `NoneSandbox` 仅提供受控影子目录文件工具，禁止任意 bash/pi；本机 UI/API/WS 使用随机会话令牌并校验 Host/Origin，`X-Weft-Client: ui` 不替代鉴权。
 - 所有任务卡默认未完成，只有 `- [x]` 表示完成。Fake/Linux 测试不能替代 Windows 真机 `win_real` 验证。

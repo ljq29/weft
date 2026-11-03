@@ -7,7 +7,7 @@
 |版本|v0.1（草稿）|
 |状态|待确认|
 |范围|v1（Windows 本地单机版）|
-|关联文档|`03-architecture.md`​、​`04-data-model.md`​、​`09-nodes-v1.md`​（规划）、​`07-roadmap.md`|
+|关联文档|`03-architecture.md`、`04-data-model.md`、`09-nodes-v1.md`（规划）、`07-roadmap.md`|
 
 ---
 
@@ -41,7 +41,7 @@
 
 **一句话**：本地优先的可视化工作流工具，融合 KNIME 式表格/文件处理、Excel 实时联动、以及带沙箱的 AI agent 节点。
 
-**名称**：Weft（纬线）。经线是固定的数据与 Excel，纬线（工作流）穿梭其间织出结果。CLI ​`weft`​，Python 包 ​`weft`​，工作流目录后缀 ​`.weft`。正式发布前需核查 PyPI 与商标。
+**名称**：Weft（纬线）。经线是固定的数据与 Excel，纬线（工作流）穿梭其间织出结果。CLI `weft`，Python 包 `weft`，工作流目录后缀 `.weft`。正式发布前需核查 PyPI 与商标。
 
 **产品形态（v1）** ：本机运行的 Python 服务 + 浏览器访问的 Web UI。为桌面壳（Tauri / pywebview）预留，但 v1 不做。
 
@@ -82,7 +82,7 @@
 
 |概念|定义|
 | ------| ------------------------------------------------------------------------------------------------------------------------------------|
-|**工作流（Workflow）**|一个自包含目录（​`xxx.weft/`），包含图定义、依赖声明、用户代码、数据、prompt。是设计、执行、打包、迁移的基本单位|
+|**工作流（Workflow）**|一个自包含目录（`xxx.weft/`），包含图定义、依赖声明、用户代码、数据、prompt。是设计、执行、打包、迁移的基本单位|
 |**工作流根目录（Root）**|工作流目录本身。路径默认相对 Root 解析；绝对路径是显式外部资源并产生可移植性警告。agent 的默认工作目录也是 Root|
 |**节点（Node）**|图中最小执行单元，有类型、参数、输入/输出端口及 `cache_policy` 执行语义|
 |**端口（Port）**|节点的连接点，带类型。只有类型兼容的端口可以连接|
@@ -104,43 +104,43 @@
 
 > 作者每周收到多份格式相同的 Excel 报表，需要合并、清洗、聚合后写入一份汇总工作簿的指定区域，汇总簿平时一直开着。
 
-1. 新建工作流，Root 内 ​`data/inbox/` 放入本周报表。
-2. 拖入 ​`List Files`​ → ​`Loop Start`​ → ​`Excel Read Range`​ → ​`Loop End (Concatenate)`​ → ​`Row Filter`​ → ​`GroupBy`​ → ​`Excel Connect (可见实例)`​ → ​`Excel Write Table`​（目标：已打开的 ​`汇总.xlsx`​，Sheet ​`本周`​，起始 ​`A1`）。
-3. 点击运行，节点依次变绿；在 Excel 中实时看到 ​`本周` 页被填充。
-4. 下周把新文件丢进 ​`inbox/`，再点一次运行。
+1. 新建工作流，Root 内 `data/inbox/` 放入本周报表。
+2. 拖入 `List Files` → `Loop Start` → `Excel Read Range` → `Loop End (Concatenate)` → `Row Filter` → `GroupBy` → `Excel Connect (可见实例)` → `Excel Write Table`（目标：已打开的 `汇总.xlsx`，Sheet `本周`，起始 `A1`）。
+3. 点击运行，节点依次变绿；在 Excel 中实时看到 `本周` 页被填充。
+4. 下周把新文件丢进 `inbox/`，再点一次运行。
 
 ### 场景 B：agent 辅助的非结构化处理
 
 > 报表中有一列自由文本备注，需要归类到固定的 5 个类别。
 
-1. 在场景 A 的 ​`Row Filter`​ 后插入 ​`Agent Loop` 节点。
-2. 给 Agent Loop 接入 ​`Prompt Template`​（分类规则）和一个 ​`Node as Tool`​（包装了 ​`Excel Read Range`，让 agent 可按需查参考表）。
+1. 在场景 A 的 `Row Filter` 后插入 `Agent Loop` 节点。
+2. 给 Agent Loop 接入 `Prompt Template`（分类规则）和一个 `Node as Tool`（包装了 `Excel Read Range`，让 agent 可按需查参考表）。
 3. 运行时在 UI 中看到 agent 的流式输出、每一次 tool 调用及其参数。
-4. 输出表多出一列 ​`category`​，进入后续 ​`GroupBy`。
+4. 输出表多出一列 `category`，进入后续 `GroupBy`。
 
 ### 场景 C：沙箱内的自由 agent 任务
 
-> 让 agent 整理 Root 下 ​`raw/` 目录里几十个命名混乱的文件：按内容重命名并归入子目录。
+> 让 agent 整理 Root 下 `raw/` 目录里几十个命名混乱的文件：按内容重命名并归入子目录。
 
-1. 拖入 ​`Pi Agent`​ 节点（或 ​`Agent Loop`​ + ​`Sandboxed Tools`），工作目录为 Root。
-2. 运行后 agent 在 Sandboxie 内自由读写、执行命令；真实 ​`raw/` 不受影响。
+1. 拖入 `Pi Agent` 节点（或 `Agent Loop` + `Sandboxed Tools`），工作目录为 Root。
+2. 运行后 agent 在 Sandboxie 内自由读写、执行命令；真实 `raw/` 不受影响。
 3. 运行结束，UI 展示变更列表（新增/修改/删除/重命名），作者勾选后点击"应用"，变更才落到真实目录。
 
 ### 场景 D：触发器驱动
 
 > 文件夹一有新文件就自动跑；或者在聊天窗口里说"把这个表按部门拆开"就触发。
 
-1. 在 ​`Trigger`​ 节点中配置：文件监听 ​`data/inbox/*.xlsx`（新建事件）。
-2. 同一工作流也可配置聊天触发：聊天消息作为 ​`Message` 输出进入下游 agent 节点。
+1. 在 `Trigger` 节点中配置：文件监听 `data/inbox/*.xlsx`（新建事件）。
+2. 同一工作流也可配置聊天触发：聊天消息作为 `Message` 输出进入下游 agent 节点。
 3. 也可配置 cron 表达式或开放一个带 token 的 HTTP 端点。
 
 ### 场景 E：打包交接
 
 > 把场景 A 的工作流给同事，同事自己的汇总簿路径不同。
 
-1. 作者点击"打包"，得到 ​`weekly-report.weft.zip`​（排除 ​`.runs/`​ 和可选排除 ​`data/`）。
-2. 同事解压，在 Weft 中打开；Weft 检测 ​`uv.lock`​ 并自动 ​`uv sync`。
-3. 同事修改 ​`Excel Write Table` 中的目标工作簿名（或通过流变量覆盖），运行。
+1. 作者点击"打包"，得到 `weekly-report.weft.zip`（排除 `.runs/` 和可选排除 `data/`）。
+2. 同事解压，在 Weft 中打开；Weft 检测 `uv.lock` 并自动 `uv sync`。
+3. 同事修改 `Excel Write Table` 中的目标工作簿名（或通过流变量覆盖），运行。
 
 ### 场景 F：调试与局部执行
 
@@ -164,9 +164,9 @@
 |F-DES-02|节点面板按分类（Excel / 表格 / 流程 / 代码 / Agent / 文件）列出，支持搜索|P0|
 |F-DES-03|端口带类型与颜色，仅允许兼容类型连接；非法连接即时拒绝并提示|P0|
 |F-DES-04|选中节点后侧栏显示参数表单，表单由节点声明的 schema 自动生成|P0|
-|F-DES-05|节点三态指示：未配置（红）/ 已配置未执行（黄）/ 已执行（绿）/ 执行中（动画）/ 错误（红叉）|P0|
+|F-DES-05|节点状态指示：未配置（红）/ 已配置未执行（黄）/ 已执行（绿）/ 执行中（动画）/ 错误（红叉）/ 已跳过（灰）|P0|
 |F-DES-06|任意参数字段可绑定流变量替代字面值|P0|
-|F-DES-07|工作流自动保存至 ​`workflow.json`；支持手动保存与脏标记|P0|
+|F-DES-07|工作流自动保存至 `workflow.json`；支持手动保存与脏标记|P0|
 |F-DES-08|Metanode：选中多节点折叠为一个；可展开进入子画布编辑|P1|
 |F-DES-09|节点上可添加注释；画布可添加便签|P1|
 |F-DES-10|Metanode 导出为可复用模板|P2|
@@ -180,19 +180,20 @@
 |F-EXE-03|节点输出缓存：节点声明 `cache_policy: pure | volatile | side_effect`，默认不复用；纯变换显式声明 `pure` 才可复用，副作用节点每次执行，LLM 与实时 Excel Read 等 `volatile` 节点每次执行且禁止跨 Run 复用；缓存落盘于 `.runs/`，可清理|P0|
 |F-EXE-04|执行状态、日志、agent 流式输出通过 WebSocket 实时推送到 UI|P0|
 |F-EXE-05|端口视图：点击任一已执行的输出端口预览数据（表格分页、Excel 引用摘要、消息文本）；历史视图读取该 Run 的输出快照|P0|
-|F-EXE-06|错误处理：节点失败时停止下游，保留已完成节点结果，展示 traceback 与输入快照；Try/Catch 节点可捕获|P0|
+|F-EXE-06|错误处理：节点失败时停止下游，保留已完成节点结果，展示 traceback 与输入快照；Try Start / Try End 节点可捕获并转入错误分支|P0|
 |F-EXE-07|取消运行：用户可中止进行中的运行，正在执行的节点收到取消信号|P0|
 |F-EXE-08|运行历史：每次 Run 冻结图、参数、变量和节点 manifest，并记录触发来源、起止时间、各节点状态、日志与端口输出；可回看|P1|
 |F-EXE-09|循环：Loop Start / Loop End 成对节点，支持按行、按块、计数三种模式，循环体为中间子图|P0|
-|F-EXE-10|条件分支：If / Switch 节点按流变量或表达式选择下游分支|P0|
+|F-EXE-10|条件分支：If / Switch 节点按流变量或表达式选择下游分支；Merge 以两个命名输入汇合分支，允许仅命中一侧输入|P0|
 |F-EXE-11|同一工作流同一时刻最多一个活跃 Run；新触发排队或丢弃（可配）；保存采用 revision/CAS 防并发覆盖|P0|
 |F-EXE-12|执行环境为工作流自己的虚拟环境（由 `uv` 管理），与 Weft 本体环境隔离；每 Run 使用独立 Worker pool，Run 结束全部退出|P0|
+|F-EXE-13|Wait 节点按 `duration_seconds` 等待并响应取消，用于流程等待与取消验证|P0|
 
 ### 7.3 Excel 联动
 
 |ID|需求|优先级|
 | ----------| -----------------------------------------------------------------------------------------| ----------------|
-|F-XLS-01|连接到用户选择的可见 Excel 实例（默认）；多实例时列出 PID/窗口供选择；若无运行实例则启动一个可见实例|P0|
+|F-XLS-01|连接到用户选择的可见 Excel 实例（默认）；多实例时列出 PID/窗口供选择并持久化选择；无人值守运行必须唯一解析该目标，无法解析或仍有歧义时失败，不得随机 attach；若无运行实例则启动一个可见实例|P0|
 |F-XLS-02|可选启动独立隐藏实例，避免干扰用户；结束策略 `save | discard` 必须由用户显式选择，未保存工作簿须报告；孤儿清理由 owned PID、创建时间、Run 与心跳识别|P0|
 |F-XLS-03|引用已打开的工作簿（按名称）、按路径打开工作簿、新建工作簿|P0|
 |F-XLS-04|读取指定区域 / 命名区域 / 表格对象 / 整张工作表为 Table；支持表头行、类型推断、空值处理；实时读取为 volatile，禁止跨 Run 缓存|P0|
@@ -218,7 +219,7 @@
 |F-TBL-06|规则引擎节点：按条件列表赋值|P1|
 |F-TBL-07|Table ↔ Variable 互转|P0|
 |F-TBL-08|文件操作：列出、复制、移动、重命名、删除、路径拼接（相对 Root）|P0|
-|F-TBL-09|Python Script 节点：输入表绑定为变量，用户代码产出输出表/变量；代码存于 Root 内 ​`nodes/` 或内联|P0|
+|F-TBL-09|Python Script 节点：输入表绑定为变量，用户代码产出输出表/变量；代码存于 Root 内 `nodes/` 或内联|P0|
 |F-TBL-10|Shell Command 节点（可信车道，非 agent 使用）|P1|
 
 ### 7.5 Agent
@@ -229,7 +230,7 @@
 |F-AGT-02|LLM Call 节点：单次调用，输入 Message/Variable，输出文本或结构化 JSON|P0|
 |F-AGT-03|Agent Loop 节点：ReAct 循环；参数含 system prompt、最大轮数、停止条件；工具通过 Tool 端口注入；输出最终消息与完整轨迹；达到最大轮数默认失败|P0|
 |F-AGT-04|Node as Tool：仅包装显式声明工具能力的节点；默认限只读/纯计算，Python/Shell/任意代码执行禁止；写文件、Excel 写等副作用需显式授权并默认逐次确认；固定参数取 Run 冻结快照并记录审计|P0|
-|F-AGT-05|Sandboxed Tools：read / write / edit / list / bash 五个基础工具，在沙箱内执行；沙箱网络默认禁止，显式开启时需有效白名单/防火墙|P0|
+|F-AGT-05|Sandboxed Tools：read / write / edit / list / bash 五个基础工具，在 Sandboxie 内执行；`none` 仅开放影子目录文件工具并禁用 bash；沙箱网络默认禁止，仅放行指定环回 LLMProxy，其他显式联网需有效白名单/防火墙|P0|
 |F-AGT-06|Pi Agent 节点：以子进程方式运行 pi coding agent，工作目录为 Root（或指定子目录），在沙箱内；pi 仅获得本地代理地址和配置名；输入任务描述，输出结果摘要与轨迹|P0|
 |F-AGT-07|Chat Input / Chat Output 节点与 UI 聊天面板：REST 发送消息触发运行，WS 推送回复；UI 会话记录独立于 P1 Memory|P0|
 |F-AGT-08|Memory 节点：按会话 ID 保存 / 读取历史消息（本地文件）|P1|
@@ -242,7 +243,7 @@
 
 |ID|需求|优先级|
 | ----------| ----------------------------------------------------------------------------------------------------------------| --------|
-|F-SBX-01|沙箱接口可插拔；v1 提供 `none` 与 `sandboxie` 两种实现；`NoneSandbox` 的隔离语义待讨论，不以本文预先定案|P0|
+|F-SBX-01|沙箱接口可插拔；v1 提供 `none` 与 `sandboxie` 两种实现；`NoneSandbox` 仅用于 CI/审批流模拟，文件工具写影子目录，任意 bash 与 pi 在 `none` 下禁用，不承诺隔离任意子进程|P0|
 |F-SBX-02|Sandboxie 实现：通过 `Start.exe /box:<name>` 启动 agent 工具进程；每 Run 使用独立 `WeftBox-<run_id>`，创建、删除、终止与归属识别须经 M0 验证|P0|
 |F-SBX-03|沙箱内进程可读取真实文件系统（Sandboxie 默认行为），写入重定向至沙箱目录；v1 只审计 Root 与显式授权目录，其他写入默认拒绝，未知变更须提示审计不完整|P0|
 |F-SBX-04|Run 前记录真实文件存在性与内容哈希基线；Run 后生成新增/修改/删除/重命名列表，重命名不确定时降级并提示，UI 展示 diff 与审计完整性|P0|
@@ -250,29 +251,30 @@
 |F-SBX-06|沙箱内进程无法访问主机 COM（Sandboxie 默认行为）；agent 需操作 Excel 必须通过经授权的 Node as Tool|P0|
 |F-SBX-07|所有 agent 工具调用（含 Node as Tool）写入审计日志：时间、工具、打码参数、结果摘要；字段名、Authorization、URL userinfo/query 均须打码|P0|
 |F-SBX-08|API key 等密钥存于用户级配置，不存入工作流目录，不下发沙箱，不出现在环境变量、stdout、trace；打包自动排除|P0|
-|F-SBX-09|HTTP 触发端点需 token；服务默认仅监听 `127.0.0.1`|P0|
+|F-SBX-09|服务默认仅监听 `127.0.0.1`；本机 UI/API/WS 使用随机会话令牌并校验 Host/Origin，HTTP 触发使用工作流 Bearer token；非本机监听使用全局 token|P0|
 
 ### 7.7 触发器
 
 |ID|需求|优先级|
 | ----------| -----------------------------------------------------------------------------------------------------| --------|
 |F-TRG-01|Trigger 节点为工作流唯一入口；所有触发源产生统一事件结构（来源、时间、payload），下游节点不区分来源|P0|
-|F-TRG-02|手动触发：UI 按钮、CLI ​`weft run <workflow>`|P0|
+|F-TRG-02|手动触发：UI 按钮、CLI `weft run <workflow>`|P0|
 |F-TRG-03|聊天触发：UI 聊天面板发送消息，消息文本与会话 ID 进入 payload|P0|
 |F-TRG-04|定时触发：cron 表达式或固定间隔；Weft 服务运行期间生效|P0|
 |F-TRG-05|文件监听触发：监听指定路径（相对 Root 或绝对）的新建/修改/删除事件，支持 glob 过滤与防抖|P0|
-|F-TRG-06|HTTP 触发：​`POST /api/workflows/{id}/trigger`，Bearer token 校验，请求体进入 payload|P0|
+|F-TRG-06|HTTP 触发：`POST /api/workflows/{id}/trigger`，Bearer token 校验，请求体进入 payload；`?wait=true` 时等待运行并返回响应|P0|
 |F-TRG-07|每个触发源可独立启用/禁用；工作流关闭或服务停止时自动失效|P0|
 |F-TRG-08|Excel 事件触发（经 xlOil 伴侣插件）|P2|
+|F-TRG-09|HTTP Response 节点定义 `status_code/headers/body`；每次 Run 最多执行一个，未执行时同步 HTTP 触发返回空 outputs，重复执行视为运行错误|P0|
 
 ### 7.8 可移植与打包
 
 |ID|需求|优先级|
 | ----------| ------------------------------------------------------------------------------------------------| --------|
 |F-PKG-01|工作流是自包含目录；结构见 `04-data-model.md`。路径默认相对 Root，绝对路径为显式外部资源并警告；跨机运行以外部资源与依赖可用为前提|P0|
-|F-PKG-02|依赖以 ​`pyproject.toml`​ + ​`uv.lock`​ 声明；打开工作流时若环境缺失或 lock 变化，自动 ​`uv sync`|P0|
-|F-PKG-03|一键打包为 zip：默认排除 ​`.runs/`​、​`.venv/`​、密钥；​`data/` 可选排除|P0|
-|F-PKG-04|导入 zip：解压至用户选择的位置、校验 ​`workflow.json` 版本、同步环境|P0|
+|F-PKG-02|依赖以 `pyproject.toml` + `uv.lock` 声明；打开工作流时若环境缺失或 lock 变化，自动 `uv sync`；Worker 与主服务精确同版本，服务升级后须显式更新 `weft-worker==<service_version>`、重锁并同步后才能运行|P0|
+|F-PKG-03|一键打包为 zip：默认排除 `.runs/`、`.venv/`、密钥；`data/` 可选排除|P0|
+|F-PKG-04|导入 zip：解压至用户选择的位置、校验 `workflow.json` 版本、同步环境|P0|
 |F-PKG-05|`workflow.json` 带 schema 版本号；旧版本自动迁移或给出明确提示|P0|
 |F-PKG-06|打包时检测绝对路径并警告|P1|
 |F-PKG-07|运行时只读检查：工作流需要的外部资源（工作簿名、绝对路径）缺失时在运行前整体报告而非逐节点失败|P1|
@@ -281,10 +283,10 @@
 
 |ID|需求|优先级|
 | ----------| ---------------------------------------------------------------------------------| --------|
-|F-SET-01|用户级设置文件（​`%APPDATA%/weft/config.toml`）：LLM 配置、Sandboxie 路径、默认 Excel 策略、监听端口|P0|
-|F-SET-02|服务默认 ​`127.0.0.1:7788`，启动后自动打开浏览器；可配置|P0|
+|F-SET-01|用户级设置文件（`%APPDATA%/weft/config.toml`）：LLM 配置、Sandboxie 路径、默认 Excel 策略、监听端口|P0|
+|F-SET-02|服务默认 `127.0.0.1:7788`，启动后自动打开浏览器；可配置|P0|
 |F-SET-03|结构化日志（服务日志 + 每个 Run 的日志），保留策略可配|P0|
-|F-SET-04|CLI：​`weft serve`​ / ​`weft run`​ / ​`weft pack`​ / ​`weft unpack`​ / ​`weft doctor`（环境检测：Python、uv、Excel、Sandboxie）|P0|
+|F-SET-04|CLI：`weft serve` / `weft run` / `weft pack` / `weft unpack` / `weft doctor`（环境检测：Python、uv、Excel、Sandboxie）|P0|
 |F-SET-05|系统托盘图标（显示状态、打开 UI、退出）|P2|
 
 ---
@@ -313,15 +315,15 @@
 
 - **COM 线程模型**：Excel COM 为 STA，所有 Excel 调用必须在一个专用线程串行执行；引擎通过队列投递任务。
 - **登录态进程**：COM 自动化在非交互会话下不可用，Weft 必须以登录用户的普通进程运行，不能注册为 Windows 服务。
-- **Sandboxie 边界**：沙箱内进程无法访问主机 COM；写入重定向到 ​`C:\Sandbox\<user>\<box>\`。
-- **Sandboxie-Plus 为 GPL**：仅以外部进程方式调用 ​`Start.exe`，不链接、不分发其代码。
+- **Sandboxie 边界**：沙箱内进程无法访问主机 COM；写入重定向到 `C:\Sandbox\<user>\<box>\`。
+- **Sandboxie-Plus 为 GPL**：仅以外部进程方式调用 `Start.exe`，不链接、不分发其代码。
 - **pi 为外部依赖**：以子进程调用，要求用户自行安装（Node.js 环境）；Weft 不捆绑。
-- **执行环境隔离**：工作流代码运行在工作流自己的 venv 中；Weft 本体运行在自己的环境中；两者通过子进程/IPC 通信（见 ​`03-architecture.md`）。
+- **执行环境隔离**：工作流代码运行在工作流自己的 venv 中；Weft 本体运行在自己的环境中；两者通过子进程/IPC 通信（见 `03-architecture.md`）。
 
 ### 9.2 环境假设
 
 - Windows 10/11 64 位，桌面版 Excel 2016+（Microsoft 365）。
-- Python 3.12+、uv 已安装（​`weft doctor` 检测）。
+- Python 3.12+、uv 已安装（`weft doctor` 检测）。
 - 用户拥有 OpenAI 兼容 API 的访问凭据。
 - 可选：Sandboxie-Plus、pi coding agent、Node.js。
 
@@ -345,7 +347,7 @@
 | ------| ----------------------------------------------------| ---------------------------------| ----------------------------------------------------------------------------------------------------------------------------------------------|
 |D-01|后端 Python，不用 Rust|Rust 引擎|瓶颈在 LLM、COM、用户代码而非调度；作者不会 Rust 无法 review；性能敏感处用 Rust 实现的 Python 库（Polars、DuckDB、uv）兜底；留 PyO3 替换接口|
 |D-02|不 fork n8n / Dify / KNIME / Langflow，自写引擎|fork 任一|需要同时支持 DAG 批处理、节点内循环、图作为工具三种语义，无现成框架满足；fork 等于重写 executor 还要背负不需要的代码|
-|D-03|Excel 后端 v1 用 xlwings|xlOil、原生 pywin32|引擎是外部长期进程，xlwings 正是外部驱动 Excel 的定位；xlOil 跑在 Excel 进程内，适合 v2 做 Excel 侧触发器。抽象 ​`ExcelBackend` 接口|
+|D-03|Excel 后端 v1 用 xlwings|xlOil、原生 pywin32|引擎是外部长期进程，xlwings 正是外部驱动 Excel 的定位；xlOil 跑在 Excel 进程内，适合 v2 做 Excel 侧触发器。抽象 `ExcelBackend` 接口|
 |D-04|Agent Loop 自写，不依赖 LangChain/LangGraph|LangGraph|ReAct 循环本身几十行；工作流引擎已是图执行器，再套一个图引擎冗余；减少依赖面|
 |D-05|表格传输格式 Arrow IPC 文件 + memory-map，计算库 Polars|pandas|减少跨进程复制、格式统一；不宣称序列化/写盘/转换全链路零拷贝；v1 仅处理内存内数据|
 |D-06|沙箱 v1 用 Sandboxie-Plus，接口可插拔|Windows Sandbox、Docker、无沙箱|Windows Sandbox 启动慢、无文件重定向审批模型；Docker 不能访问 Excel 且太重；Sandboxie 的“写入重定向 + 事后 Recover”适合审批流，但完整性须 M0 验证|
@@ -364,7 +366,8 @@
 |#|问题|影响|计划|
 | ----| ------------------------------------------------------------| ------------------| -----------------------------------------------------------------------|
 |Q1|名称 Weft 的 PyPI/商标可用性|发布|发布前核查|
-|Q2|`NoneSandbox` 的隔离承诺与命名/实现语义|CI 与显式无沙箱场景|仍需讨论明确；在定案前保留 `02-user-stories.md` US-SBX-01 与 `03-architecture.md` §7.3、ADR A-07 的现有行为，不擅自替换实现|
+
+`NoneSandbox` 已定案为影子目录审批流模拟器，不允许任意 bash/pi 在 `none` 下执行；具体约束见 F-SBX-01 与架构 ADR A-07。
 
 ---
 
@@ -382,4 +385,4 @@
    └── 09-nodes-v1.md           §7 节点的参数级规格（规划）
 ```
 
-变更本文的需求优先级或决策时，须同步更新 ​`07-roadmap.md`。
+变更本文的需求优先级或决策时，须同步更新 `07-roadmap.md`。

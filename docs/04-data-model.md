@@ -4,8 +4,8 @@
 | ------| -------------------------------------------------|
 |版本|v0.1（草稿）|
 |状态|待确认|
-|上游|`01-prd.md`​ §5 核心概念、​`03-architecture.md`|
-|下游|`05-api.md`​、​`09-nodes-v1.md`、实现代码（Pydantic 模型以本文为准）|
+|上游|`01-prd.md` §5 核心概念、`03-architecture.md`|
+|下游|`05-api.md`、`09-nodes-v1.md`、实现代码（Pydantic 模型以本文为准）|
 
 本文是**规范性**文档：字段名、类型、枚举值即实现要求。所有模型在代码中为 Pydantic v2 类，JSON Schema 由其导出。
 
@@ -111,6 +111,8 @@
 |`nodes[].id` 唯一且匹配 `^n_[0-9a-f]{8}$`；`edges` 引用的节点与端口存在|ERROR|
 |边两端端口类型兼容（§3.3）|ERROR|
 |非 Tool/Variable 输入端口入边 ≤ 1；同一 Variable 输入端口的 `edges[].order` 为唯一整数|ERROR|
+|动态输入通过实例化多个命名端口表达（如 Concatenate 的 `in_1...in_N`，N ≥ 2），每个命名端口仍最多一条入边；不允许单端口承载多条普通数据入边|ERROR|
+|Merge 固定为两个命名输入端口，并声明 `accepts_partial_inputs=true`；仅命中一侧时可执行，两侧均 skipped 时 Merge 也 skipped|ERROR|
 |折叠 Loop 后无环|ERROR|
 |Loop Start/End 配对且嵌套合法|ERROR|
 |恰好一个 `flow.trigger` 节点；触发配置只在该节点 params，不允许顶层影子 trigger|ERROR|
@@ -123,20 +125,20 @@
 
 |类型|值（运行时）|缓存序列化|UI 颜色|语义|
 | ------| ----------------------| ------------------------| ---------| ---------------------------------|
-|`table`|`pyarrow.Table`|`.arrow`（Arrow IPC file）|蓝 ​`#3b82f6`|结构化表格|
-|`excel`|描述符 dict（§3.2）|`.json`|橙 ​`#f97316`|Excel App/Workbook/Range 引用|
-|`variable`|`dict[str, Any]`（一组流变量）|`.json`|红 ​`#ef4444`|标量参数集|
-|`message`|`list[ChatMessage]`|`.json`|紫 ​`#a855f7`|LLM 消息序列|
-|`tool`|`list[ToolDecl]`|不缓存（声明性）|绿 ​`#22c55e`|agent 工具|
-|`flow`|无值（仅时序依赖）|不缓存|灰 ​`#9ca3af`|控制流（If/Try 分支、显式顺序）|
+|`table`|`pyarrow.Table`|`.arrow`（Arrow IPC file）|蓝 `#3b82f6`|结构化表格|
+|`excel`|描述符 dict（§3.2）|`.json`|橙 `#f97316`|Excel App/Workbook/Range 引用|
+|`variable`|`dict[str, Any]`（一组流变量）|`.json`|红 `#ef4444`|标量参数集|
+|`message`|`list[ChatMessage]`|`.json`|紫 `#a855f7`|LLM 消息序列|
+|`tool`|`list[ToolDecl]`|不缓存（声明性）|绿 `#22c55e`|agent 工具|
+|`flow`|无值（仅时序依赖）|不缓存|灰 `#9ca3af`|控制流（If/Try 分支、显式顺序）|
 
 `ChatMessage = {role: system|user|assistant|tool, content: str, tool_calls?: [...], tool_call_id?: str, name?: str}`（OpenAI 规范子集）。
 
-`ToolDecl = {name, description, parameters: JSONSchema, kind: node|sandboxed, requires_confirmation: bool, binding: {...}}`​，​`binding` 为实现侧路由信息（目标节点 ID 或沙箱工具名），不暴露给 LLM。
+`ToolDecl = {name, description, parameters: JSONSchema, kind: node|sandboxed, requires_confirmation: bool, binding: {...}}`，`binding` 为实现侧路由信息（目标节点 ID 或沙箱工具名），不暴露给 LLM。
 
 ### 3.2 Excel 描述符
 
-见 ​`03-architecture.md`​ §5.3。三种 ​`kind: app | workbook | range`​，均可 JSON 序列化；​`resolve()` 失败即缓存失效。
+见 `03-architecture.md` §5.3。三种 `kind: app | workbook | range`，均可 JSON 序列化；`resolve()` 失败即缓存失效。
 
 ### 3.3 兼容矩阵
 
@@ -151,7 +153,7 @@
 |tool|—|—|—|—|✓|—|
 |flow|—|—|—|—|—|✓|
 
-✓* 任何数据端口可连到 ​`flow`​ 输入端口（只取时序，弃值）。除此之外无隐式转换；类型转换一律显式节点（​`Table to Variables` 等）。此矩阵即 US-DES-03 AC-5 的测试表。
+✓* 任何数据端口可连到 `flow` 输入端口（只取时序，弃值）。除此之外无隐式转换；类型转换一律显式节点（`Table to Variables` 等）。此矩阵即 US-DES-03 AC-5 的测试表。
 
 ### 3.4 流变量作用域
 
@@ -167,7 +169,7 @@
 {"kind": "none"}                                                     // flow 端口
 ```
 
-规则：`table` 永远走文件；JSON 值 ≤ 256 KB 时 `inline`，否则落文件给 `path`。`hash` 用于缓存键（`03-architecture.md` §2.4）。进入 Run 输出快照后，`meta.json` 的 ValueRef 必须指向 `.runs/<run_id>/outputs/` 而非临时 IPC。
+规则：`table` 永远走文件；JSON 值 ≤ 256 KB 时 `inline`，否则落文件给 `path`。`hash` 用于缓存键（`03-architecture.md` §2.4）。进入 Run 输出快照后，小 JSON 可以继续以 `inline` 不可变地存入 `meta.json`；带 `path` 的 ValueRef 必须指向 `.runs/<run_id>/outputs/` 而非临时 IPC。历史端口 API 从 `meta.json` 读取内联值，或从 outputs 读取文件值。
 
 ## 5. TriggerEvent
 
@@ -207,13 +209,16 @@ Trigger 节点 `variable` 端口输出 `{source, ts, session_id?, payload}`，�
     "n_0000a1b2": {
       "status": "executed | failed | ...", "started_at": "...", "finished_at": "...",
       "from_cache": false, "error": {"type": "...", "message": "...", "traceback": "..."},
-      "outputs": {"out": {"kind": "table", "path": ".runs/r_20250101_093000_a1b2/outputs/n_0000a1b2/out.arrow", "hash": "sha256:..."}}
+      "outputs": {
+        "out": {"kind": "table", "path": ".runs/r_20250101_093000_a1b2/outputs/n_0000a1b2/out.arrow", "hash": "sha256:..."},
+        "variables": {"kind": "json", "inline": {"row_count": 1000}, "hash": "sha256:..."}
+      }
     }
   }
 }
 ```
 
-`run_id` 格式：`r_<yyyymmdd>_<hhmmss>_<4hex>`，可排序。`workflow_revision` 与冻结文件共同确定本 Run 输入；历史端口读取 `outputs` 引用，默认保留最近 50 次 Run。
+`run_id` 格式：`r_<yyyymmdd>_<hhmmss>_<4hex>`，可排序。`workflow_revision` 与冻结文件共同确定本 Run 输入；历史端口读取 `outputs` 中的内联值或文件引用，默认保留最近 50 次 Run。节点状态与错误只存于 `meta.json`，Run 日志只存于 `log.jsonl`，agent 轨迹存于 `nodes/<node_id>.trace.jsonl`，不另存 `nodes/<node_id>.json`。
 
 ## 7. 审计记录（audit.jsonl，每行一条）
 
@@ -248,7 +253,6 @@ Trigger 节点 `variable` 端口输出 `{source, ts, session_id?, payload}`，�
 ```
 
 重命名优先由删除与创建的内容哈希匹配；无法可靠判断时保留删除+创建两条并写 `audit_warnings`。apply 前重算真实目标哈希，与基线不一致即 conflict；只有显式覆盖确认才能继续。
-```
 
 ## 9. 节点类型命名空间
 
@@ -274,9 +278,9 @@ backend = "xlwings"          # xlwings | fake
 call_timeout = 60
 
 [sandbox]
-default = "sandboxie"        # sandboxie | none；NoneSandbox 语义待讨论
-allow_unsandboxed = false
-network = "deny"             # deny | allowlist；allowlist 须验证防火墙/白名单
+default = "sandboxie"        # sandboxie | none；none 仅用于影子目录审批流模拟
+allow_none_sandbox = false   # 显式允许 none；不允许任意 bash/pi 在 none 下执行
+network = "deny"             # deny | allowlist；默认仅放行指定环回 LLMProxy
 audit_roots = []             # Root 之外的显式授权目录
 
 [sandbox.sandboxie]
@@ -289,6 +293,9 @@ confirm_timeout_s = 600
 trace_full_prompt = false
 trace_retention_days = 7
 
+[trigger]
+http_wait_timeout_s = 300
+
 [logging]
 level = "INFO"
 retention_days = 14
@@ -296,12 +303,12 @@ retention_days = 14
 [cache]
 max_mb = 2048
 run_retention = 50
+chat_retention_days = 30     # 0 = 不自动清理
+memory_retention_days = 30   # 0 = 不自动清理
 ```
 
 ## 11. 版本与迁移
 
-- `schema_version`​ 整数递增；迁移函数 ​`migrate_v{n}_to_v{n+1}(doc) -> doc`​ 注册于 ​`weft.workflow.migrations`​，逐级执行，迁移前备份 ​`workflow.json.bak.v{n}`。
-- 节点级：​`node_version`​ 不匹配时调用节点类的 ​`migrate_params(old_version, params) -> params`；未实现则原样保留并 WARN。
-- 未知节点类型：加载为 ​`flow.placeholder`（保留原 type/params，不可执行），保存时原样写回，不丢数据（US-PKG-05 AC-3）。
-
-‍
+- `schema_version` 整数递增；迁移函数 `migrate_v{n}_to_v{n+1}(doc) -> doc` 注册于 `weft.workflow.migrations`，逐级执行，迁移前备份 `workflow.json.bak.v{n}`。
+- 节点级：`node_version` 不匹配时调用节点类的 `migrate_params(old_version, params) -> params`；未实现则原样保留并 WARN。
+- 未知节点类型：加载为 `flow.placeholder`（保留原 type/params，不可执行），保存时原样写回，不丢数据（US-PKG-05 AC-3）。

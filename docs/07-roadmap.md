@@ -5,8 +5,8 @@
 |项|值|
 | ------| ---------------------------------------------------------------------------------|
 |版本|v0.1（草稿）|
-|上游|`01-prd.md`​ §7 优先级、​`02-user-stories.md`|
-|用法|agent 按任务卡顺序领取；每张卡独立可验证，完成 = 列出的 AC 测试通过 + ​`poe check` 全绿|
+|上游|`01-prd.md` §7 优先级、`02-user-stories.md`|
+|用法|agent 按任务卡顺序领取；每张卡独立可验证，完成 = 列出的 AC 测试通过 + `poe check` 全绿|
 
 ---
 
@@ -71,47 +71,47 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 - [ ] **T1.2 端口类型与 ValueRef**
 【依赖】T1.1
-【产出】PortType、兼容矩阵、ValueRef、完整缓存键（实现/用户代码/uv.lock/迭代号/内容 SHA-256）
-【验收】US-DES-03/AC-5；US-EXE-04/AC-1..3
+【产出】PortType、兼容矩阵、ValueRef、完整缓存键（实现/用户代码/uv.lock/迭代号/显式外部文件与目录内容 SHA-256）
+【验收】US-DES-03/AC-5；缓存键与 ValueRef 的独立单元测试，不虚标需要 Read CSV 的 AC
 
 - [ ] **T1.3 节点协议、注册表与规格导出**
 【依赖】T1.2
-【产出】`weft-sdk` Node/Port/decorator/weft_ctx；cache_policy 与工具能力声明；注册表；由代码 JSON Schema 首次生成只读 `docs/09-nodes-v1.md`
-【验收】US-DES-04/AC-4；自定义节点可注册，生成文档与声明一致且手改 diff 会被 CI 检出
+【产出】`weft-sdk` Node/Port/DynamicPortGroup/decorator/weft_ctx；cache_policy、cache_inputs 与工具能力声明；注册表；由代码 JSON Schema 首次生成只读 `docs/09-nodes-v1.md`
+【验收】US-DES-04/AC-4；自定义节点与动态端口声明可注册，生成文档与声明一致且手改 diff 会被 CI 检出；Concatenate/Merge 行为留到对应节点卡验收
 
 - [ ] **T1.4 调度器、冻结 Run 与状态机**
 【依赖】T1.3
-【产出】拓扑、ExecScope、并行、分支、失败/取消、Run 队列；入队冻结 workflow/variables/manifest 和 revision，Run 输出快照
-【验收】US-EXE-01/AC-1,2,3；US-EXE-02；US-EXE-03；US-EXE-04/AC-6,7；US-EXE-08/AC-1,4；US-EXE-12/AC-1,2,3；US-EXE-13/AC-1,2
+【产出】拓扑、ExecScope、并行、分支、失败/取消、Run 队列；ready 出队与跳过传播；入队冻结 workflow/variables/manifest 和 revision，Run 输出快照
+【验收】US-EXE-01/AC-2,3；US-EXE-04/AC-6,7；US-EXE-13/AC-1,2,5；使用合成调度节点验证算法，不引用后续节点 AC
 
 - [ ] **T1.5 分类缓存层**
 【依赖】T1.4
 【产出】pure/volatile/side_effect 策略、缓存失效/LRU、历史输出、纯缓存恢复；副作用每次执行，LLM/实时 Excel Read 禁止跨 Run 复用
-【验收】US-EXE-04/AC-1..8（与 T1.1/T1.4 分工覆盖，不重复虚标）
+【验收】US-EXE-04/AC-1,2,5（与 T1.1/T1.4/T1.7/T4.1 分工覆盖，不重复虚标）
 
 - [ ] **T1.6 Worker pool 与 IPC**
 【依赖】T1.4
-【产出】独立 `weft-worker` 包、JSON-RPC stdio、Arrow IPC+memory-map、每 Run 懒启动 pool（默认 4）、结束全退出、取消/崩溃清理、同版本 uv.lock 与 `uv sync`
-【验收】US-EXE-14/AC-1..6；US-EXE-08/AC-2；真实子进程并行、跨 Run 状态隔离、无主机 PYTHONPATH 的集成测试
+【产出】独立 `weft-worker` 包、JSON-RPC stdio、Arrow IPC+memory-map、每 Run 懒启动 pool（默认 4）、结束全退出、取消/崩溃清理、精确同版本 uv.lock、显式升级重锁与 `uv sync`
+【验收】US-EXE-14/AC-1..7；US-EXE-08/AC-2；真实子进程并行、跨 Run 状态隔离、无主机 PYTHONPATH 的集成测试
 
 - [ ] **T1.7 基础表格与文件节点（第一批）**
 【依赖】T1.6
-【产出】`Read/Write CSV·Parquet·JSON`、`Column Filter`、`Row Filter`、`Sorter`、`Column Rename`、`Variable`、`Table Row Count`、`List Files`；写节点声明 side_effect
-【验收】US-TBL-02/AC-1,3,4,5；US-TBL-03/AC-1..4,8；US-TBL-06/AC-3,4；US-TBL-07/AC-1；US-EXE-04/AC-4
+【产出】`Read/Write CSV·Parquet·JSON`、`Column Filter`、`Row Filter`、`Sorter`、`Column Rename`、`Variable`、`Table Row Count`、`List Files`；写节点声明 side_effect，文件/目录参数声明 cache_inputs
+【验收】US-TBL-02/AC-1,3,4,5；US-TBL-03/AC-1..4,8；US-TBL-06/AC-3,4；US-TBL-07/AC-1；US-EXE-04/AC-3,9
 
 - [ ] **T1.8 流程节点（第一批）与 CLI run**
 【依赖】T1.7
-【产出】`Trigger`（仅 manual）、`If`、`Switch`、`Merge`、`Wait`；`weft run` 内嵌模式、`weft serve` 最小 API
-【验收】US-TRG-01/AC-1；US-TRG-02/AC-2；**里程碑 Demo**：CSV 闭环成功，第二次运行仅 pure 上游命中，Write CSV 仍执行，`--var` 覆盖生效
+【产出】`Trigger`（仅 manual）、`If`、`Switch`、双命名输入 `Merge`、`Wait`；`weft run` 内嵌模式、`weft serve` 最小 API
+【验收】US-EXE-01/AC-1；US-EXE-02；US-EXE-03；US-EXE-08/AC-1,4；US-EXE-12/AC-1..5；US-TRG-01/AC-1；US-TRG-02/AC-2；**里程碑 Demo**：CSV 闭环成功，第二次运行仅 pure 上游命中，Write CSV 仍执行，`--var` 覆盖生效
 
 ---
 
 ## M2 画布 UI
 
-- [ ] **T2.1 REST/WS 完整化**
+- [ ] **T2.1 REST/WS 完整化与本机安全边界**
 【依赖】T1.8
-【产出】​`05-api.md` §1–5、§11 中 M2 所需端点与事件；WS 多路订阅；错误码统一
-【验收】API 集成测试覆盖每个端点的 200 与主要错误路径
+【产出】`05-api.md` §1–5、§11 中 M2 所需端点与事件；随机 UI 会话令牌、Host/Origin 校验、WS authenticate 后订阅、403 与统一错误码
+【验收】US-SBX-09/AC-4,5；API 集成测试覆盖每个端点的成功与主要错误路径
 
 - [ ] **T2.2 画布编辑**
 【依赖】T2.1
@@ -120,19 +120,19 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 - [ ] **T2.3 执行可视化**
 【依赖】T2.2
-【产出】状态灯、右键执行菜单（到此/从此/仅此/重置）、日志面板、端口视图（Arrow 流直读 + 分页排序）、错误详情
+【产出】状态灯、右键执行菜单（到此/从此/仅此/重置）、日志面板、端口视图（Arrow 流直读、record batch 分页、显式全量稳定排序）、错误详情
 【验收】US-DES-05；US-EXE-05/AC-1,3,4；US-EXE-06/AC-1,3,4,5；US-EXE-07/AC-1,2
 【Demo】浏览器中从零搭建 M1 工作流并运行、调试
 
 - [ ] **T2.4 循环节点与 UI**
 【依赖】T2.3
-【产出】​`Loop Start/End`（Row/Chunk/Counting × concat/last/variables）、引擎虚拟循环节点、迭代进度显示、配对校验
+【产出】`Loop Start/End`（Row/Chunk/Counting × concat/last/variables）、引擎虚拟循环节点、迭代进度显示、配对校验；Counting 使用上界排他的半开区间
 【验收】US-EXE-10/AC-1..4；US-EXE-11/AC-1..4
 
 - [ ] **T2.5 第二批表格节点**
 【依赖】T2.3
-【产出】​`Joiner`​、​`Concatenate`​、​`GroupBy`​、​`Pivot/Unpivot`​、​`Duplicate Filter`​、​`Missing Value`​、​`Type Cast`​、​`Polars Expression`​、​`Math Formula`​、​`String Manipulation`​、​`Table to Variables`​、​`Variables to Table`​、​`Table Creator`​、​`Table View`​、​`Python Script`​、​`Path Join`​、​`File Copy/Move/Rename/Delete`
-【验收】US-TBL-03..07、US-TBL-08/AC-1..7、US-TBL-10 的全部 P0 AC
+【产出】`Joiner`、动态命名端口 `Concatenate`、`GroupBy`、`Pivot/Unpivot`、`Duplicate Filter`、`Missing Value`、`Type Cast`、AST 白名单 `Polars Expression`、`Math Formula`、`String Manipulation`、`Table to Variables`、`Variables to Table`、`Table Creator`、`Table View`、`Python Script`、`Path Join`、`File Copy/Move/Rename/Delete`
+【验收】US-DES-03/AC-6；US-TBL-03..07、US-TBL-08/AC-1..7、US-TBL-10 的全部 P0 AC
 
 ---
 
@@ -166,11 +166,11 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 - [ ] **T4.1 LLMProxy/LLMClient + mock 服务器**
 【依赖】T1.8 + T0.4 结论
 【产出】主机 LLMProxy、OpenAI 兼容客户端、命名配置、测试连接、mock；key 只在主机侧读取，volatile LLM 节点
-【验收】US-AGT-01/AC-1..4；US-AGT-02/AC-5；US-AGT-06/AC-4；US-EXE-04/AC-4
+【验收】US-AGT-01/AC-1..4；US-AGT-02/AC-5；US-EXE-04/AC-4；pi 的沙箱内代理验收留在 T5.4，不在本卡虚标
 
-- [ ] **T4.2 LLM Call + Prompt Template + 插值**
+- [ ] **T4.2 LLM Call + Prompt Template + 统一插值**
 【依赖】T4.1
-【产出】两节点 + `{var}` / `{table:port}` 插值 + Jinja2 沙箱
+【产出】两节点共用 Jinja2 沙箱子集、`{{ var }}` 与只读 `tables.<port> | table` 表格 filter
 【验收】US-AGT-02/AC-1..4；US-AGT-09/AC-1..4
 
 - [ ] **T4.3 Agent Loop + ToolDispatcher + 审计**
@@ -180,12 +180,12 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 - [ ] **T4.4 授权 Node as Tool**
 【依赖】T4.3
-【产出】tool_capability/参数白名单、冻结参数与 Run 输入快照、ephemeral、禁止 Python/Shell/任意代码、副作用逐次确认、防递归
+【产出】tool_capability/参数白名单、冻结参数与 Run 输入快照、ephemeral、同 Run pool/lane 槽位与排队、Run 取消继承、禁止 Python/Shell/任意代码、副作用逐次确认、防递归
 【验收】US-AGT-04/AC-1..7
 
 - [ ] **T4.5 Chat 面板与聊天触发**
 【依赖】T4.3
-【产出】REST 发送→ChatSource、WS 推送、run/session/source/message 去重映射、独立 `.runs/chat/` 会话
+【产出】REST 发送→ChatSource、WS 认证与推送、run/session/source/message 去重映射、独立 `.runs/chat/` 会话及保留策略
 【验收】US-AGT-07/AC-1..5；US-TRG-03/AC-1,2
 【Demo】场景 B（mock 自动化 + 真实模型手动 US-AGT-03/AC-6），原始 key 不进入沙箱或轨迹
 
@@ -193,25 +193,25 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## M5 沙箱
 
-- [ ] **T5.1 Sandbox 接口 + NoneSandbox（现有语义待讨论）**
-【依赖】T0.2 结论 + NoneSandbox 讨论定案
-【产出】Sandbox 接口、变更模型、受保护路径与契约；NoneSandbox 严格按 US-SBX-01/架构 §7.3/ADR A-07 的定案实现，不在本任务中擅自改名或改语义
+- [ ] **T5.1 Sandbox 接口 + NoneSandbox 影子目录模拟**
+【依赖】T0.2 结论
+【产出】Sandbox 接口、变更模型、受保护路径与契约；NoneSandbox 仅提供受控 read/write/edit/list 影子目录工具，拒绝任意 bash/pi/spawn；实现 `sandbox.allow_none_sandbox`
 【验收】US-SBX-01/AC-1..3；US-SBX-05/AC-4；Linux 契约仅覆盖替身能力，不冒充 Sandboxie 验证
 
 - [ ] **T5.2 SandboxieSandbox**
 【依赖】T5.1
-【产出】独立 `WeftBox-<run_id>`、owned 进程树、helper、网络默认拒绝/白名单、Root/授权目录审计、未知变化提示、只清理本 Run
+【产出】独立 `WeftBox-<run_id>`、owned 进程树、helper、默认拒绝网络与环回 LLMProxy 唯一例外、显式白名单、Root/授权目录审计、未知变化提示、只清理本 Run
 【验收】US-SBX-02/AC-1..4；US-SBX-03/AC-1..4；US-SBX-06/AC-1（全部 win_real）
 
 - [ ] **T5.3 基线、重命名与冲突审批流**
 【依赖】T5.1
-【产出】内容哈希基线、renamed/降级、audit_complete、逐项状态、备份、stale CHANGE_CONFLICT、显式覆盖、幂等 apply/discard
+【产出】内容哈希基线、renamed/降级、audit_complete、逐项状态、备份、200 逐项 stale CHANGE_CONFLICT、显式覆盖、幂等 apply/discard
 【验收】US-SBX-04/AC-1..4；US-SBX-05/AC-1..5
 
 - [ ] **T5.4 Sandboxed Tools + Pi Agent + 人工确认**
 【依赖】T5.2 + T4.3 + T0.4 结论
-【产出】五工具、PiRunner 经沙箱外 LLMProxy、confirm 流；不得向沙箱注入原始 key
-【验收】US-AGT-05/AC-1..6；US-AGT-06/AC-1..4；US-AGT-12/AC-1..4；US-AGT-11/AC-1..3
+【产出】Sandboxie 五工具、none 下 bash/pi 拒绝、PiRunner 经沙箱外 LLMProxy、confirm 流；不得向沙箱注入原始 key
+【验收】US-AGT-05/AC-1..6；US-AGT-06/AC-1..4,6；US-AGT-12/AC-1..4；US-AGT-11/AC-1..3
 【Demo】场景 C 真机通过；重命名可判定或明确降级，审批前真实目录不变，stale 不覆盖
 
 ---
@@ -219,23 +219,69 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 ## M6 触发器 + 打包
 
 - [ ] **T6.1 TriggerManager + schedule/watch/http/HTTP Response**
-【依赖】T1.8
-【产出】统一事件、Trigger params 派生视图、APScheduler、watchdog、token/限速/wait、P0 `HTTP Response` 节点（未执行时 outputs={}）、来源健康
-【验收】US-TRG-01/AC-2,3；US-TRG-04/AC-1..4；US-TRG-05/AC-1..5；US-TRG-06/AC-1..3；US-TRG-07/AC-1,2；US-SBX-09/AC-1..3
+【依赖】T1.8 + T3.4
+【产出】统一事件、Trigger params 派生视图、APScheduler、watch.watches/watchdog、token/限速/wait、P0 `HTTP Response` 单响应节点（未执行 outputs={}，重复执行失败）、来源健康、无人值守 Excel 目标唯一性预检
+【验收】US-TRG-01/AC-2,3；US-TRG-04/AC-1..4；US-TRG-05/AC-1..5；US-TRG-06/AC-1..4；US-TRG-07/AC-1,2；US-SBX-09/AC-1..3；US-XLS-01/AC-4
 
 - [ ] **T6.2 打包/导入**
 【依赖】T1.1
-【产出】pack 排除规则/预检/密钥扫描/绝对路径清单、ERROR 阻断/WARNING 显式确认、unpack zip slip 防护与 uv sync、导入保留 id/本机 duplicate 新 id
-【验收】US-PKG-01/AC-2；US-PKG-03/AC-1..4；US-PKG-04/AC-1..4；US-SBX-08/AC-1..3
-【Demo】场景 D + E；在外部资源、兼容 Weft/uv 和锁定依赖可用前提下，A 机 pack → B 机 unpack → run
+【产出】pack 排除规则/预检/密钥扫描/绝对路径 WARNING 清单、ERROR 阻断/WARNING 显式确认、unpack zip slip 防护与 uv sync、导入保留 id/本机 duplicate 新 id
+【验收】US-PKG-01/AC-1,2；US-PKG-03/AC-1..4；US-PKG-04/AC-1..4；US-SBX-08/AC-1..3
+【Demo】场景 D + E；在外部资源、精确兼容 Weft/uv 和锁定依赖可用前提下，A 机 pack → B 机 unpack → run
 
 ---
 
 ## M7 完整 v1 收尾
 
-- [ ] **T7.1 P1 功能包**：Metanode、注释/便签、运行历史（含 Run 输出快照）、Memory、Rule Engine、Shell Command、Excel Run Macro、资源预检、绝对路径跳转（对应 US-DES-09/10、US-EXE-09、US-AGT-08、US-TBL-05/AC-4、US-TBL-09、US-XLS-09、US-PKG-06/07）
-- [ ] **T7.2 doctor 与运维**：doctor/cleanup 按 owned 记录清理、动态 box 与网络检查、日志轮转、设置页（US-SET-01..04）
-- [ ] **T7.3 完整 v1 发布**：全量 win_real、同机性能回归、README/安装文档/CHANGELOG、构建正式发布；版本号发布前确定，不预写 0.1.0
+- [ ] **T7.1 Metanode 折叠与展开**
+【依赖】T2.5
+【产出】Metanode 内嵌子图、端口重连、子画布与可逆展开
+【验收】US-DES-09/AC-1..4
+
+- [ ] **T7.2 节点注释与画布便签**
+【依赖】T2.2
+【产出】节点注释、Markdown 便签、样式与持久化
+【验收】US-DES-10/AC-1,2
+
+- [ ] **T7.3 运行历史面板**
+【依赖】T2.3
+【产出】历史列表、meta/log/trace 只读视图、内联与 outputs 文件端口读取、Run 保留清理
+【验收】US-EXE-09/AC-1..4
+
+- [ ] **T7.4 Memory 节点**
+【依赖】T4.5
+【产出】Memory Load/Save/Clear、会话截断与保留清理
+【验收】US-AGT-08/AC-1..3
+
+- [ ] **T7.5 Rule Engine**
+【依赖】T2.5
+【产出】复用 Row Filter 条件语法的有序规则、default 与目标列
+【验收】US-TBL-05/AC-4
+
+- [ ] **T7.6 Shell Command**
+【依赖】T1.6
+【产出】可信 Worker 命令执行、插值转义、流式日志与退出码
+【验收】US-TBL-09/AC-1..3
+
+- [ ] **T7.7 Excel Run Macro**
+【依赖】T3.4
+【产出】Application.Run、参数与 COM 错误映射
+【验收】US-XLS-09/AC-1,2
+
+- [ ] **T7.8 外部资源预检与绝对路径跳转**
+【依赖】T6.2
+【产出】只读资源预检、汇总报告与打包警告逐条跳转
+【验收】US-PKG-06/AC-1；US-PKG-07/AC-1,2
+
+- [ ] **T7.9 doctor 与运维**
+【依赖】T5.4 + T6.2
+【产出】doctor/cleanup 按 owned 记录清理、动态 box 与网络检查、日志轮转、完整设置页与保留策略
+【验收】US-SET-01..04
+
+- [ ] **T7.10 完整 v1 发布**
+【依赖】T7.1..T7.9
+【产出】README/安装文档/CHANGELOG、正式构建与发布；版本号发布前确定，不预写 0.1.0
+【验收】全量 CI 与 win_real 绿、同机性能回归通过、PRD 成功标准启动跟踪
 
 ---
 
@@ -255,9 +301,9 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 当前 01–08 设计文档与 `AGENTS.md` 已建立；所有实现任务仍为 `- [ ]`。`docs/09-nodes-v1.md` 当前不存在，T0.1 建导出器骨架、T1.3 首次由代码节点声明/JSON Schema 自动生成，之后只读更新。
 
-以下事项仍未验证或待讨论，不能当成既成真机事实：
+以下事项仍需真机验证，不能当成既成事实：
 
-1. Sandboxie 独立 box、进程归属、重命名、未知路径、网络拒绝与冲突 apply 必须通过 T0.2。
+1. Sandboxie 独立 box、进程归属、重命名、未知路径、网络拒绝与冲突 apply 必须通过 T0.2；未授权路径“拒绝”AC 在验证前不预先弱化。
 2. Excel 多实例、COM 真超时、用户并发编辑与 owned PID 生命周期必须通过 T0.3；性能是同机基准。
 3. pi 非交互调用与沙箱外 LLMProxy 兼容性必须通过 T0.4。
-4. `NoneSandbox` 语义待讨论；`X-Weft-Client: ui` 暂不优化，不能据此声称完成权限控制。
+4. NoneSandbox 已限定为受控影子目录模拟；本机 UI 会话令牌与 Host/Origin 校验是既定安全边界，`X-Weft-Client` 只作操作标记，不构成权限控制。
