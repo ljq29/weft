@@ -103,6 +103,35 @@ describe("T2.2 editing contracts", () => {
     expect(useWorkflowStore.getState().history.length).toBe(50);
   });
 
+  it("US-DES-10/AC-1,2: comments and styled Markdown notes persist separately", () => {
+    useWorkflowStore.getState().addNode(declaration.type, { x: 0, y: 0 });
+    const nodeId = useWorkflowStore.getState().nodes[0].id;
+    useWorkflowStore.getState().updateComment(nodeId, "需要人工复核");
+    useWorkflowStore.getState().addNote({ x: 40, y: 50 });
+    const noteId = useWorkflowStore.getState().nodes[1].id;
+    useWorkflowStore.getState().updateParams(noteId, {
+      markdown: "# 交接说明",
+      color: "#ffeeaa",
+      width: 320,
+      height: 200,
+    });
+    const saved = toDocument(
+      useWorkflowStore.getState(),
+      document.viewport,
+    ) as unknown as WorkflowDocument;
+    expect(saved.nodes).toHaveLength(1);
+    expect(saved.nodes[0].comment).toBe("需要人工复核");
+    expect(saved.notes).toEqual([
+      {
+        id: noteId,
+        position: { x: 40, y: 50 },
+        size: { width: 320, height: 200 },
+        color: "#ffeeaa",
+        markdown: "# 交接说明",
+      },
+    ]);
+  });
+
   it("US-DES-11/AC-3: viewport is persisted into workflow.json", () => {
     const result = toDocument(useWorkflowStore.getState(), {
       x: 10,

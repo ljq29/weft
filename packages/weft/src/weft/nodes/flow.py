@@ -9,6 +9,26 @@ from weft_sdk import CachePolicy, Lane, Node, Port
 from weft.triggers.chat import ChatSessionStore
 
 
+class MetanodeNode(Node):
+    type = "flow.metanode"
+    category = "flow"
+    name = "Metanode"
+    description = "将内嵌子图作为可逆折叠的复合节点"
+    lane = Lane.TRUSTED_SERVICE
+    params_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+            "graph": {"type": "object", "description": "内嵌节点与边"},
+            "interface": {"type": "object", "description": "外部端口到内部端口的映射"},
+        },
+        "required": ["graph", "interface"],
+    }
+
+    def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+        raise RuntimeError("Metanode must be expanded before execution")
+
+
 class TriggerNode(Node):
     type = "flow.trigger"
     category = "flow"

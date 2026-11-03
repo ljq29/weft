@@ -33,6 +33,10 @@ class NodeRegistry:
 
     def declaration(self, type_name: str, params: dict[str, Any] | None = None) -> NodeDeclaration:
         node = self.get(type_name)
+        if node.type == "flow.metanode":
+            from weft.workflow.metanodes import metanode_declaration
+
+            return metanode_declaration(node, params or {}, self)
         return NodeDeclaration(
             node_type=node.type,
             inputs=[
@@ -49,7 +53,23 @@ class NodeRegistry:
         return {node.type: self.declaration(node.type) for node in self.all()}
 
     def declarations_for(self, workflow: Any) -> dict[str, NodeDeclaration]:
-        return {node.type: self.declaration(node.type, node.params) for node in workflow.nodes}
+        from weft.workflow.models import Node as WorkflowNode
+
+        result: dict[str, NodeDeclaration] = {}
+
+        def collect(nodes: list[Any]) -> None:
+            for node in nodes:
+                result[node.type] = self.declaration(node.type, node.params)
+                if node.type == "flow.metanode":
+                    collect(
+                        [
+                            WorkflowNode.model_validate(item)
+                            for item in node.params.get("graph", {}).get("nodes", [])
+                        ]
+                    )
+
+        collect(workflow.nodes)
+        return result
 
     def load_directory(self, directory: Path) -> None:
         for path in sorted(directory.glob("*.py")):
@@ -92,10 +112,12 @@ def builtin_registry() -> NodeRegistry:
         LoopEndNode,
         LoopStartNode,
         MergeNode,
+        MetanodeNode,
         SwitchNode,
         TriggerNode,
         WaitNode,
     )
+    from weft.nodes.memory import MemoryClearNode, MemoryLoadNode, MemorySaveNode
 
     registry = NodeRegistry()
     for node_type in (
@@ -105,6 +127,7 @@ def builtin_registry() -> NodeRegistry:
         IfNode,
         SwitchNode,
         MergeNode,
+        MetanodeNode,
         WaitNode,
         LoopStartNode,
         LoopEndNode,
@@ -114,6 +137,9 @@ def builtin_registry() -> NodeRegistry:
         NodeToolNode,
         SandboxedToolsNode,
         PiAgentNode,
+        MemoryLoadNode,
+        MemorySaveNode,
+        MemoryClearNode,
     ):
         registry.register(node_type)
     for builtin_type in (*BUILTIN_NODES, *BUILTIN_EXTRA_NODES, *EXCEL_NODES):

@@ -196,6 +196,7 @@ Trigger 节点 `variable` 端口输出 `{source, ts, session_id?, payload}`，�
 // .runs/<run_id>/meta.json
 {
   "run_id": "r_20250101_093000_a1b2",
+  "trace_id": "与服务日志关联的 trace_id（默认使用 run_id）",
   "workflow_id": "wf_8f3a...",
   "workflow_revision": 1,
   "frozen_workflow": ".runs/r_20250101_093000_a1b2/workflow.json",

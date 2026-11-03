@@ -247,6 +247,8 @@ class FakeExcelBackend:
         return target
 
     def run_macro(self, workbook: dict[str, Any], macro: str, args: list[Any]) -> Any:
+        if macro in {"Missing", "Raise"}:
+            raise RuntimeError(f"COM error: macro '{macro}' does not exist or raised VBA error")
         return {"macro": macro, "args": args}
 
     @contextmanager

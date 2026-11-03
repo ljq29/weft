@@ -8,6 +8,7 @@ export function SchemaForm({
   root,
   columnHints,
   variables,
+  onCommentChange,
 }: {
   node: WorkflowNodeData;
   declaration?: NodeTypeDecl;
@@ -15,6 +16,7 @@ export function SchemaForm({
   root: string;
   columnHints: string[];
   variables: string[];
+  onCommentChange?: (comment: string) => void;
 }) {
   const properties = declaration?.params_schema.properties ?? {};
   const required = new Set(
@@ -157,6 +159,18 @@ export function SchemaForm({
           </label>
         );
       })}
+      {onCommentChange && (
+        <label>
+          <span>注释</span>
+          <textarea
+            aria-label="节点注释"
+            value={node.comment}
+            onChange={(event) => {
+              onCommentChange(event.target.value);
+            }}
+          />
+        </label>
+      )}
     </form>
   );
 }

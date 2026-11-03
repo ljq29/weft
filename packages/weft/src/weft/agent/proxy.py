@@ -14,6 +14,9 @@ class LLMProxy:
         self.settings = settings
 
     def _target(self, name: str, endpoint: str) -> tuple[dict[str, Any], str, dict[str, str]]:
+        from weft.operations import log_llm_request
+
+        log_llm_request(name, "HTTP", endpoint)
         config = self.settings.llm(name)
         base = config["base_url"].rstrip("/")
         if not base.endswith("/v1"):

@@ -53,11 +53,13 @@ class RunRecord:
             "tool_calls": 0,
         }
     )
+    trace_id: str = ""
     finished: asyncio.Event = field(default_factory=asyncio.Event)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "run_id": self.run_id,
+            "trace_id": self.trace_id or self.run_id,
             "workflow_id": self.workflow_id,
             "workflow_revision": self.workflow_revision,
             "frozen_workflow": f".runs/{self.run_id}/workflow.json",

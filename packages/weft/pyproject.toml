@@ -19,6 +19,7 @@ dependencies = [
   "watchdog>=6.0",
   "xlwings>=0.30; sys_platform == 'win32'",
   "pywin32>=306; sys_platform == 'win32'",
+  "loguru>=0.7",
 ]
 
 [project.scripts]
@@ -27,6 +28,9 @@ weft = "weft.cli:main"
 [build-system]
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.hooks.custom]
+path = "build_hooks.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/weft"]

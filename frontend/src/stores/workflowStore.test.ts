@@ -40,6 +40,9 @@ describe("T2.2 workflow editing store", () => {
 
   it("US-DES-08/AC-1: undo and redo restore node edits", () => {
     useWorkflowStore.getState().addNode(declaration.type, { x: 0, y: 0 });
+    const added = useWorkflowStore.getState().nodes[0];
+    useWorkflowStore.getState().moveNodes([{ ...added, selected: true }]);
+    expect(useWorkflowStore.getState().history).toHaveLength(1);
     useWorkflowStore.getState().undo();
     expect(useWorkflowStore.getState().nodes).toHaveLength(0);
     useWorkflowStore.getState().redo();

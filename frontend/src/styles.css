@@ -176,3 +176,51 @@ button {
   color: #b91c1c;
   white-space: pre-wrap;
 }
+.canvas-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #d6b656;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.note-toolbar {
+  display: flex;
+  justify-content: space-between;
+  min-height: 28px;
+}
+.note-toolbar input {
+  width: 36px;
+  padding: 0;
+}
+.canvas-note textarea {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+}
+.note-markdown {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.note-markdown > :first-child {
+  margin-top: 0;
+}
+.history-panel {
+  max-height: 300px;
+  overflow: auto;
+  padding: 8px 16px;
+  background: white;
+}
+.history-panel button {
+  margin: 2px;
+}
+.history-panel table {
+  border-collapse: collapse;
+}
+.history-panel th,
+.history-panel td {
+  padding: 4px 8px;
+  border: 1px solid #cbd5e1;
+}

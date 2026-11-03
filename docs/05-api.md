@@ -60,7 +60,8 @@
 
 |方法|路径|说明|
 | ------| ------| ------------------------------------------------------------------|
-|POST|`/api/workflows/{id}/runs`|发起运行：`{scope: {kind: all\|to_node\|from_node\|single, node_id?}, overrides?: {k: v}}`。立即执行或入队 → 202 `{run_id, disposition: started\|queued}`；`drop` 策略丢弃 → 200 `{run_id: null, disposition: dropped}` 并记录日志；队列满 → 409 `RUN_QUEUE_FULL`。未配置节点存在 → 400（detail 列出）|
+|POST|`/api/workflows/{id}/runs`|发起运行：`{scope: {kind: all\|to_node\|from_node\|single, node_id?}, overrides?: {k: v}, allow_missing_resources?: bool}`。立即执行或入队 → 202 `{run_id, disposition: started\|queued}`；`drop` 策略丢弃 → 200 `{run_id: null, disposition: dropped}` 并记录日志；队列满 → 409 `RUN_QUEUE_FULL`。未配置节点存在 → 400（detail 列出）；外部资源缺失默认 409 `MISSING_EXTERNAL_RESOURCES`，只有用户确认后才以 `allow_missing_resources: true` 继续|
+|GET|`/api/workflows/{id}/resources/preflight`|只读汇总声明的文件、工作簿、LLM 配置与 pi 资源：`{ok, resources, missing}`；不执行节点或写操作|
 |GET|`/api/workflows/{id}/runs?status=&limit=20`|运行历史（US-EXE-09）|
 |GET|`/api/runs/{run_id}`|Run 详情 = `meta.json` 内容（`04-data-model.md` §6）|
 |POST|`/api/runs/{run_id}/cancel`|取消 → 202；已终态 → 409|

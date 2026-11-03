@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -93,6 +94,16 @@ class TraceWriter:
         self.path = root / ".runs" / run_id / "nodes" / f"{node_id}.trace.jsonl"
         self.include_prompts = include_prompts
         self._lock = threading.Lock()
+        self.cleanup(root, retention_days)
+
+    @staticmethod
+    def cleanup(root: Path, retention_days: int) -> None:
+        if retention_days <= 0:
+            return
+        cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+        for path in root.glob(".runs/r_*/nodes/*.trace.jsonl"):
+            if datetime.fromtimestamp(path.stat().st_mtime, UTC) < cutoff:
+                path.unlink()
 
     def append(self, **record: Any) -> None:
         record = {"ts": now(), **record}

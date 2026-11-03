@@ -4,7 +4,7 @@ import asyncio
 from typing import Any
 
 import polars as pl
-from weft_sdk import CachePolicy, Lane, Node, Port, ToolCapability
+from weft_sdk import CachePolicy, ExternalResource, Lane, Node, Port, ToolCapability
 
 
 class ExcelClient:
@@ -96,6 +96,10 @@ class ExcelWorkbookNode(Node):
         ["mode"],
     )
     portable_params = ["path"]
+    external_resources = [
+        ExternalResource("name", "workbook"),
+        ExternalResource("path", "file"),
+    ]
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         target = params.get("name") if params["mode"] == "open_existing" else params.get("path")
@@ -320,6 +324,38 @@ class ExcelSaveNode(Node):
         return {"path": str(result) if result is not None else None}
 
 
+class ExcelRunMacroNode(Node):
+    type = "excel.run_macro"
+    category = "excel"
+    name = "Excel Run Macro"
+    description = "通过 ExcelWorker 的 STA 串行队列调用 Application.Run"
+    lane = Lane.TRUSTED_SERVICE
+    cache_policy = CachePolicy.SIDE_EFFECT
+    inputs = (Port("workbook", "excel", "目标工作簿"),)
+    outputs = (Port("variable", "variable", "宏返回值"),)
+    params_schema = schema(
+        {
+            "macro": {"type": "string", "description": "宏名，例如 Module1.Refresh"},
+            "args": {
+                "type": "array",
+                "description": "按顺序传给宏的参数",
+                "default": [],
+            },
+        },
+        ["macro"],
+    )
+
+    def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+        result = ctx.excel.call(
+            ctx.run_id,
+            "run_macro",
+            workbook_input(inputs, ctx),
+            params["macro"],
+            params.get("args", []),
+        )
+        return {"variable": result}
+
+
 EXCEL_NODES = (
     ExcelConnectNode,
     ExcelWorkbookNode,
@@ -329,4 +365,5 @@ EXCEL_NODES = (
     ExcelSheetNamesNode,
     ExcelSheetNode,
     ExcelSaveNode,
+    ExcelRunMacroNode,
 )

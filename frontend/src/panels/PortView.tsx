@@ -34,6 +34,7 @@ export function PortView({
   const [sortBy, setSortBy] = useState("");
   const [descending, setDescending] = useState(false);
   const [error, setError] = useState("");
+  const [jsonValue, setJsonValue] = useState<{ value: unknown } | null>(null);
   useEffect(() => {
     const load = async () => {
       try {
@@ -50,6 +51,17 @@ export function PortView({
           headers: { Authorization: `Bearer ${sessionToken()}` },
         });
         if (!response.ok) throw new Error("节点未执行");
+        setError("");
+        if (
+          response.headers.get("content-type")?.includes("application/json")
+        ) {
+          setJsonValue({ value: (await response.json()) as unknown });
+          setColumns([]);
+          setRows([]);
+          setTotal(1);
+          return;
+        }
+        setJsonValue(null);
         const table = tableFromIPC(await response.arrayBuffer());
         setColumns(table.schema.fields.map((field) => field.name));
         setTotal(
@@ -91,45 +103,50 @@ export function PortView({
         </button>
         <span>共 {total} 行，每页 100 行</span>
         {error && <p role="alert">{error}</p>}
-        <table>
-          <thead>
-            <tr>
-              {columns.map((column) => (
-                <th key={column}>
-                  <button
-                    onClick={() => {
-                      if (sortBy === column) setDescending(!descending);
-                      else {
-                        setSortBy(column);
-                        setDescending(false);
-                      }
-                      setOffset(0);
-                    }}
-                  >
-                    {column}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={index}>
-                {row.values.map((value, cell) => (
-                  <td key={cell}>
+        {jsonValue && <pre>{JSON.stringify(jsonValue.value, null, 2)}</pre>}
+        {!jsonValue && (
+          <table>
+            <thead>
+              <tr>
+                {columns.map((column) => (
+                  <th key={column}>
                     <button
                       onClick={() => {
-                        void navigator.clipboard.writeText(formatValue(value));
+                        if (sortBy === column) setDescending(!descending);
+                        else {
+                          setSortBy(column);
+                          setDescending(false);
+                        }
+                        setOffset(0);
                       }}
                     >
-                      {formatValue(value)}
+                      {column}
                     </button>
-                  </td>
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={index}>
+                  {row.values.map((value, cell) => (
+                    <td key={cell}>
+                      <button
+                        onClick={() => {
+                          void navigator.clipboard.writeText(
+                            formatValue(value),
+                          );
+                        }}
+                      >
+                        {formatValue(value)}
+                      </button>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
     </div>
   );

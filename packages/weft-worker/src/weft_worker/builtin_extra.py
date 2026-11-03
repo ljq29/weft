@@ -13,7 +13,8 @@ import polars as pl
 from send2trash import send2trash
 from weft_sdk import CachePolicy, DynamicPortGroup, Node, Port
 
-from weft_worker.builtin import prop, schema, validate_table
+from weft_worker.builtin import prop, row_condition, schema, validate_table
+from weft_worker.shell import ShellCommandNode
 
 
 class ExtraTableNode(Node):
@@ -416,6 +417,31 @@ class TableCreator(Node):
         return {"out": table}
 
 
+class RuleEngine(ExtraTableNode):
+    type = "table.rule_engine"
+    category = "table"
+    name = "Rule Engine"
+    description = "按有序规则赋值，首个命中生效，其余使用默认值"
+    params_schema = schema(
+        {
+            "rules": prop("array", "有序规则 [{condition, value}]"),
+            "default": {"description": "未命中时的默认值"},
+            "alias": prop("string", "输出列名"),
+        },
+        ["rules", "alias"],
+    )
+
+    def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+        expression = pl.lit(params.get("default"))
+        for rule in reversed(params["rules"]):
+            expression = (
+                pl.when(row_condition(rule["condition"]))
+                .then(pl.lit(rule.get("value")))
+                .otherwise(expression)
+            )
+        return {"out": inputs["in"].with_columns(expression.alias(params["alias"]))}
+
+
 class TableView(ExtraTableNode):
     type = "table.view"
     category = "table"
@@ -596,6 +622,7 @@ BUILTIN_EXTRA_NODES = (
     TableToVariables,
     VariablesToTable,
     TableCreator,
+    RuleEngine,
     TableView,
     PathJoin,
     FileCopy,
@@ -603,4 +630,5 @@ BUILTIN_EXTRA_NODES = (
     FileRename,
     FileDelete,
     PythonScript,
+    ShellCommandNode,
 )

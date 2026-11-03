@@ -7,6 +7,7 @@ import subprocess
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 from weft.worker.environment import WorkflowEnvironment
@@ -17,9 +18,16 @@ class WorkerCrashedError(RuntimeError):
 
 
 class WorkerProcess:
-    def __init__(self, environment: WorkflowEnvironment, run_id: str, env: dict[str, str]) -> None:
+    def __init__(
+        self,
+        environment: WorkflowEnvironment,
+        run_id: str,
+        env: dict[str, str],
+        on_log: Callable[[str, str, str], None] | None = None,
+    ) -> None:
         self.environment = environment
         self.run_id = run_id
+        self.on_log = on_log
         self.responses: dict[Any, dict[str, Any]] = {}
         self.condition = threading.Condition()
         self.execute_lock = threading.Lock()
@@ -51,6 +59,13 @@ class WorkerProcess:
             return
         for line in self.process.stdout:
             message = json.loads(line)
+            if message.get("method") == "log" and self.on_log is not None:
+                params = message.get("params", {})
+                self.on_log(
+                    str(params.get("node_exec_id", "")),
+                    str(params.get("level", "INFO")),
+                    str(params.get("message", "")),
+                )
             if "id" in message:
                 with self.condition:
                     self.responses[message["id"]] = message
@@ -113,12 +128,14 @@ class WorkerPool:
         self.worker_env["PYTHONNOUSERSITE"] = "1"
         self._lock = threading.Lock()
         self._next = 0
+        self.on_log: Callable[[str, str, str], None] | None = None
 
     def start(self) -> None:
         if self.workers:
             return
         self.workers = [
-            WorkerProcess(self.environment, self.run_id, self.worker_env) for _ in range(self.size)
+            WorkerProcess(self.environment, self.run_id, self.worker_env, self.on_log)
+            for _ in range(self.size)
         ]
 
     async def execute(

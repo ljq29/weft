@@ -91,8 +91,10 @@ class Engine:
         trigger: dict[str, Any] | None = None,
         scope: dict[str, Any] | None = None,
         run_id: str | None = None,
+        trace_id: str | None = None,
     ) -> PreparedRun:
         workflow = workflow.model_copy(deep=True)
+        frozen_workflow = workflow
         run_id = run_id or self.new_run_id()
         trigger = trigger or {
             "source": "manual",
@@ -103,12 +105,16 @@ class Engine:
         variables = {variable.name: variable.value for variable in workflow.variables}
         variables.update(trigger["payload"].get("overrides", {}))
         self._precheck(workflow, registry, variables)
+        from weft.workflow.metanodes import expand_metanodes
+
+        workflow = expand_metanodes(workflow)
         record = RunRecord(
             run_id=run_id,
             workflow_id=workflow.id,
             workflow_revision=workflow.revision,
             trigger=trigger,
             scope=scope,
+            trace_id=trace_id or run_id,
             nodes={node.id: NodeRecord() for node in workflow.nodes},
         )
         prepared = PreparedRun(root, workflow, registry, record)
@@ -126,7 +132,7 @@ class Engine:
         self.runs[run_id] = prepared
         run_dir = root / ".runs" / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        frozen = workflow.model_dump(mode="json")
+        frozen = frozen_workflow.model_dump(mode="json")
         frozen["node_manifest"] = [
             {"node_id": node.id, **registry.get(node.type).manifest(node.params)}
             for node in workflow.nodes
@@ -297,6 +303,9 @@ class Engine:
                     pool = self.worker_pools.get(prepared.record.run_id)
                     if pool is None:
                         pool = self.worker_pool_factory(prepared.root, prepared.record.run_id)
+                        pool.on_log = lambda node_id, level, message: self._event(
+                            prepared, "node.log", node_id, {"level": level, "message": message}
+                        )
                         self.worker_pools[prepared.record.run_id] = pool
                     result = await pool.execute(
                         node_id,
@@ -511,6 +520,9 @@ class Engine:
                 pool = self.worker_pools.get(prepared.record.run_id)
                 if pool is None:
                     pool = self.worker_pool_factory(prepared.root, prepared.record.run_id)
+                    pool.on_log = lambda node_id, level, message: self._event(
+                        prepared, "node.log", node_id, {"level": level, "message": message}
+                    )
                     self.worker_pools[prepared.record.run_id] = pool
                 input_refs = self._ephemeral_input_refs(prepared, execution_id, inputs)
                 result = await pool.execute(execution_id, node.type, params, input_refs, variables)
@@ -749,6 +761,7 @@ class Engine:
         line = {
             "event": event,
             "run_id": prepared.record.run_id,
+            "trace_id": prepared.record.trace_id or prepared.record.run_id,
             "node_id": node_id,
             "ts": now(),
             "data": data or {},

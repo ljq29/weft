@@ -50,7 +50,11 @@ test("US-PKG-03/AC-1,4; US-PKG-04/AC-1,3,5: pack and import through the browser"
     void dialog.accept(value);
   };
   page.on("dialog", importDialogs);
+  const unpacked = page.waitForResponse(
+    (response) => response.url().endsWith("/workflows/unpack") && response.ok(),
+  );
   await page.getByRole("button", { name: "导入工作流" }).click();
+  await unpacked;
   await expect(page.locator(".weft-node")).toHaveCount(1);
   await expect.poll(() => importStep).toBe(2);
   page.off("dialog", importDialogs);

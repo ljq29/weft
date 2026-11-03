@@ -27,9 +27,12 @@ interface WorkflowState extends Snapshot {
     nodes: FlowNode[],
     edges: FlowEdge[],
   ) => void;
+  setGraph: (nodes: FlowNode[], edges: FlowEdge[]) => void;
   setNodeTypes: (types: NodeTypeDecl[]) => void;
   setSelected: (ids: string[]) => void;
   addNode: (type: string, position: { x: number; y: number }) => void;
+  addNote: (position: { x: number; y: number }) => void;
+  updateComment: (id: string, comment: string) => void;
   updateParams: (id: string, params: Record<string, unknown>) => void;
   connect: (edge: FlowEdge) => void;
   moveNodes: (nodes: FlowNode[]) => void;
@@ -107,6 +110,9 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
         future: [],
       });
     },
+    setGraph: (nodes, edges) => {
+      change(nodes, edges);
+    },
     setNodeTypes: (nodeTypes) => {
       set({ nodeTypes });
     },
@@ -139,6 +145,42 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
         },
       };
       change([...state.nodes, node], state.edges);
+    },
+    addNote: (position) => {
+      const state = get();
+      const noteId = id("note");
+      const note: FlowNode = {
+        id: noteId,
+        type: "note",
+        position,
+        data: {
+          nodeId: noteId,
+          type: "canvas.note",
+          name: "便签",
+          params: {
+            markdown: "# 新便签\n双击此处编辑",
+            color: "#fef3c7",
+            width: 240,
+            height: 160,
+          },
+          inputs: [],
+          outputs: [],
+          comment: "",
+          status: "configured",
+        },
+      };
+      change([...state.nodes, note], state.edges);
+    },
+    updateComment: (nodeId, comment) => {
+      const state = get();
+      change(
+        state.nodes.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...node.data, comment } }
+            : node,
+        ),
+        state.edges,
+      );
     },
     updateParams: (nodeId, params) => {
       const state = get();
@@ -193,7 +235,17 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
       change([...state.nodes], [...retained, edge]);
     },
     moveNodes: (nodes) => {
-      change(nodes, get().edges);
+      const previous = get().nodes;
+      const changed =
+        nodes.length !== previous.length ||
+        nodes.some(
+          (node, index) =>
+            previous[index]?.id !== node.id ||
+            previous[index]?.position.x !== node.position.x ||
+            previous[index]?.position.y !== node.position.y,
+        );
+      if (changed) change(nodes, get().edges);
+      else set({ nodes });
     },
     deleteSelected: () => {
       const state = get();
@@ -290,15 +342,35 @@ export function toDocument(
     ...state.document,
     settings: state.document.settings,
     variables: state.document.variables,
-    nodes: state.nodes.map((node) => ({
-      id: node.id,
-      type: node.data.type,
-      node_version: 1,
-      name: node.data.name,
-      position: node.position,
-      comment: node.data.comment,
-      params: node.data.params,
-    })),
+    nodes: state.nodes
+      .filter((node) => node.data.type !== "canvas.note")
+      .map((node) => ({
+        id: node.id,
+        type: node.data.type,
+        node_version: 1,
+        name: node.data.name,
+        position: node.position,
+        comment: node.data.comment,
+        params: node.data.params,
+      })),
+    notes: state.nodes
+      .filter((node) => node.data.type === "canvas.note")
+      .map((node) => ({
+        id: node.id,
+        position: node.position,
+        size: {
+          width: Number(node.data.params.width ?? 240),
+          height: Number(node.data.params.height ?? 160),
+        },
+        color:
+          typeof node.data.params.color === "string"
+            ? node.data.params.color
+            : "#fef3c7",
+        markdown:
+          typeof node.data.params.markdown === "string"
+            ? node.data.params.markdown
+            : "",
+      })),
     edges: state.edges.map((edge, order) => ({
       id: edge.id,
       source: edge.source,

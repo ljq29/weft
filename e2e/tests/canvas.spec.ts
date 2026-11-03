@@ -57,11 +57,18 @@ test("US-DES-08/AC-1,2, US-DES-11/AC-1,2: history and view navigation work", asy
   await expect(page.locator(".weft-node")).toHaveCount(1);
   await page.getByRole("button", { name: "Read CSV", exact: true }).dblclick();
   await expect(page.locator(".weft-node")).toHaveCount(2);
+  await page
+    .locator(".react-flow__pane")
+    .click({ position: { x: 500, y: 80 } });
   await page.keyboard.press("Control+z");
   await expect(page.locator(".weft-node")).toHaveCount(1);
   await page.keyboard.press("Control+y");
   await expect(page.locator(".weft-node")).toHaveCount(2);
-  await page.locator(".weft-node").filter({ hasText: "Read CSV" }).click();
+  await page
+    .locator(".weft-node")
+    .filter({ hasText: "Read CSV" })
+    .locator("strong")
+    .click();
   await page.keyboard.press("Control+c");
   await page.keyboard.press("Control+v");
   await expect(page.locator(".weft-node")).toHaveCount(3);

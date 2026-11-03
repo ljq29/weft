@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 import polars as pl
-from weft_sdk import CachePolicy, Lane, Node, Port
+from weft_sdk import CachePolicy, ExternalResource, Lane, Node, Port
 
 from weft.agent.audit import AuditLog, TraceWriter
 from weft.agent.loop import run_agent_loop
@@ -40,6 +40,7 @@ class PromptTemplateNode(Node):
         ["template"],
     )
     portable_params = ["path"]
+    external_resources = [ExternalResource("path", "file")]
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         source = params["template"]
@@ -81,6 +82,7 @@ class LLMCallNode(Node):
         },
         ["llm", "user_prompt"],
     )
+    external_resources = [ExternalResource("llm", "llm")]
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         return asyncio.run(self._execute(ctx, inputs, params))
@@ -292,6 +294,10 @@ class PiAgentNode(Node):
         },
         ["task", "llm"],
     )
+    external_resources = [
+        ExternalResource("llm", "llm"),
+        ExternalResource("pi_path", "pi"),
+    ]
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         from weft.agent.pi import PiRunner
@@ -361,6 +367,7 @@ class AgentLoopNode(Node):
         },
         ["llm", "task"],
     )
+    external_resources = [ExternalResource("llm", "llm")]
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         return asyncio.run(self._execute(ctx, inputs, params))

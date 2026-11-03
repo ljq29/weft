@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -60,11 +61,26 @@ class ExecutionLock:
     @contextmanager
     def acquire(self) -> Iterator[None]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.touch()
-        with self.path.open("r+b") as stream:
-            if self.path.stat().st_size == 0:
-                stream.write(b"\0")
-                stream.flush()
+        deadline = time.monotonic() + 10
+        while True:
+            stream = None
+            try:
+                self.path.touch()
+                stream = self.path.open("r+b")
+                if self.path.stat().st_size == 0:
+                    stream.write(b"\0")
+                    stream.flush()
+                break
+            except PermissionError:
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except PermissionError:
+                        pass
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.02)
+        with stream:
             stream.seek(0)
             if os.name == "nt":
                 msvcrt.locking(stream.fileno(), msvcrt.LK_LOCK, 1)

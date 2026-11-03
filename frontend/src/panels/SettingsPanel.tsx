@@ -22,11 +22,21 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState("");
   const [headers, setHeaders] = useState("{}");
   const [message, setMessage] = useState("");
+  const [cache, setCache] = useState<Record<string, unknown>>({});
+  const [advanced, setAdvanced] = useState("{}");
   useEffect(() => {
-    void api<{ llm?: Record<string, LLMConfig> }>("/settings")
+    void api<{
+      llm?: Record<string, LLMConfig>;
+      cache?: Record<string, unknown>;
+    }>("/settings")
       .then((settings) => {
         const values = settings.llm ?? {};
         setConfigs(values);
+        setCache(settings.cache ?? {});
+        const rest = { ...settings };
+        delete rest.llm;
+        delete rest.cache;
+        setAdvanced(JSON.stringify(rest, null, 2));
         const first = Object.keys(values)[0] ?? "";
         setSelected(first);
         setHeaders(
@@ -47,17 +57,20 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const save = async () => {
     try {
       const extra_headers = JSON.parse(headers) as Record<string, string>;
+      const other = JSON.parse(advanced) as Record<string, unknown>;
       const result = await api<{ llm: Record<string, LLMConfig> }>(
         "/settings",
         {
           method: "PUT",
           body: JSON.stringify({
+            ...other,
             llm: Object.fromEntries(
               Object.entries(configs).map(([name, config]) => [
                 name,
                 selected === name ? { ...config, extra_headers } : config,
               ]),
             ),
+            cache,
           }),
         },
       );
@@ -168,6 +181,32 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               setHeaders(event.target.value);
             }}
           />
+        </label>
+        <label>
+          最近 Run 保留数
+          <input
+            aria-label="最近 Run 保留数"
+            type="number"
+            min={0}
+            value={Number(cache.run_retention ?? 50)}
+            onChange={(event) => {
+              setCache({
+                ...cache,
+                run_retention: Number(event.target.value),
+              });
+            }}
+          />
+        </label>
+        <label>
+          运行与运维配置（JSON）
+          <textarea
+            aria-label="运行与运维配置（JSON）"
+            value={advanced}
+            onChange={(event) => {
+              setAdvanced(event.target.value);
+            }}
+          />
+          <small>server.host / server.port 保存后需要重启服务。</small>
         </label>
         <button onClick={() => void save()}>保存设置</button>
         <button

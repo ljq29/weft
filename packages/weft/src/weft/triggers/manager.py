@@ -164,9 +164,18 @@ class TriggerManager:
     async def emit(self, workflow_id: str, source: str, payload: dict[str, Any]) -> Any:
         from weft.triggers.preflight import precheck_excel_targets
         from weft.workflow import WorkflowStore
+        from weft.workflow.resources import preflight_resources
 
         root = self.roots[workflow_id]
         workflow = WorkflowStore(root).load()
+        registry = (
+            self.coordinator.engine.registry
+            if hasattr(self.coordinator.engine, "registry")
+            else self.registry
+        )
+        report = await preflight_resources(workflow, root, registry, self.coordinator.engine)
+        if report["missing"]:
+            raise ValueError(f"无人值守触发外部资源缺失：{report['missing']}")
         await precheck_excel_targets(workflow, self.coordinator.engine)
         return await self.coordinator.submit(
             workflow,

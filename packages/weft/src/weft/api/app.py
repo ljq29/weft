@@ -40,6 +40,7 @@ class CreateRequest(BaseModel):
 class RunRequest(BaseModel):
     scope: dict[str, Any] | None = None
     overrides: dict[str, Any] = {}
+    allow_missing_resources: bool = False
 
 
 class ChatRequest(BaseModel):
@@ -164,6 +165,7 @@ def create_app(
 
     @app.middleware("http")
     async def security(request: Any, call_next: Any) -> Any:
+        request.state.trace_id = secrets.token_hex(8)
         request_host = request.headers.get("host", "")
         if request_host not in allowed_hosts:
             return error("FORBIDDEN", "Host 不受信任", 403)
@@ -181,7 +183,16 @@ def create_app(
                 request.headers.get("authorization", ""), f"Bearer {expected}"
             ):
                 return error("UNAUTHORIZED", "令牌缺失或无效", 401)
-        return await call_next(request)
+        response = await call_next(request)
+        from weft.operations import log_http
+
+        log_http(
+            request.method,
+            request.url.path,
+            response.status_code,
+            request.state.trace_id,
+        )
+        return response
 
     @app.get("/health")
     def health() -> dict[str, bool]:
@@ -196,16 +207,28 @@ def create_app(
             "warning": "非本机监听已启用" if host not in {"127.0.0.1", "localhost", "::1"} else "",
         }
 
+    @app.get("/api/system/doctor")
+    async def system_doctor() -> Any:
+        from weft.doctor import run_doctor
+
+        return await asyncio.to_thread(run_doctor)
+
     from weft.agent.client import LLMClient
     from weft.agent.proxy import LLMProxy
     from weft.agent.settings import LLMConfigError, SettingsStore
 
     settings_store = SettingsStore()
     app.state.settings = settings_store
+    app.state.coordinator.run_retention = (
+        settings_store.read().get("cache", {}).get("run_retention", 50)
+    )
     llm_proxy = LLMProxy(settings_store)
     app.state.llm_proxy = llm_proxy
     engine.llm_client = LLMClient(llm_proxy)
     app.state.llm = engine.llm_client
+    from weft.operations import configure_service_logging
+
+    configure_service_logging(settings_store.read())
 
     @app.get("/api/settings")
     def get_settings() -> dict[str, Any]:
@@ -214,7 +237,12 @@ def create_app(
     @app.put("/api/settings")
     def update_settings(settings: dict[str, Any]) -> Any:
         try:
-            return settings_store.update(settings)
+            updated = settings_store.update(settings)
+            app.state.coordinator.run_retention = updated.get("cache", {}).get("run_retention", 50)
+            app.state.excel.call_timeout = updated["excel"]["call_timeout"]
+            app.state.excel.restart_after_timeouts = updated["excel"]["restart_after_timeouts"]
+            configure_service_logging(updated)
+            return updated
         except LLMConfigError as exception:
             return error("INVALID_SETTINGS", str(exception), 400)
 
@@ -525,12 +553,40 @@ def create_app(
         status = 200 if result.get("disposition") == "dropped" else 202
         return JSONResponse(result, status_code=status)
 
+    @app.get("/api/workflows/{workflow_id}/resources/preflight")
+    async def resource_preflight(workflow_id: str) -> Any:
+        from weft.workflow.resources import preflight_resources
+
+        return await preflight_resources(
+            WorkflowStore(root_for(app, workflow_id)).load(),
+            root_for(app, workflow_id),
+            app.state.registry,
+            app.state.engine,
+        )
+
     @app.post("/api/workflows/{workflow_id}/runs", status_code=202)
-    async def run(workflow_id: str, request: RunRequest) -> Any:
+    async def run(workflow_id: str, request: RunRequest, http_request: Request) -> Any:
+        from weft.workflow.resources import preflight_resources
+
         root = root_for(app, workflow_id)
         store = WorkflowStore(root)
+        document = store.load()
+        report = await preflight_resources(
+            document, root, app.state.registry, app.state.engine, request.overrides
+        )
+        if report["missing"] and not request.allow_missing_resources:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "error": {
+                        "code": "MISSING_EXTERNAL_RESOURCES",
+                        "message": "外部资源缺失",
+                        "detail": report,
+                    }
+                },
+            )
         result = await app.state.coordinator.submit(
-            store.load(),
+            document,
             root,
             app.state.registry,
             trigger={
@@ -539,6 +595,7 @@ def create_app(
                 "payload": {"overrides": request.overrides},
             },
             scope=request.scope,
+            trace_id=http_request.state.trace_id,
         )
         return {"run_id": result.run_id, "disposition": result.disposition}
 
@@ -576,19 +633,22 @@ def create_app(
 
     @app.get("/api/workflows/{workflow_id}/runs")
     def runs(workflow_id: str, limit: int = 20) -> list[dict[str, Any]]:
-        root = root_for(app, workflow_id)
-        records = []
-        for path in sorted((root / ".runs").glob("r_*/meta.json"), reverse=True)[:limit]:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            records.append(
-                {key: data.get(key) for key in ("run_id", "status", "started_at", "finished_at")}
-                | {"trigger_source": data["trigger"]["source"]}
-            )
-        return records
+        from weft.workflow.history import RunHistory
+
+        return RunHistory(root_for(app, workflow_id)).list_runs(limit)
 
     @app.get("/api/runs/{run_id}")
-    def get_run(run_id: str) -> dict[str, Any]:
-        return dict(app.state.engine.runs[run_id].record.to_dict())
+    def get_run(run_id: str) -> Any:
+        if run_id in app.state.engine.runs:
+            return dict(app.state.engine.runs[run_id].record.to_dict())
+        from weft.workflow.history import RunHistory
+
+        for root in app.state.roots.values():
+            try:
+                return RunHistory(root).get(run_id)
+            except (ValueError, FileNotFoundError):
+                continue
+        return error("RUN_NOT_FOUND", "运行记录不存在", 404)
 
     @app.post("/api/runs/{run_id}/cancel", status_code=202)
     def cancel(run_id: str) -> dict[str, Any]:
@@ -632,7 +692,7 @@ def create_app(
         from weft.sandbox.review import ChangeReviewStore
 
         try:
-            return ChangeReviewStore(run_root(app, run_id), run_id).load().to_dict()
+            return ChangeReviewStore(workflow_root_for_run(app, run_id), run_id).load().to_dict()
         except FileNotFoundError:
             return error("CHANGES_NOT_READY", "变更尚未生成", 404)
 
@@ -640,14 +700,14 @@ def create_app(
     def change_diff(run_id: str, path: str) -> Any:
         from weft.sandbox.review import ChangeReviewStore
 
-        return ChangeReviewStore(run_root(app, run_id), run_id).diff(Path(path))
+        return ChangeReviewStore(workflow_root_for_run(app, run_id), run_id).diff(Path(path))
 
     @app.post("/api/runs/{run_id}/changes/apply")
     def apply_changes(run_id: str, request: ChangeApplyRequest) -> Any:
         from weft.sandbox.review import ChangeReviewStore, ProtectedChangeError
 
         try:
-            results = ChangeReviewStore(run_root(app, run_id), run_id).apply(
+            results = ChangeReviewStore(workflow_root_for_run(app, run_id), run_id).apply(
                 [Path(path) for path in request.paths], request.overwrite_conflicts
             )
         except ProtectedChangeError as exception:
@@ -658,7 +718,7 @@ def create_app(
     def discard_changes(run_id: str, request: ChangeDiscardRequest) -> Any:
         from weft.sandbox.review import ChangeReviewStore
 
-        results = ChangeReviewStore(run_root(app, run_id), run_id).discard(
+        results = ChangeReviewStore(workflow_root_for_run(app, run_id), run_id).discard(
             [Path(path) for path in request.paths] if request.paths is not None else None
         )
         return {"results": [change.to_dict() for change in results]}
@@ -675,7 +735,7 @@ def create_app(
 
     @app.get("/api/runs/{run_id}/audit")
     def run_audit(run_id: str) -> list[dict[str, Any]]:
-        path = run_root(app, run_id) / ".runs" / run_id / "audit.jsonl"
+        path = run_root(app, run_id) / "audit.jsonl"
         if not path.exists():
             return []
         return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
@@ -708,11 +768,19 @@ def create_app(
         sort_by: str = "",
         desc: bool = False,
     ) -> Any:
-        record = app.state.engine.runs[run_id].record.nodes[node_id]
-        if port_name not in record.outputs:
+        root = workflow_root_for_run(app, run_id)
+        if run_id in app.state.engine.runs:
+            record = app.state.engine.runs[run_id].record.nodes.get(node_id)
+            outputs = record.outputs if record is not None else {}
+            value = outputs[port_name].model_dump(mode="json") if port_name in outputs else None
+        else:
+            from weft.workflow.history import RunHistory
+
+            node = RunHistory(root).get(run_id)["nodes"].get(node_id, {})
+            value = node.get("outputs", {}).get(port_name)
+        if value is None:
             return error("PORT_NOT_EXECUTED", "节点未执行", 404)
-        value = record.outputs[port_name].model_dump(mode="json")
-        return port_response(value, run_root(app, run_id), offset, limit, sort_by, desc)
+        return port_response(value, root, offset, limit, sort_by, desc)
 
     @app.websocket("/api/ws")
     async def websocket(socket: WebSocket) -> None:
@@ -746,6 +814,30 @@ def create_app(
         finally:
             sender.cancel()
             app.state.bus.unsubscribe(queue)
+
+    packaged_static = Path(__file__).resolve().parent.parent / "static"
+    frontend_dist = (
+        packaged_static
+        if (packaged_static / "index.html").is_file()
+        else Path(__file__).resolve().parents[5] / "frontend" / "dist"
+    )
+    if (frontend_dist / "index.html").is_file():
+        from fastapi.responses import FileResponse
+        from fastapi.staticfiles import StaticFiles
+
+        if (frontend_dist / "assets").is_dir():
+            app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
+
+        @app.get("/{path:path}", include_in_schema=False)
+        def frontend(path: str) -> Any:
+            if path.startswith("api"):
+                return error("NOT_FOUND", "接口不存在", 404)
+            return FileResponse(frontend_dist / "index.html")
+    else:
+
+        @app.get("/", include_in_schema=False)
+        def frontend_missing() -> Any:
+            return error("FRONTEND_NOT_BUILT", "请先运行 pnpm -C frontend build", 503)
 
     return app
 
@@ -825,5 +917,23 @@ def root_for(app: FastAPI, workflow_id: str) -> Path:
 
 
 def run_root(app: FastAPI, run_id: str) -> Path:
-    root: Path = app.state.engine.runs[run_id].root
-    return root
+    if run_id in app.state.engine.runs:
+        root: Path = app.state.engine.runs[run_id].root
+        return root / ".runs" / run_id
+    from weft.workflow.history import RunHistory
+
+    for root in app.state.roots.values():
+        try:
+            path = RunHistory(root).path(run_id)
+        except ValueError:
+            continue
+        if path.is_dir():
+            return path
+    raise FileNotFoundError(run_id)
+
+
+def workflow_root_for_run(app: FastAPI, run_id: str) -> Path:
+    if run_id in app.state.engine.runs:
+        root: Path = app.state.engine.runs[run_id].root
+        return root
+    return run_root(app, run_id).parent.parent

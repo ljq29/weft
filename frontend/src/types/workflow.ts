@@ -32,6 +32,14 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   workflowId?: string;
 }
 
+export interface CanvasNote {
+  id: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  color: string;
+  markdown: string;
+}
+
 export interface WorkflowDocument {
   schema_version: number;
   revision: number;
@@ -42,7 +50,7 @@ export interface WorkflowDocument {
   modified_at: string;
   settings: Record<string, unknown>;
   variables: { name: string; type: string; value: unknown }[];
-  notes: unknown[];
+  notes: CanvasNote[];
   viewport: { x: number; y: number; zoom: number };
   nodes: {
     id: string;

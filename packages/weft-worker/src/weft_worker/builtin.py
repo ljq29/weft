@@ -220,6 +220,36 @@ class ColumnFilter(TableNode):
         return {"out": table.select(selected)}
 
 
+def row_condition(params: dict[str, Any]) -> pl.Expr:
+    column = pl.col(params["column"])
+    operator = params["operator"]
+    value = params.get("value")
+    if operator in {"is_null", "is_not_null"}:
+        return column.is_null() if operator == "is_null" else column.is_not_null()
+    try:
+        value = json.loads(value) if isinstance(value, str) else value
+    except json.JSONDecodeError:
+        pass
+    if operator in {"==", "!=", ">", ">=", "<", "<="}:
+        operations = {
+            "==": column.eq,
+            "!=": column.ne,
+            ">": column.gt,
+            ">=": column.ge,
+            "<": column.lt,
+            "<=": column.le,
+        }
+        return operations[operator](value)
+    if operator == "contains":
+        return column.str.contains(str(value), literal=True)
+    if operator == "starts_with":
+        return column.str.starts_with(str(value))
+    if operator == "regex":
+        return column.str.contains(str(value))
+    values = value if isinstance(value, list) else str(value).split(",")
+    return column.is_in(values)
+
+
 class RowFilter(TableNode):
     type = "table.row_filter"
     category = "table"
@@ -255,30 +285,7 @@ class RowFilter(TableNode):
     )
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
-        table = inputs["in"]
-        column = pl.col(params["column"])
-        operator = params["operator"]
-        value = params.get("value")
-        if operator in {"is_null", "is_not_null"}:
-            expression = column.is_null() if operator == "is_null" else column.is_not_null()
-        else:
-            try:
-                value = json.loads(value) if isinstance(value, str) else value
-            except json.JSONDecodeError:
-                pass
-            if operator in {"==", "!=", ">", ">=", "<", "<="}:
-                operations = {"==": "eq", "!=": "ne", ">": "gt", ">=": "ge", "<": "lt", "<=": "le"}
-                expression = getattr(column, operations[operator])(value)
-            elif operator == "contains":
-                expression = column.str.contains(str(value), literal=True)
-            elif operator == "starts_with":
-                expression = column.str.starts_with(str(value))
-            elif operator == "regex":
-                expression = column.str.contains(str(value))
-            else:
-                values = value if isinstance(value, list) else str(value).split(",")
-                expression = column.is_in(values)
-        return {"out": table.filter(expression)}
+        return {"out": inputs["in"].filter(row_condition(params))}
 
 
 class Sorter(TableNode):

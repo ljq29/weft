@@ -6,14 +6,19 @@
 | --- | --- | --- | --- | --- | --- |
 |`agent.llm_call`|LLM Call|agent|trusted_service|volatile|通过主机 LLMProxy 执行流式文本或 JSON 补全|
 |`agent.loop`|Agent Loop|agent|trusted_service|volatile|执行可停止、可审计的 ReAct 工具调用循环|
+|`agent.memory_clear`|Memory Clear|agent|trusted_service|side_effect|清空指定会话的 Memory 数据|
+|`agent.memory_load`|Memory Load|agent|trusted_service|volatile|读取指定会话的最新消息，不跨 Run 缓存|
+|`agent.memory_save`|Memory Save|agent|trusted_service|side_effect|向指定会话追加 Message 输入|
 |`agent.node_tool`|Node as Tool|agent|trusted_service|side_effect|把显式授权的节点包装为受控 Agent 工具|
 |`agent.pi`|Pi Agent|agent|trusted_service|volatile|在 Sandboxie 中运行原版 pi，经环回 LLMProxy 使用命名配置|
 |`agent.prompt_template`|Prompt Template|agent|trusted_service|volatile|用受限 Jinja2 模板组合变量与只读表格|
 |`agent.sandboxed_tools`|Sandboxed Tools|agent|trusted_service|side_effect|提供沙箱内 read/write/edit/list/bash；沙箱内不支持 COM，Excel 请用 Node as Tool|
 |`code.python`|Python Script|code|trusted_worker|side_effect|在可信 Worker 中执行用户 Python 代码|
+|`code.shell`|Shell Command|code|trusted_worker|side_effect|在可信 Worker 车道执行 PowerShell/cmd，不向 Agent 开放|
 |`excel.cell_update`|Excel Cell Update|excel|trusted_service|side_effect|原子更新若干不连续单元格，默认禁止公式|
 |`excel.connect`|Excel Connect|excel|trusted_service|side_effect|连接可见 Excel 或创建独立的可见/隐藏实例|
 |`excel.read_range`|Excel Read Range|excel|trusted_service|volatile|实时读取 Excel 区域、表对象或命名区域为表格|
+|`excel.run_macro`|Excel Run Macro|excel|trusted_service|side_effect|通过 ExcelWorker 的 STA 串行队列调用 Application.Run|
 |`excel.save`|Excel Save|excel|trusted_service|side_effect|显式保存或另存工作簿，不隐式覆盖文件|
 |`excel.sheet`|Excel Sheet|excel|trusted_service|side_effect|创建、删除、重命名或清空工作表|
 |`excel.sheet_names`|Excel Sheet Names|excel|trusted_service|volatile|列出工作表名、索引与可见状态|
@@ -31,6 +36,7 @@
 |`flow.loop_end`|Loop End|flow|trusted_service|side_effect|收集循环体输出|
 |`flow.loop_start`|Loop Start|flow|trusted_service|side_effect|按行、按块或计数启动循环|
 |`flow.merge`|Merge|flow|trusted_service|pure|汇合两个可部分到达的表格分支|
+|`flow.metanode`|Metanode|flow|trusted_service|side_effect|将内嵌子图作为可逆折叠的复合节点|
 |`flow.switch`|Switch|flow|trusted_service|pure|按变量值选择命名分支|
 |`flow.trigger`|Trigger|flow|trusted_service|side_effect|手动、聊天、定时、文件或 HTTP 工作流入口|
 |`flow.variable`|Variable|flow|trusted_worker|pure|定义流变量|
@@ -52,6 +58,7 @@
 |`table.read_parquet`|Read Parquet|table|trusted_worker|pure|读取 Parquet 文件|
 |`table.row_count`|Table Row Count|table|trusted_worker|pure|输出表格行数变量|
 |`table.row_filter`|Row Filter|table|trusted_worker|pure|按单条件筛选行|
+|`table.rule_engine`|Rule Engine|table|trusted_worker|pure|按有序规则赋值，首个命中生效，其余使用默认值|
 |`table.sorter`|Sorter|table|trusted_worker|pure|按多个列键稳定排序|
 |`table.string_manipulation`|String Manipulation|table|trusted_worker|pure|执行常用字符串函数|
 |`table.to_variables`|Table to Variables|table|trusted_worker|pure|将表格行或列转换为流变量|
@@ -172,6 +179,72 @@
   "required": [
     "llm",
     "task"
+  ]
+}
+```
+
+## Memory Clear (`agent.memory_clear`)
+
+清空指定会话的 Memory 数据
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "会话 ID；空值使用聊天会话"
+    }
+  },
+  "required": [
+    "session_id"
+  ]
+}
+```
+
+## Memory Load (`agent.memory_load`)
+
+读取指定会话的最新消息，不跨 Run 缓存
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "会话 ID；空值使用聊天会话"
+    },
+    "max_messages": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 20,
+      "description": "最多保留的最新消息数"
+    }
+  },
+  "required": [
+    "session_id"
+  ]
+}
+```
+
+## Memory Save (`agent.memory_save`)
+
+向指定会话追加 Message 输入
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "会话 ID；空值使用聊天会话"
+    }
+  },
+  "required": [
+    "session_id"
   ]
 }
 ```
@@ -420,6 +493,54 @@
 }
 ```
 
+## Shell Command (`code.shell`)
+
+在可信 Worker 车道执行 PowerShell/cmd，不向 Agent 开放
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "command": {
+      "type": "string",
+      "description": "命令；{name} 插值流变量"
+    },
+    "cwd": {
+      "type": "string",
+      "description": "工作目录，默认 Root",
+      "default": "."
+    },
+    "shell": {
+      "type": "string",
+      "description": "命令解释器",
+      "enum": [
+        "powershell",
+        "cmd"
+      ],
+      "default": "powershell"
+    },
+    "timeout": {
+      "type": "number",
+      "description": "超时秒数",
+      "default": 60
+    },
+    "env": {
+      "type": "object",
+      "description": "附加环境变量"
+    },
+    "fail_on_nonzero": {
+      "type": "boolean",
+      "description": "非零退出码时失败",
+      "default": true
+    }
+  },
+  "required": [
+    "command"
+  ]
+}
+```
+
 ## Excel Cell Update (`excel.cell_update`)
 
 原子更新若干不连续单元格，默认禁止公式
@@ -531,6 +652,31 @@
   },
   "required": [
     "sheet"
+  ]
+}
+```
+
+## Excel Run Macro (`excel.run_macro`)
+
+通过 ExcelWorker 的 STA 串行队列调用 Application.Run
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "macro": {
+      "type": "string",
+      "description": "宏名，例如 Module1.Refresh"
+    },
+    "args": {
+      "type": "array",
+      "description": "按顺序传给宏的参数",
+      "default": []
+    }
+  },
+  "required": [
+    "macro"
   ]
 }
 ```
@@ -1043,6 +1189,31 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {}
+}
+```
+
+## Metanode (`flow.metanode`)
+
+将内嵌子图作为可逆折叠的复合节点
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "graph": {
+      "type": "object",
+      "description": "内嵌节点与边"
+    },
+    "interface": {
+      "type": "object",
+      "description": "外部端口到内部端口的映射"
+    }
+  },
+  "required": [
+    "graph",
+    "interface"
+  ]
 }
 ```
 
@@ -1628,6 +1799,34 @@
   "required": [
     "column",
     "operator"
+  ]
+}
+```
+
+## Rule Engine (`table.rule_engine`)
+
+按有序规则赋值，首个命中生效，其余使用默认值
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "rules": {
+      "type": "array",
+      "description": "有序规则 [{condition, value}]"
+    },
+    "default": {
+      "description": "未命中时的默认值"
+    },
+    "alias": {
+      "type": "string",
+      "description": "输出列名"
+    }
+  },
+  "required": [
+    "rules",
+    "alias"
   ]
 }
 ```

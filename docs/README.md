@@ -1,6 +1,6 @@
 # Weft 文档索引
 
-Weft 是本地优先的 Windows 可视化工作流工具，融合表格数据流、Excel COM 实时联动和沙箱化 AI agent。T0.1 已通过 Linux/Windows 本地检查，远程双平台 CI 待配置仓库后确认；M1 与 M2 功能按 roadmap 逐卡验收。
+Weft 是本地优先的 Windows 可视化工作流工具，融合表格数据流、Excel COM 实时联动和沙箱化 AI agent。M1–M6 已完成各自自动化验收；M7 功能与运维实现已完成，但正式发布仍以 roadmap 的 win_real、真实模型、双机和性能门禁为准。
 
 ## 阅读顺序
 
@@ -14,6 +14,7 @@ Weft 是本地优先的 Windows 可视化工作流工具，融合表格数据流
 |[06-engineering.md](06-engineering.md)|monorepo、工具链、依赖规则、测试与发布规范|开发与自检|
 |[07-roadmap.md](07-roadmap.md)|M0–M7 里程碑与未完成任务卡|实施顺序与完成追踪|
 |[08-testing-strategy.md](08-testing-strategy.md)|测试分层、契约测试、安全红线、性能与 AC 门禁|验证策略|
+|[09-nodes-v1.md](09-nodes-v1.md)|由代码声明生成的只读节点参数参考|查阅节点与参数|
 
 ## 真源与派生文档
 

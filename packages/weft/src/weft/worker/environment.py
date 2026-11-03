@@ -54,6 +54,8 @@ class WorkflowEnvironment:
             cwd=self.root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             env={key: value for key, value in os.environ.items() if key != "PYTHONPATH"},
         )
         if result.returncode != 0 or result.stdout.strip() != f"weft-worker {self.service_version}":
@@ -75,7 +77,13 @@ class WorkflowEnvironment:
         environment = os.environ.copy()
         environment.setdefault("UV_INDEX_URL", "https://pypi.tuna.tsinghua.edu.cn/simple")
         result = subprocess.run(
-            ["uv", *args], cwd=self.root, capture_output=True, text=True, env=environment
+            ["uv", *args],
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=environment,
         )
         if result.returncode != 0:
             raise EnvironmentError(result.stdout + result.stderr)

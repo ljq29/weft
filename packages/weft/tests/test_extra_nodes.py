@@ -169,6 +169,37 @@ def test_python_script_inline_run_dynamic_ports_and_type_error(tmp_path: Path) -
         execute("code.python", tmp_path, params, {"in": table})
 
 
+def test_rule_engine_first_match_default_and_shared_conditions(tmp_path: Path) -> None:
+    """US-TBL-05/AC-4: ordered rules share Row Filter semantics and preserve defaults."""
+    table = pl.DataFrame({"amount": [-5, 5, 15, None], "text": ["abc", "x", "abc", None]})
+    result = execute(
+        "table.rule_engine",
+        tmp_path,
+        {
+            "rules": [
+                {
+                    "condition": {"column": "amount", "operator": ">", "value": "10"},
+                    "value": "high",
+                },
+                {
+                    "condition": {"column": "amount", "operator": ">", "value": "0"},
+                    "value": "positive",
+                },
+                {"condition": {"column": "amount", "operator": "is_null"}, "value": "missing"},
+                {
+                    "condition": {"column": "text", "operator": "contains", "value": "bc"},
+                    "value": "text",
+                },
+            ],
+            "default": "low",
+            "alias": "category",
+        },
+        {"in": table},
+    )["out"]
+    assert result["category"].to_list() == ["text", "positive", "high", "missing"]
+    assert builtin_registry().get("table.rule_engine").cache_policy == CachePolicy.PURE
+
+
 def test_extra_cache_policy_matrix() -> None:
     """US-EXE-04/AC-11: extra transforms are pure and file mutations are side effects."""
     registry = builtin_registry()

@@ -85,7 +85,9 @@ def _walk_params(value: Any, path: str = "") -> Iterator[tuple[str, str, str]]:
         yield path, value, "path"
 
 
-def _validate_metanode(node: Node) -> list[ValidationIssue]:
+def _validate_metanode(
+    node: Node, declarations: Mapping[str, NodeDeclaration]
+) -> list[ValidationIssue]:
     if node.type != "flow.metanode":
         return []
     issues: list[ValidationIssue] = []
@@ -96,8 +98,9 @@ def _validate_metanode(node: Node) -> list[ValidationIssue]:
             ValidationIssue("METANODE_INVALID", "Metanode requires graph and interface", node.id)
         ]
     internal_nodes = graph.get("nodes", [])
-    internal_ids = {item.get("id") for item in internal_nodes if isinstance(item, dict)}
+    internal_by_id = {item.get("id"): item for item in internal_nodes if isinstance(item, dict)}
     external_names: set[str] = set()
+    external_declaration = declarations.get(node.type)
     for direction in ("inputs", "outputs"):
         mappings = interface.get(direction, {})
         if not isinstance(mappings, dict):
@@ -115,7 +118,7 @@ def _validate_metanode(node: Node) -> list[ValidationIssue]:
             external_names.add(name)
             if (
                 not isinstance(mapping, dict)
-                or mapping.get("node") not in internal_ids
+                or mapping.get("node") not in internal_by_id
                 or not mapping.get("port")
             ):
                 issues.append(
@@ -125,6 +128,73 @@ def _validate_metanode(node: Node) -> list[ValidationIssue]:
                         node.id,
                     )
                 )
+                continue
+            internal_node = internal_by_id[mapping["node"]]
+            internal_type = internal_node.get("type")
+            internal_declaration = (
+                declarations.get(internal_type) if isinstance(internal_type, str) else None
+            )
+            if external_declaration is None or internal_declaration is None:
+                continue
+            external_ports = getattr(external_declaration, direction)
+            internal_ports = getattr(internal_declaration, direction)
+            external_port = next((item for item in external_ports if item.name == name), None)
+            internal_port = next(
+                (item for item in internal_ports if item.name == mapping["port"]), None
+            )
+            if external_port is None or internal_port is None:
+                issues.append(
+                    ValidationIssue(
+                        "METANODE_PORT_MISSING",
+                        f"Metanode port '{name}' maps to a missing internal port",
+                        node.id,
+                    )
+                )
+            elif external_port.kind != internal_port.kind:
+                issues.append(
+                    ValidationIssue(
+                        "METANODE_PORT_INCOMPATIBLE",
+                        f"Metanode port '{name}' type does not match its internal port",
+                        node.id,
+                    )
+                )
+    for raw_edge in graph.get("edges", []):
+        try:
+            edge = Edge.model_validate(raw_edge)
+            source = internal_by_id[edge.source]
+            target = internal_by_id[edge.target]
+            source_type = source.get("type")
+            target_type = target.get("type")
+            if not isinstance(source_type, str) or not isinstance(target_type, str):
+                raise ValueError("missing internal node type")
+            source_declaration = declarations.get(source_type)
+            target_declaration = declarations.get(target_type)
+            source_port = next(
+                (
+                    item
+                    for item in (source_declaration.outputs if source_declaration else [])
+                    if item.name == edge.sourcePort
+                ),
+                None,
+            )
+            target_port = next(
+                (
+                    item
+                    for item in (target_declaration.inputs if target_declaration else [])
+                    if item.name == edge.targetPort
+                ),
+                None,
+            )
+            if source_port is None or target_port is None:
+                raise ValueError("missing internal port")
+            if not is_compatible(source_port.kind, target_port.kind):
+                raise ValueError("incompatible internal ports")
+        except (KeyError, ValueError) as exception:
+            issues.append(
+                ValidationIssue(
+                    "METANODE_INVALID", f"Metanode contains an invalid edge: {exception}", node.id
+                )
+            )
     return issues
 
 
@@ -234,7 +304,7 @@ def validate_workflow(
                 warnings.append(
                     ValidationIssue("ABSOLUTE_PATH", f"绝对路径不可移植: {path}={value}", node.id)
                 )
-        errors.extend(_validate_metanode(node))
+        errors.extend(_validate_metanode(node, declarations))
     for raw_edge in document.edges:
         edge = Edge.model_validate(raw_edge)
         source = node_by_id.get(edge.source)

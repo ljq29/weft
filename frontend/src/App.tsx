@@ -12,6 +12,7 @@ import type { Connection, Edge, NodeChange } from "@xyflow/react";
 import { api } from "./api/client";
 import { AuditPanel } from "./panels/AuditPanel";
 import { WeftNode } from "./canvas/WeftNode";
+import { CanvasNote } from "./canvas/CanvasNote";
 import { connectRuns } from "./api/ws";
 import { LogPanel } from "./panels/LogPanel";
 import { PortView } from "./panels/PortView";
@@ -23,7 +24,14 @@ import { ChatPanel } from "./panels/ChatPanel";
 import { ChangeReviewPanel } from "./panels/ChangeReviewPanel";
 import { ConfirmPanel } from "./panels/ConfirmPanel";
 import { TriggerStatusPanel } from "./panels/TriggerStatusPanel";
+import { HistoryPanel } from "./panels/HistoryPanel";
 import { useRunStore } from "./stores/runStore";
+import {
+  collapseGraph,
+  expandGraph,
+  flowGraph,
+  metanodePorts,
+} from "./stores/metanodes";
 import { toDocument, useWorkflowStore } from "./stores/workflowStore";
 import type { FlowNode } from "./stores/workflowStore";
 import type { NodeTypeDecl, WorkflowDocument } from "./types/workflow";
@@ -55,6 +63,7 @@ function Editor() {
   const [preview, setPreview] = useState<{
     nodeId: string;
     port: string;
+    runId?: string;
   } | null>(null);
   const [menu, setMenu] = useState<{
     nodeId: string;
@@ -70,8 +79,17 @@ function Editor() {
   const [parent, setParent] = useState("C:/flows");
   const [root, setRoot] = useState("");
   const [columnHints, setColumnHints] = useState<string[]>([]);
+  const [pathIssues, setPathIssues] = useState<
+    { node_id: string; param: string; value: string }[]
+  >([]);
   const flow = useReactFlow();
   const viewport = useRef({ x: 0, y: 0, zoom: 1 });
+  const graphStack = useRef<
+    { nodes: FlowNode[]; edges: typeof store.edges; id: string; name: string }[]
+  >([]);
+  const [breadcrumbs, setBreadcrumbs] = useState<
+    { id: string; name: string }[]
+  >([]);
   const nodeTypes = useMemo(
     () => new Map(store.nodeTypes.map((item) => [item.type, item])),
     [store.nodeTypes],
@@ -80,7 +98,7 @@ function Editor() {
   const save = useCallback(() => {
     const operation = saveQueue.then(async () => {
       const state = useWorkflowStore.getState();
-      if (!state.document) return;
+      if (!state.document || graphStack.current.length) return;
       try {
         const document = toDocument(state, viewport.current);
         const saved = await api<WorkflowDocument>(
@@ -195,8 +213,17 @@ function Editor() {
   const load = (
     document: WorkflowDocument & { nodes: unknown[]; edges: unknown[] },
   ) => {
+    graphStack.current = [];
+    setBreadcrumbs([]);
     const nodes = document.nodes.map((raw) => {
       const node = raw as StoredNode;
+      const ports =
+        node.type === "flow.metanode"
+          ? metanodePorts(node.params, store.nodeTypes)
+          : {
+              inputs: nodeTypes.get(node.type)?.inputs ?? [],
+              outputs: nodeTypes.get(node.type)?.outputs ?? [],
+            };
       return {
         id: node.id,
         type: "weft",
@@ -206,13 +233,33 @@ function Editor() {
           type: node.type,
           name: node.name,
           params: node.params,
-          inputs: nodeTypes.get(node.type)?.inputs ?? [],
-          outputs: nodeTypes.get(node.type)?.outputs ?? [],
+          inputs: ports.inputs,
+          outputs: ports.outputs,
           comment: node.comment ?? "",
           status: "configured",
         },
       };
     });
+    const notes: FlowNode[] = document.notes.map((note) => ({
+      id: note.id,
+      type: "note",
+      position: note.position,
+      data: {
+        nodeId: note.id,
+        type: "canvas.note",
+        name: "便签",
+        params: {
+          markdown: note.markdown,
+          color: note.color,
+          width: note.size.width,
+          height: note.size.height,
+        },
+        inputs: [],
+        outputs: [],
+        comment: "",
+        status: "configured",
+      },
+    }));
     const edges = document.edges.map((raw) => {
       const edge = raw as StoredEdge;
       return {
@@ -223,7 +270,7 @@ function Editor() {
         targetHandle: edge.targetPort,
       };
     });
-    store.setDocument(document, nodes, edges);
+    store.setDocument(document, [...nodes, ...notes], edges);
     viewport.current = document.viewport;
   };
 
@@ -284,8 +331,10 @@ function Editor() {
       const report = await api<{
         errors: { message: string }[];
         warnings: { message: string }[];
+        abs_paths: { node_id: string; param: string; value: string }[];
         size_estimate: number;
       }>(`/workflows/${document.id}/pack/preflight`);
+      setPathIssues(report.abs_paths);
       if (report.errors.length) {
         setError(report.errors.map((item) => item.message).join("\n"));
         return;
@@ -311,6 +360,121 @@ function Editor() {
     } catch (reason) {
       setError(String(reason));
     }
+  };
+
+  const collapse = () => {
+    const state = useWorkflowStore.getState();
+    const selected = state.selected.filter(
+      (id) =>
+        state.nodes.find((node) => node.id === id)?.data.type !== "canvas.note",
+    );
+    if (!selected.length) return;
+    const metaId = `n_${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
+    const graph = collapseGraph(
+      store.nodes,
+      store.edges,
+      selected,
+      store.nodeTypes,
+      metaId,
+    );
+    store.setGraph(graph.nodes, graph.edges);
+    store.setSelected([metaId]);
+  };
+
+  const expand = (nodeId: string) => {
+    const graph = expandGraph(
+      store.nodes,
+      store.edges,
+      nodeId,
+      store.nodeTypes,
+    );
+    store.setGraph(graph.nodes, graph.edges);
+    setMenu(null);
+  };
+
+  const enterMetanode = (node: FlowNode) => {
+    if (node.data.type !== "flow.metanode") return;
+    const graph = flowGraph(node.data.params, store.nodeTypes);
+    graphStack.current.push({
+      nodes: store.nodes,
+      edges: store.edges,
+      id: node.id,
+      name: node.data.name,
+    });
+    setBreadcrumbs([
+      ...graphStack.current.map((item) => ({ id: item.id, name: item.name })),
+    ]);
+    useWorkflowStore.setState({
+      nodes: graph.nodes,
+      edges: graph.edges,
+      selected: [],
+      history: [],
+      future: [],
+      dirty: false,
+    });
+  };
+
+  const leaveMetanode = () => {
+    const parent = graphStack.current.pop();
+    if (!parent) return;
+    const meta = parent.nodes.find((node) => node.id === parent.id);
+    if (!meta) throw new Error("Metanode 不存在");
+    const params = {
+      ...meta.data.params,
+      graph: {
+        nodes: store.nodes
+          .filter((node) => node.data.type !== "canvas.note")
+          .map((node) => ({
+            id: node.id,
+            type: node.data.type,
+            name: node.data.name,
+            position: node.position,
+            params: node.data.params,
+            comment: node.data.comment,
+          })),
+        notes: store.nodes
+          .filter((node) => node.data.type === "canvas.note")
+          .map((node) => ({
+            id: node.id,
+            position: node.position,
+            size: {
+              width: Number(node.data.params.width ?? 240),
+              height: Number(node.data.params.height ?? 160),
+            },
+            color:
+              typeof node.data.params.color === "string"
+                ? node.data.params.color
+                : "#fef3c7",
+            markdown:
+              typeof node.data.params.markdown === "string"
+                ? node.data.params.markdown
+                : "",
+          })),
+        edges: store.edges.map((edge, order) => ({
+          id: edge.id,
+          source: edge.source,
+          sourcePort: edge.sourceHandle,
+          target: edge.target,
+          targetPort: edge.targetHandle,
+          order,
+        })),
+      },
+    };
+    useWorkflowStore.setState({
+      nodes: parent.nodes.map((node) =>
+        node.id === parent.id
+          ? { ...node, data: { ...node.data, params } }
+          : node,
+      ),
+      edges: parent.edges,
+      selected: [parent.id],
+      history: [],
+      future: [],
+      dirty: true,
+    });
+    setBreadcrumbs(
+      graphStack.current.map((item) => ({ id: item.id, name: item.name })),
+    );
   };
 
   const addAtCenter = (type: string) => {
@@ -380,9 +544,24 @@ function Editor() {
       if (!document) return;
       await save();
       try {
+        const resources = await api<{
+          missing: { message: string }[];
+        }>(`/workflows/${document.id}/resources/preflight`);
+        const allowMissing = resources.missing.length
+          ? window.confirm(
+              `外部资源缺失：\n${resources.missing.map((item) => item.message).join("\n")}\n仍要运行？`,
+            )
+          : false;
+        if (resources.missing.length && !allowMissing) return;
         const result = await api<{ run_id: string }>(
           `/workflows/${document.id}/runs`,
-          { method: "POST", body: JSON.stringify({ scope }) },
+          {
+            method: "POST",
+            body: JSON.stringify({
+              scope,
+              allow_missing_resources: allowMissing,
+            }),
+          },
         );
         useRunStore.getState().started(result.run_id);
         const snapshot = await api<{
@@ -485,6 +664,16 @@ function Editor() {
             {store.dirty ? " *" : ""}
           </span>
         )}
+        {breadcrumbs.length > 0 && (
+          <nav aria-label="Metanode 面包屑">
+            {store.document?.name} &gt;{" "}
+            {breadcrumbs.map((item) => item.name).join(" > ")}
+            <button onClick={leaveMetanode}>返回上级</button>
+          </nav>
+        )}
+        {store.selected.length > 0 && (
+          <button onClick={collapse}>折叠为 Metanode</button>
+        )}
         <button onClick={() => void save()}>保存</button>
         <button onClick={() => void execute()}>运行</button>
         {run.runId && (
@@ -503,17 +692,47 @@ function Editor() {
           {error}
         </div>
       )}
+      {pathIssues.length > 0 && (
+        <section aria-label="绝对路径警告">
+          {pathIssues.map((issue) => (
+            <button
+              key={`${issue.node_id}:${issue.param}`}
+              onClick={() => {
+                store.setSelected([issue.node_id]);
+                const node = store.nodes.find(
+                  (item) => item.id === issue.node_id,
+                );
+                if (node) void flow.fitView({ nodes: [node] });
+              }}
+            >
+              定位 {issue.node_id}.{issue.param}：{issue.value}
+            </button>
+          ))}
+        </section>
+      )}
       <div className="editor-body">
         <NodePanel types={store.nodeTypes} onAdd={addAtCenter} />
         <section className="canvas" aria-label="工作流画布">
           <ReactFlow
             nodes={displayNodes}
             edges={store.edges}
-            nodeTypes={{ weft: WeftNode }}
+            nodeTypes={{ weft: WeftNode, note: CanvasNote }}
+            onPaneContextMenu={(event) => {
+              event.preventDefault();
+              store.addNote(
+                flow.screenToFlowPosition({
+                  x: event.clientX,
+                  y: event.clientY,
+                }),
+              );
+            }}
             onNodesChange={(changes: NodeChange<FlowNode>[]) => {
               store.moveNodes(applyNodeChanges(changes, store.nodes));
             }}
             onConnect={(connection) => void connect(connection)}
+            onNodeDoubleClick={(_, node) => {
+              enterMetanode(node);
+            }}
             onNodeContextMenu={(event, node) => {
               event.preventDefault();
               setMenu({ nodeId: node.id, x: event.clientX, y: event.clientY });
@@ -559,6 +778,9 @@ function Editor() {
               onChange={(params) => {
                 store.updateParams(selectedNode.id, params);
               }}
+              onCommentChange={(comment) => {
+                store.updateComment(selectedNode.id, comment);
+              }}
             />
           )}
           {selectedNode?.data.type === "flow.trigger" && (
@@ -580,6 +802,14 @@ function Editor() {
         </aside>
       </div>
       <LogPanel />
+      {store.document && (
+        <HistoryPanel
+          workflowId={store.document.id}
+          onPreview={(runId, nodeId, port) => {
+            setPreview({ runId, nodeId, port });
+          }}
+        />
+      )}
       {menu && (
         <div className="context-menu" style={{ left: menu.x, top: menu.y }}>
           <button
@@ -603,6 +833,16 @@ function Editor() {
           >
             仅执行本节点
           </button>
+          {store.nodes.find((node) => node.id === menu.nodeId)?.data.type ===
+            "flow.metanode" && (
+            <button
+              onClick={() => {
+                expand(menu.nodeId);
+              }}
+            >
+              展开 Metanode
+            </button>
+          )}
           <button
             onClick={() => {
               void api(
@@ -642,7 +882,7 @@ function Editor() {
       {preview && store.document && (
         <PortView
           workflowId={store.document.id}
-          runId={run.runId}
+          runId={preview.runId ?? run.runId}
           nodeId={preview.nodeId}
           port={preview.port}
           onClose={() => {

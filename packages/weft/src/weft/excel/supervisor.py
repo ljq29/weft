@@ -191,6 +191,9 @@ class ExcelWorkerSupervisor:
         process = self._ensure()
         if run_id is not None:
             self._run_ids.add(run_id)
+        from weft.operations import log_excel_call
+
+        log_excel_call(method, run_id)
         try:
             result = process.request(method, args, kwargs, run_id, timeout)
         except TimeoutError:
