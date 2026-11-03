@@ -1,172 +1,307 @@
-# 04-data-model.md
-
-**Weft API 契约（REST + WebSocket）**
+# Weft 数据模型
 
 |项|值|
-| --------| --------------------------------|
+| ------| -------------------------------------------------|
 |版本|v0.1（草稿）|
 |状态|待确认|
-|上游|`02-user-stories.md`​、​`04-data-model.md`|
-|消费方|前端 UI、CLI、外部 HTTP 触发方|
+|上游|`01-prd.md`​ §5 核心概念、​`03-architecture.md`|
+|下游|`05-api.md`​、​`09-nodes-v1.md`、实现代码（Pydantic 模型以本文为准）|
 
-约定：前缀 ​`/api`​；请求/响应均为 ​`application/json`（除注明 Arrow 流处）；时间为 ISO 8601 带时区；错误统一结构：
-
-```jsonc
-// 非 2xx 响应体
-{"error": {"code": "WORKFLOW_NOT_FOUND", "message": "人类可读", "detail": {...}}}
-```
-
-|HTTP 状态|场景|
-| -----------| ------------------------------------------------------------|
-|400|参数/校验错误（含受保护文件 apply）|
-|401|token 缺失或错误|
-|404|资源不存在（HTTP 触发未启用也返回 404，见 US-TRG-06 AC-3）|
-|409|状态冲突（运行期改图、重复 apply、队列满）|
-|422|workflow.json schema 校验失败（detail 含逐条错误）|
-|202|异步接受（触发运行）|
-
-鉴权：监听 ​`127.0.0.1`​ 时除 ​`/trigger`​ 外免鉴权；监听非本机时全部要求 ​`Authorization: Bearer <global_token>`​（US-SBX-09）。图结构修改接口要求头 ​`X-Weft-Client: ui`（US-AGT-11 AC-2）。
+本文是**规范性**文档：字段名、类型、枚举值即实现要求。所有模型在代码中为 Pydantic v2 类，JSON Schema 由其导出。
 
 ---
 
-## 1. 工作流管理
+## 1. 工作流目录
 
-|方法|路径|说明|
-| --------| ------| -----------------------------------------------------------------------------------|
-|GET|`/api/workflows`|已打开的工作流列表：​`[{id, name, path, dirty, env_status}]`|
-|POST|`/api/workflows`|新建：​`{name, parent_dir}`​ → 201 ​`{id, path}`；同名目录存在 → 409|
-|POST|`/api/workflows/open`|打开已有目录：​`{path}`​ → ​`{id, env_status: ok\|syncing\|error}`​；触发 ​`uv sync`（US-PKG-02）|
-|GET|`/api/workflows/{id}`|返回完整 ​`workflow.json` 文档|
-|PUT|`/api/workflows/{id}`|整文档保存（前端自动保存用）；校验失败 422；Run 活跃时改图结构 → 409|
-|PATCH|`/api/workflows/{id}`|局部更新（JSON Merge Patch）：节点参数、位置、注释等非结构字段在 Run 活跃时也允许|
-|DELETE|`/api/workflows/{id}`|从服务关闭（不删目录）；​`?purge_cache=true` 顺带清缓存|
-|GET|`/api/workflows/{id}/validate`|返回校验结果 ​`{errors: [...], warnings: [...]}`​（规则见 ​`04-data-model.md` §2）|
-|GET|`/api/workflows/{id}/env`|环境状态：​`{status, python, uv_output}`|
-|POST|`/api/workflows/{id}/env/sync`|手动触发 ​`uv sync`​；进度经 WS ​`env.progress`|
-
-## 2. 节点类型
-
-|方法|路径|说明|
-| ------| ------| --------------------------------------------------------------------------|
-|GET|`/api/nodes/types`|全部可用节点类型（内置 + 当前工作流 ​`user.*`​）：​`[{type, node_version, category, name, description, lane, inputs, outputs, params_schema, ui_hints}]`（US-DES-04 AC-4）|
-|GET|`/api/nodes/types/{type}`|单个类型详情|
-|POST|`/api/workflows/{id}/nodes/{node_id}/column-hints`|返回该节点各输入端口上游缓存的列名（表单下拉用）：​`{port: [col, ...]}`；上游未执行 → 空|
-
-## 3. 运行
-
-|方法|路径|说明|
-| ------| ------| ------------------------------------------------------------------|
-|POST|`/api/workflows/{id}/runs`|发起运行：​`{scope: {kind: all\|to_node\|from_node\|single, node_id?}, overrides?: {k: v}}`​ → 202 ​`{run_id, queued: bool}`；未配置节点存在 → 400（detail 列出）|
-|GET|`/api/workflows/{id}/runs?status=&limit=20`|运行历史（US-EXE-09）|
-|GET|`/api/runs/{run_id}`|Run 详情 = ​`meta.json`​ 内容（​`04-data-model.md` §6）|
-|POST|`/api/runs/{run_id}/cancel`|取消 → 202；已终态 → 409|
-|POST|`/api/runs/{run_id}/confirm`|`{request_id, decision: approve\|reject, modified_args?}`（US-AGT-12）|
-|GET|`/api/runs/{run_id}/log?offset=0&limit=500&level=&node_id=`|分页日志|
-|GET|`/api/runs/{run_id}/audit`|审计记录列表（US-SBX-07）|
-|GET|`/api/runs/{run_id}/nodes/{node_id}/trace`|agent 轨迹（trace.jsonl 内容）|
-
-## 4. 节点状态与缓存操作
-
-|方法|路径|说明|
-| ------| ------| ------------------------------------|
-|POST|`/api/workflows/{id}/nodes/{node_id}/reset`|重置本节点及下游（US-EXE-03 AC-3）|
-|POST|`/api/workflows/{id}/reset`|重置全部|
-|GET|`/api/workflows/{id}/nodes/{node_id}/status`|`{status, from_cache, last_run_id}`|
-
-## 5. 端口数据预览
-
-|方法|路径|说明|
-| ------| ------| ------------------------------------------------------------------------------------------------------|
-|GET|`/api/workflows/{id}/nodes/{node_id}/ports/{port}`|读取**缓存**的端口值（设计期端口视图）。Table：​`?offset=0&limit=100&sort_by=&desc=`​ → ​`Content-Type: application/vnd.apache.arrow.stream`​（切片后的 Arrow IPC）+ 头 ​`X-Weft-Total-Rows`；其他类型 → JSON|
-|GET|`/api/runs/{run_id}/nodes/{node_id}/ports/{port}`|同上，但读指定 Run 的记录（历史回看）|
-
-未执行 → 404 ​`PORT_NOT_EXECUTED`（US-EXE-06 AC-5）。
-
-## 6. 沙箱变更审批
-
-|方法|路径|说明|
-| ------| ------| ------------------------------------------------------------------------------------------|
-|GET|`/api/runs/{run_id}/changes`|`changes.json` 内容（§8）|
-|GET|`/api/runs/{run_id}/changes/diff?path=`|文本文件 unified diff：​`{old: str\|null, new: str\|null, diff: str}`；二进制 → 400|
-|POST|`/api/runs/{run_id}/changes/apply`|`{paths: [...]}`​ → ​`{results: [{path, ok, error?}]}`；含 protected 路径 → 400 整体拒绝；重复 → 幂等返回已应用状态（US-SBX-05）|
-|POST|`/api/runs/{run_id}/changes/discard`|丢弃全部未应用变更|
-
-## 7. 触发
-
-|方法|路径|说明|
-| ------| ------| --------------------------------------------------------------------------|
-|POST|`/api/workflows/{id}/trigger`|外部 HTTP 触发（US-TRG-06）。​`Authorization: Bearer <workflow_token>`​；body 任意 JSON；​`?wait=true`​ 同步等待 → ​`{run_id, status, outputs}`|
-|POST|`/api/workflows/{id}/trigger/token`|生成/轮换 workflow token（仅 UI），返回明文一次|
-|GET|`/api/workflows/{id}/triggers/status`|各来源状态：​`{manual: {enabled}, schedule: {enabled, next_fire_times: [...]}, watch: {enabled, health: ok\|error, error?}, ...}`|
-
-## 8. 聊天
-
-|方法|路径|说明|
-| ------| ------| ------------------------------------------------------------------------------------|
-|POST|`/api/workflows/{id}/chat`|`{message, session_id?}`​ → 202 ​`{run_id, session_id}`​；未启用 chat 触发 → 400 ​`CHAT_DISABLED`（面板据此显示提示，US-TRG-03 AC-2）|
-|GET|`/api/workflows/{id}/chat/{session_id}`|本会话消息列表（含历次 Run 的 Chat Output）|
-|POST|`/api/workflows/{id}/chat/{session_id}/clear`|清空会话（含 Memory 文件）|
-
-## 9. 打包与导入
-
-|方法|路径|说明|
-| ------| ------| --------------------------------------------------------------------------------------|
-|POST|`/api/workflows/{id}/pack`|`{exclude_data: bool}`​ → ​`{job_id}`​；完成经 WS ​`pack.finished`​ 给出产物路径；校验 ERROR 未确认 → 409（​`?force=true` 跳过确认）|
-|GET|`/api/workflows/{id}/pack/preflight`|打包预检报告：​`{errors, warnings, abs_paths: [{node_id, param, value}], size_estimate}`|
-|POST|`/api/workflows/unpack`|`{zip_path, dest_dir}`​ → ​`{id, path}`；zip slip → 400|
-
-## 10. 设置与系统
-
-|方法|路径|说明|
-| -----------| ------| ----------------------------------------------------------|
-|GET / PUT|`/api/settings`|用户级配置（api_key 读取时掩码；PUT 时 ​`"***"` 表示不变更）|
-|POST|`/api/settings/llm/{name}/test`|测试连接（US-AGT-01 AC-2）|
-|GET|`/api/system/doctor`|`weft doctor` 的 JSON 输出|
-|GET|`/api/system/version`|`{version, schema_version}`|
-|POST|`/api/fs/browse`|服务端文件选择器：​`{path, dirs_only}` → 目录列表（表单路径选择用）|
-
-## 11. WebSocket
-
-`WS /api/ws`（单连接多路复用，连接后客户端发送订阅）：
-
-```jsonc
-// 客户端 → 服务端
-{"op": "subscribe",   "topics": ["workflow:wf_8f3a", "run:r_2025..."]}
-{"op": "unsubscribe", "topics": [...]}
-
-// 服务端 → 客户端（统一信封）
-{"topic": "run:r_...", "event": "node.started", "ts": "...", "data": {...}}
+```
+<name>.weft/
+├── workflow.json          # 图定义（§2），唯一必需文件
+├── pyproject.toml         # 依赖声明；[tool.weft] 段存元数据
+├── uv.lock                # 锁定（uv 生成）
+├── nodes/                 # 用户自定义节点（@weft.node）
+├── prompts/               # prompt 文件（Prompt Template source: file）
+├── data/                  # 约定的数据目录（非强制）
+├── .gitignore             # 生成：.runs/ .venv/ __pycache__/
+├── .venv/                 # uv 管理，不打包
+└── .runs/                 # 运行产物，不打包
+    ├── cache/<node_id>/{<port>.arrow|<port>.json, meta.json}  # 仅 pure 节点的可复用缓存
+    ├── memory/<session_id>.jsonl # P1 Memory 节点数据
+    ├── chat/<session_id>.jsonl   # UI 会话记录，不等于 Memory
+    └── <run_id>/
+        ├── workflow.json      # 入队时冻结的图、参数、变量与节点 manifest
+        ├── meta.json          # Run 元数据（§6），含 workflow_revision 与端口 ValueRef
+        ├── log.jsonl          # Run 日志
+        ├── audit.jsonl        # 审计（§7）
+        ├── changes.json       # 沙箱变更（§8）
+        ├── ipc/               # Worker 间 Arrow 临时文件，不作历史输出真源
+        ├── outputs/<node_id>/<port>  # 历史端口读取的不可变输出快照
+        └── nodes/<node_id>.trace.jsonl
 ```
 
-事件目录（​`data` 字段）：
+路径规则：`format: weft-path` 字段默认存相对 Root 的 POSIX 风格路径（`data/in.csv`）；绝对路径是用户显式声明的外部资源，允许使用但设计期与打包时警告。运行时由 `weft_ctx.resolve()` 统一解析；可信车道允许 Root 外操作，沙箱则另有目录授权。
 
-|event|data|对应 AC|
-| -------------| --------------------------------------------------------------| ----------------|
-|`run.started`|`{run_id, scope}`|US-EXE-05|
-|`run.finished`|`{run_id, status, usage}`||
-|`run.queued`​ / ​`run.dequeued`|`{run_id, position}`|US-EXE-13|
-|`node.status`|`{node_id, status}`（configured/running/executed/failed/skipped/cancelled）|US-DES-05|
-|`node.started`​ / ​`node.finished`|`{node_id, duration_ms?, from_cache?}`||
-|`node.failed`|`{node_id, error: {type, message}}`（完整 traceback 走 REST）|US-EXE-07|
-|`node.progress`|`{node_id, fraction, message?}`||
-|`node.log`|`{node_id, level, message}`||
-|`node.stream`|`{node_id, delta}`|US-EXE-05 AC-2|
-|`node.tool_call`|`{node_id, tool, args_redacted, status, duration_ms, result_summary}`|US-AGT-03 AC-5|
-|`node.confirm_request`|`{request_id, node_id, tool, args, timeout_at}`|US-AGT-12|
-|`node.iteration`|`{loop_node_id, index, total}`|US-EXE-10 AC-3|
-|`chat.message`|`{session_id, role, content, streaming: bool}`|US-AGT-07|
-|`changes.ready`|`{run_id, count}`|US-SBX-04|
-|`env.progress`|`{workflow_id, line}`（uv 输出逐行）|US-EXE-14 AC-1|
-|`pack.finished`|`{job_id, path}`​ / ​`pack.failed`|US-PKG-03|
-|`workflow.saved`|`{workflow_id, modified_at}`（多标签页同步）||
-|`trigger.status`|`{workflow_id, source, health}`|US-TRG-05 AC-4|
+## 2. workflow.json
 
-重连语义：WS 无事件回放；客户端重连后用 REST 补齐（US-EXE-05 AC-3）。
+```jsonc
+{
+  "schema_version": 1,
+  "revision": 1,                        // 每次成功保存递增；PUT/PATCH 用作 CAS
+  "id": "wf_8f3a...",              // 创建时生成；打包/导入保留，本机 duplicate 生成新 id
+  "name": "weekly-report",
+  "description": "",
+  "created_at": "2025-01-01T00:00:00+08:00",
+  "modified_at": "...",
+  "settings": {
+    "concurrency_policy": "queue",     // queue | drop | cancel_previous
+    "sandbox": {
+      "mode": "inherit",               // inherit | sandboxie | none
+      "auto_apply_in_root": false
+    }
+  },
+  "variables": [                        // 工作流级默认流变量（可被触发 overrides 覆盖）
+    {"name": "target_wb", "type": "str", "value": "汇总.xlsx"}
+  ],
+  "nodes": [
+    {
+      "id": "n_0000a1b2",
+      "type": "flow.trigger",
+      "node_version": 1,
+      "name": "Trigger",
+      "position": {"x": 0, "y": 200},
+      "params": {                       // 触发配置唯一真源，不另存顶层影子 trigger
+        "manual": {"enabled": true},
+        "chat": {"enabled": false},
+        "schedule": {"enabled": false, "schedules": [{"cron": "0 9 * * 1-5"}]},
+        "watch": {"enabled": false, "watches": [{"path": "data/inbox", "pattern": "*.xlsx",
+                      "events": ["created"], "debounce_ms": 2000, "recursive": false}]},
+        "http": {"enabled": false, "token_hash": "sha256:..."}
+      },
+      "disabled": false
+    },
+    {
+      "id": "n_0000c3d4",              // "n_" + 8 hex
+      "type": "table.row_filter",      // 命名空间.名称（§9）
+      "node_version": 1,
+      "name": "过滤低额",               // 用户可改显示名
+      "position": {"x": 300, "y": 200},
+      "comment": "",
+      "params": {
+        "column": "amount",
+        "operator": ">",
+        "value": {"$var": "threshold"} // 变量绑定（US-DES-06）
+      },
+      "disabled": false
+    }
+  ],
+  "edges": [
+    {"id": "e_c3d4", "source": "n_0000a1b2", "sourcePort": "variable",
+     "target": "n_0000c3d4", "targetPort": "variables", "order": 0}
+  ],
+  "notes": [
+    {"id": "note_1", "position": {...}, "size": {...}, "color": "#fff3c4", "markdown": "..."}
+  ],
+  "viewport": {"x": 0, "y": 0, "zoom": 1}
+}
+```
 
-## 12. 兼容性承诺
+约束（保存时校验，违反为 ERROR 或 WARN）：
 
-- v1 期间 API 可变；​`/api/system/version`​ 的 ​`schema_version` 是唯一跨版本契约。
-- 事件只增不改：新增 event 或 data 字段向后兼容，删除/重命名需升主版本。
-- CLI 的 ​`--json` 输出结构与对应 REST 响应一致。
+|规则|级别|
+| ---------------------------------------------------------| --------------------|
+|`nodes[].id` 唯一且匹配 `^n_[0-9a-f]{8}$`；`edges` 引用的节点与端口存在|ERROR|
+|边两端端口类型兼容（§3.3）|ERROR|
+|非 Tool/Variable 输入端口入边 ≤ 1；同一 Variable 输入端口的 `edges[].order` 为唯一整数|ERROR|
+|折叠 Loop 后无环|ERROR|
+|Loop Start/End 配对且嵌套合法|ERROR|
+|恰好一个 `flow.trigger` 节点；触发配置只在该节点 params，不允许顶层影子 trigger|ERROR|
+|`{"$var": name}` 引用的变量可能存在（静态可达性不保证，运行时兜底）|WARN|
+|`format: weft-path` 字段为绝对路径|WARN（打包时汇总）|
+
+## 3. 端口类型系统
+
+### 3.1 六种类型
+
+|类型|值（运行时）|缓存序列化|UI 颜色|语义|
+| ------| ----------------------| ------------------------| ---------| ---------------------------------|
+|`table`|`pyarrow.Table`|`.arrow`（Arrow IPC file）|蓝 ​`#3b82f6`|结构化表格|
+|`excel`|描述符 dict（§3.2）|`.json`|橙 ​`#f97316`|Excel App/Workbook/Range 引用|
+|`variable`|`dict[str, Any]`（一组流变量）|`.json`|红 ​`#ef4444`|标量参数集|
+|`message`|`list[ChatMessage]`|`.json`|紫 ​`#a855f7`|LLM 消息序列|
+|`tool`|`list[ToolDecl]`|不缓存（声明性）|绿 ​`#22c55e`|agent 工具|
+|`flow`|无值（仅时序依赖）|不缓存|灰 ​`#9ca3af`|控制流（If/Try 分支、显式顺序）|
+
+`ChatMessage = {role: system|user|assistant|tool, content: str, tool_calls?: [...], tool_call_id?: str, name?: str}`（OpenAI 规范子集）。
+
+`ToolDecl = {name, description, parameters: JSONSchema, kind: node|sandboxed, requires_confirmation: bool, binding: {...}}`​，​`binding` 为实现侧路由信息（目标节点 ID 或沙箱工具名），不暴露给 LLM。
+
+### 3.2 Excel 描述符
+
+见 ​`03-architecture.md`​ §5.3。三种 ​`kind: app | workbook | range`​，均可 JSON 序列化；​`resolve()` 失败即缓存失效。
+
+### 3.3 兼容矩阵
+
+`is_compatible(src, dst)`：
+
+|src \ dst|table|excel|variable|message|tool|flow|
+| -----------| -------| -------| ----------| ---------| ------| ------|
+|table|✓|—|—|—|—|✓*|
+|excel|—|✓|—|—|—|✓*|
+|variable|—|—|✓|—|—|✓*|
+|message|—|—|—|✓|—|✓*|
+|tool|—|—|—|—|✓|—|
+|flow|—|—|—|—|—|✓|
+
+✓* 任何数据端口可连到 ​`flow`​ 输入端口（只取时序，弃值）。除此之外无隐式转换；类型转换一律显式节点（​`Table to Variables` 等）。此矩阵即 US-DES-03 AC-5 的测试表。
+
+### 3.4 流变量作用域
+
+- `variable` 端口的值是 dict，沿边流动时**合并**：多条 Variable 入边按显式 `edges[].order` 升序浅合并，高 order 覆盖低 order（UI 提示覆盖项）；同一输入端口的 order 必须唯一。
+- 节点收到的变量作用域 = 工作流级 `variables` ⊕ 触发 `payload.overrides` ⊕ 所有到达本节点的 variable 端口值（就近优先）。
+- `{"$var": name}` 在节点执行前由引擎解析；缺失则节点失败（US-DES-06 AC-4）。
+
+## 4. ValueRef（IPC 与缓存的统一值引用）
+
+```jsonc
+{"kind": "table",    "path": ".runs/r_1/ipc/x/out.arrow", "hash": "sha256:...", "rows": 1000, "cols": 5}
+{"kind": "json",     "inline": {...}, "hash": "sha256:..."}         // variable / message / excel 描述符
+{"kind": "none"}                                                     // flow 端口
+```
+
+规则：`table` 永远走文件；JSON 值 ≤ 256 KB 时 `inline`，否则落文件给 `path`。`hash` 用于缓存键（`03-architecture.md` §2.4）。进入 Run 输出快照后，`meta.json` 的 ValueRef 必须指向 `.runs/<run_id>/outputs/` 而非临时 IPC。
+
+## 5. TriggerEvent
+
+```jsonc
+{
+  "source": "manual | chat | schedule | file | http | excel",
+  "ts": "ISO8601",
+  "session_id": "s_...",            // chat 必有，其余可空
+  "payload": {
+    // manual:   {"overrides": {k: v}}
+    // chat:     {"message": str, "history_len": int}
+    // schedule: {"schedule_id": str, "scheduled_at": ISO8601}
+    // file:     {"events": [{"path": str, "kind": "created|modified|deleted", "ts": ISO8601}]}
+    // http:     {"body": any, "headers_subset": {...}}
+    // excel:    {"workbook": str, "sheet": str, "address": str}（仅预留，v1 不接受运行）
+  }
+}
+```
+
+Trigger 节点 `variable` 端口输出 `{source, ts, session_id?, payload}`，不 flatten；聊天文本通过 `payload.message` 访问。`message` 端口 = chat 时 `[{role: "user", content: payload.message}]` 否则 `[]`；`table` 端口 = file 时 events 表（列 `path, kind, ts`）否则空表。TriggerManager 加载时从 Trigger 节点 params 派生运行视图，workflow 顶层不保存影子 trigger。
+
+## 6. Run 与节点执行记录
+
+```jsonc
+// .runs/<run_id>/meta.json
+{
+  "run_id": "r_20250101_093000_a1b2",
+  "workflow_id": "wf_8f3a...",
+  "workflow_revision": 1,
+  "frozen_workflow": ".runs/r_20250101_093000_a1b2/workflow.json",
+  "trigger": { TriggerEvent },
+  "scope": {"kind": "all | to_node | from_node | single", "node_id": null},
+  "status": "queued | running | waiting | succeeded | failed | cancelled",
+  "started_at": "...", "finished_at": "...",
+  "usage": {"prompt_tokens": 0, "completion_tokens": 0, "llm_calls": 0, "tool_calls": 0},
+  "nodes": {
+    "n_0000a1b2": {
+      "status": "executed | failed | ...", "started_at": "...", "finished_at": "...",
+      "from_cache": false, "error": {"type": "...", "message": "...", "traceback": "..."},
+      "outputs": {"out": {"kind": "table", "path": ".runs/r_20250101_093000_a1b2/outputs/n_0000a1b2/out.arrow", "hash": "sha256:..."}}
+    }
+  }
+}
+```
+
+`run_id` 格式：`r_<yyyymmdd>_<hhmmss>_<4hex>`，可排序。`workflow_revision` 与冻结文件共同确定本 Run 输入；历史端口读取 `outputs` 引用，默认保留最近 50 次 Run。
+
+## 7. 审计记录（audit.jsonl，每行一条）
+
+```jsonc
+{"ts": "...", "run_id": "...", "node_id": "n_0000a1b2", "agent_kind": "agent_loop | pi",
+ "lane": "trusted | sandboxed", "tool": "excel_read_range",
+ "args_redacted": {...}, "status": "ok | error | rejected",
+ "duration_ms": 123, "result_hash": "sha256:..."}
+```
+
+打码规则：键名匹配 `/key|token|password|secret/i` 的字符串值替换为 `"***"`；`Authorization` 等认证头、URL userinfo 与敏感 query 参数同样打码。完整 prompt 默认不写 trace，只有显式开启时才记录并按所设保留期限删除；原始 API key 不进入沙箱环境变量、stdout 或任何 trace。
+
+## 8. 变更记录（changes.json）
+
+```jsonc
+{
+  "run_id": "...", "collected_at": "...",
+  "sandbox": "sandboxie | none",
+  "audit_complete": true,
+  "audit_warnings": [],
+  "changes": [
+    {"path": "D:/flows/demo.weft/out/a.txt",       // 真实目标路径（绝对）
+     "rel_root": "out/a.txt",                       // Root 内时给出相对路径，否则 null
+     "kind": "created | modified | deleted | renamed",
+     "old_path": null, "new_path": null,           // renamed 时填写；其余为 null
+     "baseline_hash": "sha256:... | null",
+     "size": 1024, "is_text": true, "protected": false,
+     "state": "pending | applied | conflict | failed | discarded",
+     "error": null}
+  ]
+}
+```
+
+重命名优先由删除与创建的内容哈希匹配；无法可靠判断时保留删除+创建两条并写 `audit_warnings`。apply 前重算真实目标哈希，与基线不一致即 conflict；只有显式覆盖确认才能继续。
+```
+
+## 9. 节点类型命名空间
+
+`<namespace>.<name>`，v1 命名空间：`flow` `table` `excel` `file` `agent` `code`。用户节点强制 `user.<name>`。代码中的节点声明/JSON Schema 是参数真源；`09-nodes-v1.md` 由导出器生成，是只读参考。用户故事仍是行为与 AC 真源。
+
+## 10. 用户级配置（config.toml）
+
+```toml
+[server]
+host = "127.0.0.1"
+port = 7788
+open_browser = true
+global_token = ""            # 监听非本机时必填
+
+[llm.default]
+base_url = "https://api.example.com/v1"
+api_key  = "sk-..."          # 仅主机 LLMProxy 读取，不下发沙箱
+model    = "gpt-4o"
+timeout  = 120
+
+[excel]
+backend = "xlwings"          # xlwings | fake
+call_timeout = 60
+
+[sandbox]
+default = "sandboxie"        # sandboxie | none；NoneSandbox 语义待讨论
+allow_unsandboxed = false
+network = "deny"             # deny | allowlist；allowlist 须验证防火墙/白名单
+audit_roots = []             # Root 之外的显式授权目录
+
+[sandbox.sandboxie]
+start_exe = 'C:\Program Files\Sandboxie-Plus\Start.exe'
+box_prefix = "WeftBox"        # 实际每 Run 为 WeftBox-<run_id>
+
+[agent]
+pi_path = ""                 # 空 = PATH 查找
+confirm_timeout_s = 600
+trace_full_prompt = false
+trace_retention_days = 7
+
+[logging]
+level = "INFO"
+retention_days = 14
+
+[cache]
+max_mb = 2048
+run_retention = 50
+```
+
+## 11. 版本与迁移
+
+- `schema_version`​ 整数递增；迁移函数 ​`migrate_v{n}_to_v{n+1}(doc) -> doc`​ 注册于 ​`weft.workflow.migrations`​，逐级执行，迁移前备份 ​`workflow.json.bak.v{n}`。
+- 节点级：​`node_version`​ 不匹配时调用节点类的 ​`migrate_params(old_version, params) -> params`；未实现则原样保留并 WARN。
+- 未知节点类型：加载为 ​`flow.placeholder`（保留原 type/params，不可执行），保存时原样写回，不丢数据（US-PKG-05 AC-3）。
 
 ‍

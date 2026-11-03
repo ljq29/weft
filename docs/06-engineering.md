@@ -1,4 +1,4 @@
-# 05-engineering.md
+# 06-engineering.md
 
 # **Weft 工程规范**
 
@@ -14,12 +14,15 @@
 
 ```
 weft/
-├── CLAUDE.md                  # agent 入口索引（保持简短，链接到 docs/）
-├── docs/                      # 本套文档（01–07）
+├── AGENTS.md                  # 通用 agent 入口索引
+├── docs/                      # 本套文档（01–08）
 ├── pyproject.toml             # workspace 根（uv workspace）
 ├── packages/
 │   ├── weft/                  # 主包：服务、引擎、CLI（见 03-architecture.md §1.2 分层）
 │   │   ├── src/weft/
+│   │   └── tests/
+│   ├── weft-worker/           # Worker 入口、RPC、可信 Worker 内置节点实现
+│   │   ├── src/weft_worker/
 │   │   └── tests/
 │   └── weft-sdk/              # weft_ctx + 节点声明协议（Worker 侧与用户工作流依赖）
 │       ├── src/weft_sdk/
@@ -37,9 +40,9 @@ weft/
 
 规则：
 
-- `weft-sdk`​ 不得依赖 ​`weft`​；​`weft`​ 依赖 ​`weft-sdk`。
-- 分层依赖方向违规（如 ​`engine`​ import ​`api`​）由 ​`ruff`​ 的 ​`flake8-tidy-imports` banned-api 规则 + import-linter 检查，CI 强制。
-- 前端 ​`types/`​ 与后端 Pydantic 模型不自动同步，变更 ​`04-data-model.md` 时两侧手动更新（文档是唯一真源）。
+- `weft-sdk` 不得依赖 `weft` 或 `weft-worker`；`weft` 与 `weft-worker` 均依赖 `weft-sdk`，主服务与工作流锁定的 `weft-worker` 必须同版本。
+- 分层依赖方向违规（如 `engine` import `api`）由 `ruff` 的 `flake8-tidy-imports` banned-api 规则 + import-linter 检查，CI 强制。Engine 只暴露执行接口，trigger/agent 位于上层并调用接口，由组合根注入；Engine 不 import 具体 triggers/agent。
+- 前端 `types/` 与后端 Pydantic 模型不自动同步，变更 `04-data-model.md` 时两侧手动更新。代码中的节点声明/JSON Schema 是参数真源，`09-nodes-v1.md` 由导出器生成且只读；用户故事仍是行为与 AC 真源。
 
 ## 2. 语言与工具链版本
 
@@ -83,7 +86,8 @@ weft/
 |前端单元|vitest||每 PR|
 |E2E|Playwright||每 PR（Linux，FakeExcelBackend + mock LLM）|
 
-- AC 映射：测试函数 docstring 首行写 ​`US-XXX-NN/AC-M`​，一个 AC 至少一个测试；​`scripts/coverage_matrix.py` 解析生成覆盖报告，缺失的 P0 AC 使 CI 失败。
+- AC 映射：测试函数 docstring 首行写 `US-XXX-NN/AC-M`。`scripts/coverage_matrix.py` 只检查 roadmap 中 `- [x]` 已完成任务卡的非 manual AC；引用不存在的 US/AC 直接报错。所有任务默认 `- [ ]`，文档编写完成不等于实现完成。
+- 节点规格：代码声明/JSON Schema 为参数真源，T0.1 建导出器骨架，T1.3 首次生成只读 `docs/09-nodes-v1.md`；导出 diff 纳入 CI，禁止手改生成文件。
 - mock LLM：​`tests/fixtures/mock_llm/`​ 内置可脚本化的 OpenAI 兼容服务器（支持 stream 与 tool_calls 剧本）；真实模型响应录制为回放素材（​`03-architecture.md` §12）。
 - 覆盖率目标：​`engine/`​、​`workflow/`​、​`agent/` 行覆盖 ≥ 85%；其余 ≥ 70%。不为凑数写无断言测试。
 
@@ -117,7 +121,7 @@ uv run poe check                          # = ruff + mypy + pytest + 前端 lint
 - PR：描述须含"关联的 US/AC 编号"与"文档是否需要更新"勾选项；CI 全绿才可合并。
 - 文档即真源：行为变更必须同 PR 更新对应文档（PRD/US/数据模型/API）；审查时文档与代码不一致按文档为准打回。
 
-## 7. 对 agent（Claude Code 等）的工作约定
+## 7. 对 Coding Agent 的工作约定
 
 1. **任务粒度**：一次只做 ​`07-roadmap.md`​ 中的一个任务；完成的定义 = 对应 AC 的测试通过 + ​`poe check` 全绿。
 2. **先读后写**：动代码前先读该模块文档章节；发现文档与代码矛盾时停下来报告，不要擅自选边。
@@ -129,6 +133,7 @@ uv run poe check                          # = ruff + mypy + pytest + 前端 lint
 
 ## 8. 发布
 
-- 版本：SemVer，v1 期间 ​`0.x`​；​`weft --version`​ 与 ​`/api/system/version` 一致。
-- 打包：​`uv build`​；发布产物为 wheel + ​`pipx install weft`​ / ​`uv tool install weft` 指引。
-- 发布前 checklist：​`weft doctor`​ 真机全绿、​`-m win_real`​ 测试通过、​`e2e` 通过、docs 与 CHANGELOG 更新。
+- 版本：SemVer。0.x 阶段 REST/WS 可破坏；1.0 起只新增。P0 表示完整 v1 必须，不等于首个公开版全交付：M0–M3 发布首个公开 MVP，M4–M6 为后续预览，M7 才形成完整 v1。具体版本号在对应里程碑发布前确定，不预写 M7=`0.1.0`。
+- 主服务、`weft-worker` 与工作流锁定的 Worker 版本必须一致；`weft --version` 与 `/api/system/version` 一致。
+- 打包：`uv build`；发布产物为 wheel + `pipx install weft` / `uv tool install weft` 指引。
+- 发布前 checklist：`weft doctor` 真机全绿、`-m win_real` 测试通过、`e2e` 通过、docs 与 CHANGELOG 更新。Fake/Linux 绿灯不能替代 win_real。

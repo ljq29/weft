@@ -12,227 +12,230 @@
 
 ## 0. 里程碑总览
 
+P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0–M3 为首个公开 MVP，M4–M6 为后续预览，M7 才形成完整 v1**；版本号在各里程碑发布前确定。
+
 |里程碑|主题|出口标准（Demo）|
 | --------| ---------------------| ------------------------------------------------------------|
-|**M0**|骨架与风险验证|仓库可构建；三个技术 spike 有结论|
-|**M1**|引擎核心 + 最小闭环|CLI 跑通 ​`Trigger → Read CSV → Row Filter → Write CSV`，含缓存与局部执行|
-|**M2**|画布 UI|浏览器中设计并运行 M1 工作流，状态实时、端口可预览|
-|**M3**|Excel 联动|场景 A（读打开的 Excel → 处理 → 写回打开的 Excel）端到端|
-|**M4**|Agent|场景 B（Agent Loop + Node as Tool）端到端|
-|**M5**|沙箱|场景 C（Pi/沙箱工具 + 变更审批）端到端|
-|**M6**|触发器 + 打包|场景 D、E 端到端；​`pack → unpack → run` 跨目录通过|
-|**M7**|收尾|P1 项、运行历史、doctor、文档、​`0.1.0` 发布|
+|**M0**|骨架与风险验证|仓库可构建；Sandboxie、Excel、pi/LLMProxy 三个技术 spike 有真机结论|
+|**M1**|引擎核心 + 最小闭环|CLI 跑通 CSV 闭环，含冻结 Run、分类缓存、局部执行与 Worker pool|
+|**M2**|画布 UI|浏览器中设计并运行 M1 工作流，状态实时、端口读 Run 快照、CAS 保存|
+|**M3**|Excel 联动 + 首个公开 MVP|场景 A 端到端；公开 MVP 发布，真机门禁通过|
+|**M4**|Agent 预览|场景 B（Agent Loop + 授权 NodeTool + LLMProxy）端到端|
+|**M5**|沙箱预览|场景 C（Pi/沙箱工具 + 变更审批）端到端|
+|**M6**|触发器 + 打包预览|场景 D、E 端到端；外部资源与依赖满足时跨机运行|
+|**M7**|完整 v1|P0/P1 范围、运行历史、doctor、文档与正式发布|
 
-依赖关系：M1 → M2 → M3 → M4 → M5 → M6 → M7 线性为主；M3 与 M2 可部分并行（Excel 子系统不依赖 UI）。
+依赖关系以 M1 → M2 → M3 → M4 → M5 → M6 → M7 为主；M3 与 M2 可部分并行。
 
 规则：
 
-- 每张卡标注【依赖】【产出】【验收】；验收引用 ​`02-user-stories.md` 的 AC。
-- P2/占位项不排卡。P1 项集中在 M7，若时间紧可砍。
+- 每张卡统一使用 `- [ ] **T…**`；只有 `- [x]` 表示实现完成，验收引用 `02-user-stories.md` 的 AC。当前所有任务均未完成。
+- 覆盖脚本只检查已完成卡中的非 manual AC，对不存在的 US/AC 引用报错；manual 项必须列入人工验收单。
+- P2/占位项不排卡。P1 的完整收尾集中在 M7；预览卡若明确列出少量 P1（如 fast_mode、轨迹、人工确认），按该卡验收，不代表 P1 默认全部提前。任何裁减须在完整 v1 发布前重新确认，不能静默删除 P0。
 - 实现中发现文档缺口：小缺口在 PR 中补文档；大缺口（影响数据模型/API）先停下来改文档再继续。
 
 ---
 
 ## M0 骨架与风险验证
 
-> 目标：把"后面会死人的坑"先踩掉。spike 代码允许丢弃，结论必须写回文档。
+> 目标：把“后面会死人的坑”先踩掉。spike 代码允许丢弃，结论必须写回文档。
 
-**T0.1 仓库骨架**  
-【依赖】无  
-【产出】monorepo 目录（​`06-engineering.md`​ §1）；uv workspace；​`weft`​ / ​`weft-sdk`​ 空包可安装；frontend Vite 骨架；ruff/mypy/eslint/pytest/vitest/poe check 全部就绪；CI（Linux + Windows）跑通空测试；import-linter 分层规则生效  
-【验收】​`uv run poe check` 与两平台 CI 绿
+- [ ] **T0.1 仓库骨架**
+【依赖】无
+【产出】monorepo；uv workspace；`weft` / `weft-worker` / `weft-sdk` 空包可安装；frontend Vite；lint/type/test/poe 与 Linux+Windows CI；import-linter；节点规格导出器骨架与 AC 覆盖脚本骨架
+【验收】`uv run poe check` 与两平台 CI 绿；导出器能生成空节点索引，覆盖脚本能识别任务 checkbox 和非法 AC 引用
 
-**T0.2 Spike：Sandboxie 变更收集**（最高风险，​`03-architecture.md`​ §12）  
-【依赖】T0.1  
-【产出】Windows 真机验证脚本 + 结论写入 ​`03-architecture.md`​ §7.2：​`Start.exe`​ 启动/等待/终止、stdout 回传方案、​`drive\` 目录结构、删除标记的实际形态、网络可用性  
-【验收】脚本演示 created/modified/deleted 三种变更被正确收集；若发现方案不可行，提出替代并更新文档（此时停止后续沙箱卡）
+- [ ] **T0.2 Spike：Sandboxie 归属、外泄与变更收集**
+【依赖】T0.1
+【产出】Windows 真机脚本与 `docs/spikes/sandbox.md`：动态 `WeftBox-<run_id>` 创建/删除/列举/终止、进程归属、stdout、删除标记、重命名、网络默认拒绝、未授权路径与 `user\` 未知变更、stale apply 冲突
+【验收】created/modified/deleted/renamed（或明确降级）可收集；只终止本 Run box；默认外网/越权写失败；未知变化令 audit_complete=false；真实目标 stale 时拒绝覆盖。任一安全关键项不可行则停止后续沙箱卡并改设计
 
-**T0.3 Spike：xlwings attach 行为**  
-【依赖】T0.1  
-【产出】真机验证：GetActiveObject 多实例行为、已打开工作簿写回可见性、​`RPC_E_CALL_REJECTED`​ 重现与重试、10 万单元格整块读写耗时；结论写入 ​`03-architecture.md`​ §5  
-【验收】​`docs/spikes/excel.md` 记录数据；性能达标或调整 PRD §9.3 指标
+- [ ] **T0.3 Spike：xlwings 多实例、超时与 owned 生命周期**
+【依赖】T0.1
+【产出】`docs/spikes/excel.md`：多实例列表与 PID/窗口选择、GetActiveObject 实测、默认模式写回可见性、模态对话框、真超时后队列占用、用户并发编辑、owned PID+创建时间+Run/心跳清理、10 万单元格与逐格/批量受控基准
+【验收】记录环境版本和原始数据；明确可行边界并回写架构/AC，不能以 GetActiveObject 猜测实例或宣称超时后 Worker 立即可用
 
-**T0.4 Spike：pi 非交互模式**  
-【依赖】T0.1  
-【产出】确认 pi 的非交互调用方式、输出格式、API key 注入、退出码；固定命令行写入 ​`06-nodes-v1.md`（Pi Agent 节点）  
-【验收】脚本演示给定 task 运行 pi 并解析输出
+- [ ] **T0.4 Spike：pi 非交互模式与沙箱外 LLMProxy**
+【依赖】T0.1
+【产出】确认 pi 非交互参数、输出、退出码；实现最小主机 LLMProxy，验证 pi 可配置 OpenAI 兼容本地代理；原始 key 只在主机配置，沙箱仅收到本地地址和配置名
+【验收】pi 经代理完成任务，env/stdout/trace 无原始 key，直连外网默认拒绝；命令行固化到节点声明，T1.3 后由导出器写入只读 `09-nodes-v1.md`
 
 ---
 
 ## M1 引擎核心 + 最小闭环
 
-**T1.1 数据模型与校验**  
-【依赖】T0.1  
-【产出】​`weft.workflow`​：Pydantic 模型（workflow.json 全量，​`04-data-model.md` §2）、校验规则表、原子保存、迁移框架骨架  
-【验收】US-PKG-05/AC-1,2；US-DES-07/AC-4；校验规则表全部有测试
+- [ ] **T1.1 数据模型与校验**
+【依赖】T0.1
+【产出】`weft.workflow`：Pydantic 全量模型、校验、原子保存、revision/CAS、迁移骨架；Trigger params 唯一真源、合法节点 ID 与 edge order
+【验收】US-PKG-05/AC-1,2；US-DES-07/AC-4,5；US-EXE-04/AC-8；校验规则表全部有测试
 
-**T1.2 端口类型与 ValueRef**  
-【依赖】T1.1  
-【产出】​`PortType`​ 枚举、兼容矩阵、​`ValueRef` 序列化/反序列化、缓存键计算（canonical JSON + 哈希）  
-【验收】US-DES-03/AC-5（36 组合测试表）；US-EXE-04/AC-1
+- [ ] **T1.2 端口类型与 ValueRef**
+【依赖】T1.1
+【产出】PortType、兼容矩阵、ValueRef、完整缓存键（实现/用户代码/uv.lock/迭代号/内容 SHA-256）
+【验收】US-DES-03/AC-5；US-EXE-04/AC-1..3
 
-**T1.3 节点协议与注册表**  
-【依赖】T1.2  
-【产出】​`weft-sdk`​：​`Node`​ 基类、​`Port`​、​`@weft.node`​、​`weft_ctx`​；​`weft`​：内置注册表 + 用户 ​`nodes/` 扫描  
-【验收】示例自定义节点可注册、schema 可导出（US-DES-04/AC-4）
+- [ ] **T1.3 节点协议、注册表与规格导出**
+【依赖】T1.2
+【产出】`weft-sdk` Node/Port/decorator/weft_ctx；cache_policy 与工具能力声明；注册表；由代码 JSON Schema 首次生成只读 `docs/09-nodes-v1.md`
+【验收】US-DES-04/AC-4；自定义节点可注册，生成文档与声明一致且手改 diff 会被 CI 检出
 
-**T1.4 调度器与 Run 状态机**  
-【依赖】T1.3  
-【产出】​`weft.engine`：拓扑排序、ExecScope、并行执行、分支 skip、失败传播、取消、Run 队列与并发策略  
-【验收】US-EXE-01/AC-1,2,3；US-EXE-02；US-EXE-03；US-EXE-08/AC-1,4；US-EXE-12/AC-1,2,3；US-EXE-13/AC-1,2（全部用内存测试节点，无 Worker）
+- [ ] **T1.4 调度器、冻结 Run 与状态机**
+【依赖】T1.3
+【产出】拓扑、ExecScope、并行、分支、失败/取消、Run 队列；入队冻结 workflow/variables/manifest 和 revision，Run 输出快照
+【验收】US-EXE-01/AC-1,2,3；US-EXE-02；US-EXE-03；US-EXE-04/AC-6,7；US-EXE-08/AC-1,4；US-EXE-12/AC-1,2,3；US-EXE-13/AC-1,2
 
-**T1.5 缓存层**  
-【依赖】T1.4  
-【产出】缓存读写、命中判定、失效、LRU 清理、打开工作流时恢复状态  
-【验收】US-EXE-04/AC-2,3,4,5
+- [ ] **T1.5 分类缓存层**
+【依赖】T1.4
+【产出】pure/volatile/side_effect 策略、缓存失效/LRU、历史输出、纯缓存恢复；副作用每次执行，LLM/实时 Excel Read 禁止跨 Run 复用
+【验收】US-EXE-04/AC-1..8（与 T1.1/T1.4 分工覆盖，不重复虚标）
 
-**T1.6 Workflow Worker 与 IPC**  
-【依赖】T1.4  
-【产出】JSON-RPC over stdio、Arrow 文件传值、Worker 生命周期（启动/保活/依赖变更重启/取消/崩溃重启）、​`uv sync` 集成  
-【验收】US-EXE-14/AC-1..5；US-EXE-08/AC-2；A-01/A-03 行为有集成测试
+- [ ] **T1.6 Worker pool 与 IPC**
+【依赖】T1.4
+【产出】独立 `weft-worker` 包、JSON-RPC stdio、Arrow IPC+memory-map、每 Run 懒启动 pool（默认 4）、结束全退出、取消/崩溃清理、同版本 uv.lock 与 `uv sync`
+【验收】US-EXE-14/AC-1..6；US-EXE-08/AC-2；真实子进程并行、跨 Run 状态隔离、无主机 PYTHONPATH 的集成测试
 
-**T1.7 基础表格与文件节点（第一批）**   
-【依赖】T1.6  
-【产出】​`Read/Write CSV·Parquet·JSON`​、​`Column Filter`​、​`Row Filter`​、​`Sorter`​、​`Column Rename`​、​`Variable`​、​`Table Row Count`​、​`List Files`  
-【验收】US-TBL-02/AC-1,3,4,5；US-TBL-03/AC-1..4,8；US-TBL-06/AC-3,4；US-TBL-07/AC-1
+- [ ] **T1.7 基础表格与文件节点（第一批）**
+【依赖】T1.6
+【产出】`Read/Write CSV·Parquet·JSON`、`Column Filter`、`Row Filter`、`Sorter`、`Column Rename`、`Variable`、`Table Row Count`、`List Files`；写节点声明 side_effect
+【验收】US-TBL-02/AC-1,3,4,5；US-TBL-03/AC-1..4,8；US-TBL-06/AC-3,4；US-TBL-07/AC-1；US-EXE-04/AC-4
 
-**T1.8 流程节点（第一批）与 CLI run**  
-【依赖】T1.7  
-【产出】​`Trigger`​（仅 manual）、​`If`​、​`Switch`​、​`Merge`​、​`Wait`​；​`weft run`​（内嵌模式）、​`weft serve`​ 最小 API（workflows CRUD + runs）  
-【验收】US-TRG-01/AC-1；US-TRG-02/AC-2；**里程碑 Demo**：​`weft run demo.weft`​ 跑通 CSV 闭环，二次运行全缓存命中，​`--var` 覆盖生效
+- [ ] **T1.8 流程节点（第一批）与 CLI run**
+【依赖】T1.7
+【产出】`Trigger`（仅 manual）、`If`、`Switch`、`Merge`、`Wait`；`weft run` 内嵌模式、`weft serve` 最小 API
+【验收】US-TRG-01/AC-1；US-TRG-02/AC-2；**里程碑 Demo**：CSV 闭环成功，第二次运行仅 pure 上游命中，Write CSV 仍执行，`--var` 覆盖生效
 
 ---
 
 ## M2 画布 UI
 
-**T2.1 REST/WS 完整化**  
-【依赖】T1.8  
-【产出】​`05-api.md` §1–5、§11 中 M2 所需端点与事件；WS 多路订阅；错误码统一  
+- [ ] **T2.1 REST/WS 完整化**
+【依赖】T1.8
+【产出】​`05-api.md` §1–5、§11 中 M2 所需端点与事件；WS 多路订阅；错误码统一
 【验收】API 集成测试覆盖每个端点的 200 与主要错误路径
 
-**T2.2 画布编辑**  
-【依赖】T2.1  
-【产出】React Flow 画布：节点面板、拖拽、连线（后端校验）、参数表单（JSON Schema 生成）、变量绑定控件、自动保存、undo/redo、复制粘贴、导航、小地图  
+- [ ] **T2.2 画布编辑**
+【依赖】T2.1
+【产出】React Flow 画布：节点面板、拖拽、连线（后端校验）、参数表单（JSON Schema 生成）、变量绑定控件、自动保存、undo/redo、复制粘贴、导航、小地图
 【验收】US-DES-01..04、US-DES-06..08、US-DES-11 的全部 AC（e2e 用 Playwright）
 
-**T2.3 执行可视化**  
-【依赖】T2.2  
-【产出】状态灯、右键执行菜单（到此/从此/仅此/重置）、日志面板、端口视图（Arrow 流直读 + 分页排序）、错误详情  
-【验收】US-DES-05；US-EXE-05/AC-1,3,4；US-EXE-06/AC-1,3,4,5；US-EXE-07/AC-1,2  
+- [ ] **T2.3 执行可视化**
+【依赖】T2.2
+【产出】状态灯、右键执行菜单（到此/从此/仅此/重置）、日志面板、端口视图（Arrow 流直读 + 分页排序）、错误详情
+【验收】US-DES-05；US-EXE-05/AC-1,3,4；US-EXE-06/AC-1,3,4,5；US-EXE-07/AC-1,2
 【Demo】浏览器中从零搭建 M1 工作流并运行、调试
 
-**T2.4 循环节点与 UI**  
-【依赖】T2.3  
-【产出】​`Loop Start/End`（Row/Chunk/Counting × concat/last/variables）、引擎虚拟循环节点、迭代进度显示、配对校验  
+- [ ] **T2.4 循环节点与 UI**
+【依赖】T2.3
+【产出】​`Loop Start/End`（Row/Chunk/Counting × concat/last/variables）、引擎虚拟循环节点、迭代进度显示、配对校验
 【验收】US-EXE-10/AC-1..4；US-EXE-11/AC-1..4
 
-**T2.5 第二批表格节点**  
-【依赖】T2.3  
-【产出】​`Joiner`​、​`Concatenate`​、​`GroupBy`​、​`Pivot/Unpivot`​、​`Duplicate Filter`​、​`Missing Value`​、​`Type Cast`​、​`Polars Expression`​、​`Math Formula`​、​`String Manipulation`​、​`Table to Variables`​、​`Variables to Table`​、​`Table Creator`​、​`Table View`​、​`Python Script`​、​`Path Join`​、​`File Copy/Move/Rename/Delete`  
+- [ ] **T2.5 第二批表格节点**
+【依赖】T2.3
+【产出】​`Joiner`​、​`Concatenate`​、​`GroupBy`​、​`Pivot/Unpivot`​、​`Duplicate Filter`​、​`Missing Value`​、​`Type Cast`​、​`Polars Expression`​、​`Math Formula`​、​`String Manipulation`​、​`Table to Variables`​、​`Variables to Table`​、​`Table Creator`​、​`Table View`​、​`Python Script`​、​`Path Join`​、​`File Copy/Move/Rename/Delete`
 【验收】US-TBL-03..07、US-TBL-08/AC-1..7、US-TBL-10 的全部 P0 AC
 
 ---
 
 ## M3 Excel 联动
 
-**T3.1 ExcelBackend 接口 + Fake 实现**  
-【依赖】T1.3（可与 M2 并行）  
-【产出】接口（​`03-architecture.md`​ §5.1）、​`FakeExcelBackend`、描述符、契约测试套件（两实现共用）  
-【验收】US-XLS-03/AC-4；契约测试在 Linux CI 绿
+- [ ] **T3.1 ExcelBackend 接口 + Fake 实现**
+【依赖】T1.3（可与 M2 并行）
+【产出】ExcelBackend、Fake、描述符与共用契约；实时读取 volatile，App/Workbook 仅在 resolve 成功后复用
+【验收】US-XLS-03/AC-4；US-XLS-04/AC-6（Fake 部分）；Linux 契约绿但不代替真机
 
-**T3.2 ExcelWorker**  
-【依赖】T3.1  
-【产出】STA 线程、submit 队列、超时放弃、错误映射、RefRegistry、非 Worker 线程断言  
-【验收】US-XLS-11/AC-1,2,3；US-XLS-12/AC-1,2,3
+- [ ] **T3.2 ExcelWorker**
+【依赖】T3.1
+【产出】STA 串行队列、超时后繁忙/排队、错误映射、owned RefRegistry、fast_mode 状态恢复
+【验收】US-XLS-11/AC-1..3；US-XLS-12/AC-1..3
 
-**T3.3 XlwingsBackend**  
-【依赖】T3.2 + T0.3 结论  
-【产出】真实实现：attach/new_hidden、读写区域（类型推断/整块）、cell update、sheet 管理、save、fast_mode  
-【验收】US-XLS-01..08、US-XLS-10 的 ​`[int-win]`​ AC（真机脚本 ​`weft-test-win.ps1`）；US-XLS-04/AC-4 与 US-XLS-05/AC-5 性能达标
+- [ ] **T3.3 XlwingsBackend**
+【依赖】T3.2 + T0.3 结论
+【产出】多实例 PID/窗口选择、attach/new_hidden、整块读写、cell update、sheet/save、显式 save|discard、owned PID 清理、可见 false/隐藏 true 的 fast_mode
+【验收】US-XLS-01..08、US-XLS-10 的 `[int-win]` AC；固定基准机记录 US-XLS-04/AC-4、US-XLS-05/AC-5、US-XLS-10/AC-2 结果
 
-**T3.4 Excel 节点 + 缓存描述符解析**  
-【依赖】T3.3  
-【产出】​`Excel Connect/Workbook/Read Range/Write Table/Cell Update/Sheet Names/Sheet/Save`​ 节点；描述符缓存失效重解析  
-【验收】US-XLS-11/AC-4；端口视图对 Excel 描述符的展示（US-EXE-06/AC-2）  
-【Demo】**场景 A 端到端**：读打开的 Excel → 处理 → 写回打开的 Excel，用户全程不关 Excel
+- [ ] **T3.4 Excel 节点 + 描述符解析与 MVP 发布**
+【依赖】T3.3
+【产出】Excel 节点；描述符重解析；实时 Read 每次执行；场景 A 与公开 MVP 发布包
+【验收】US-XLS-11/AC-4；US-XLS-04/AC-6（win_real）；US-EXE-06/AC-2；场景 A 真机通过
+【Demo】用户选择可见实例，读打开的 Excel → 处理 → 默认模式写回并立即可见
 
 ---
 
 ## M4 Agent
 
-**T4.1 LLMClient + mock 服务器**  
-【依赖】T1.8  
-【产出】OpenAI 兼容客户端（流式/重试/用量）、LLM 配置管理 + 测试连接、​`tests/fixtures/mock_llm/`  
-【验收】US-AGT-01/AC-1..4；US-AGT-02/AC-5
+- [ ] **T4.1 LLMProxy/LLMClient + mock 服务器**
+【依赖】T1.8 + T0.4 结论
+【产出】主机 LLMProxy、OpenAI 兼容客户端、命名配置、测试连接、mock；key 只在主机侧读取，volatile LLM 节点
+【验收】US-AGT-01/AC-1..4；US-AGT-02/AC-5；US-AGT-06/AC-4；US-EXE-04/AC-4
 
-**T4.2 LLM Call + Prompt Template + 插值**  
-【依赖】T4.1  
-【产出】两节点 + ​`{var}`​ / ​`{table:port}` 插值 + Jinja2 沙箱  
+- [ ] **T4.2 LLM Call + Prompt Template + 插值**
+【依赖】T4.1
+【产出】两节点 + `{var}` / `{table:port}` 插值 + Jinja2 沙箱
 【验收】US-AGT-02/AC-1..4；US-AGT-09/AC-1..4
 
-**T4.3 Agent Loop + ToolDispatcher + 审计**  
-【依赖】T4.2  
-【产出】ReAct 循环、Tool 端口、工具去重/超时/错误回填、audit.jsonl、trace.jsonl、​`node.stream`​/​`node.tool_call` 事件、轨迹面板  
+- [ ] **T4.3 Agent Loop + ToolDispatcher + 审计**
+【依赖】T4.2
+【产出】ReAct、停止正则优先、max_turns 默认失败/显式 partial、工具去重/超时/错误回填、打码 audit、默认不含完整 prompt 的 trace、事件与轨迹面板
 【验收】US-AGT-03/AC-1..5；US-SBX-07/AC-1..3；US-AGT-10/AC-1..3
 
-**T4.4 Node as Tool**  
-【依赖】T4.3  
-【产出】节点包装、ephemeral 执行、result_format、防递归校验  
+- [ ] **T4.4 授权 Node as Tool**
+【依赖】T4.3
+【产出】tool_capability/参数白名单、冻结参数与 Run 输入快照、ephemeral、禁止 Python/Shell/任意代码、副作用逐次确认、防递归
 【验收】US-AGT-04/AC-1..7
 
-**T4.5 Chat 面板与聊天触发**  
-【依赖】T4.3  
-【产出】​`Chat Input/Output`​、聊天面板、​`chat.message`​ 流式、session 管理  
-【验收】US-AGT-07/AC-1..5；US-TRG-03/AC-1,2  
-【Demo】**场景 B 端到端**（mock LLM 自动化 + 真实模型手动验收 US-AGT-03/AC-6）
+- [ ] **T4.5 Chat 面板与聊天触发**
+【依赖】T4.3
+【产出】REST 发送→ChatSource、WS 推送、run/session/source/message 去重映射、独立 `.runs/chat/` 会话
+【验收】US-AGT-07/AC-1..5；US-TRG-03/AC-1,2
+【Demo】场景 B（mock 自动化 + 真实模型手动 US-AGT-03/AC-6），原始 key 不进入沙箱或轨迹
 
 ---
 
 ## M5 沙箱
 
-**T5.1 Sandbox 接口 + NoneSandbox（影子目录）**   
-【依赖】T0.2 结论  
-【产出】接口、NoneSandbox、变更收集/应用/丢弃、受保护文件、契约测试  
-【验收】US-SBX-01/AC-1..3；US-SBX-05/AC-4（Linux CI 可测）
+- [ ] **T5.1 Sandbox 接口 + NoneSandbox（现有语义待讨论）**
+【依赖】T0.2 结论 + NoneSandbox 讨论定案
+【产出】Sandbox 接口、变更模型、受保护路径与契约；NoneSandbox 严格按 US-SBX-01/架构 §7.3/ADR A-07 的定案实现，不在本任务中擅自改名或改语义
+【验收】US-SBX-01/AC-1..3；US-SBX-05/AC-4；Linux 契约仅覆盖替身能力，不冒充 Sandboxie 验证
 
-**T5.2 SandboxieSandbox**  
-【依赖】T5.1  
-【产出】Start.exe 封装、helper 进程、changes 收集、终止清理、单 Run 互斥  
-【验收】US-SBX-02/AC-1..4；US-SBX-03/AC-1..3；US-SBX-06/AC-1（真机）
+- [ ] **T5.2 SandboxieSandbox**
+【依赖】T5.1
+【产出】独立 `WeftBox-<run_id>`、owned 进程树、helper、网络默认拒绝/白名单、Root/授权目录审计、未知变化提示、只清理本 Run
+【验收】US-SBX-02/AC-1..4；US-SBX-03/AC-1..4；US-SBX-06/AC-1（全部 win_real）
 
-**T5.3 变更审批流**  
-【依赖】T5.1  
-【产出】changes API、diff、审批面板、auto_apply_in_root、幂等 apply  
-【验收】US-SBX-04/AC-1..4；US-SBX-05/AC-1..3,5
+- [ ] **T5.3 基线、重命名与冲突审批流**
+【依赖】T5.1
+【产出】内容哈希基线、renamed/降级、audit_complete、逐项状态、备份、stale CHANGE_CONFLICT、显式覆盖、幂等 apply/discard
+【验收】US-SBX-04/AC-1..4；US-SBX-05/AC-1..5
 
-**T5.4 Sandboxed Tools + Pi Agent 节点 + 人工确认**  
-【依赖】T5.2 + T4.3 + T0.4 结论  
-【产出】五工具、Pi 节点（PiRunner）、confirm 流（事件/API/UI 卡片/超时）  
-【验收】US-AGT-05/AC-1..6；US-AGT-06/AC-1..4；US-AGT-12/AC-1..4；US-AGT-11/AC-1..3  
-【Demo】**场景 C 端到端**（真机 + 真实模型手动验收 US-AGT-06/AC-5）
+- [ ] **T5.4 Sandboxed Tools + Pi Agent + 人工确认**
+【依赖】T5.2 + T4.3 + T0.4 结论
+【产出】五工具、PiRunner 经沙箱外 LLMProxy、confirm 流；不得向沙箱注入原始 key
+【验收】US-AGT-05/AC-1..6；US-AGT-06/AC-1..4；US-AGT-12/AC-1..4；US-AGT-11/AC-1..3
+【Demo】场景 C 真机通过；重命名可判定或明确降级，审批前真实目录不变，stale 不覆盖
 
 ---
 
 ## M6 触发器 + 打包
 
-**T6.1 TriggerManager + schedule/watch/http**  
-【依赖】T1.8  
-【产出】统一事件、APScheduler、watchdog（防抖/忽略规则/防自激）、HTTP 触发（token/限速/wait）、来源开关、健康状态  
+- [ ] **T6.1 TriggerManager + schedule/watch/http/HTTP Response**
+【依赖】T1.8
+【产出】统一事件、Trigger params 派生视图、APScheduler、watchdog、token/限速/wait、P0 `HTTP Response` 节点（未执行时 outputs={}）、来源健康
 【验收】US-TRG-01/AC-2,3；US-TRG-04/AC-1..4；US-TRG-05/AC-1..5；US-TRG-06/AC-1..3；US-TRG-07/AC-1,2；US-SBX-09/AC-1..3
 
-**T6.2 打包/导入**  
-【依赖】T1.1  
-【产出】pack（排除规则/预检/密钥扫描/绝对路径清单）、unpack（zip slip 防护/自动 sync）、CLI 等价命令  
-【验收】US-PKG-01/AC-2；US-PKG-03/AC-1..4；US-PKG-04/AC-1..4；US-SBX-08/AC-1..3  
-【Demo】**场景 D + E 端到端**：watch 触发自动跑；A 机 pack → B 机 unpack → run 通过
+- [ ] **T6.2 打包/导入**
+【依赖】T1.1
+【产出】pack 排除规则/预检/密钥扫描/绝对路径清单、ERROR 阻断/WARNING 显式确认、unpack zip slip 防护与 uv sync、导入保留 id/本机 duplicate 新 id
+【验收】US-PKG-01/AC-2；US-PKG-03/AC-1..4；US-PKG-04/AC-1..4；US-SBX-08/AC-1..3
+【Demo】场景 D + E；在外部资源、兼容 Weft/uv 和锁定依赖可用前提下，A 机 pack → B 机 unpack → run
 
 ---
 
-## M7 收尾（P1 + 发布）
+## M7 完整 v1 收尾
 
-**T7.1 P1 功能包**：Metanode（US-DES-09）、注释/便签（US-DES-10）、运行历史面板（US-EXE-09）、Memory 节点（US-AGT-08）、Rule Engine（US-TBL-05/AC-4）、Shell Command（US-TBL-09）、Excel Run Macro（US-XLS-09）、运行前预检（US-PKG-07）、绝对路径跳转修改（US-PKG-06）  
-**T7.2 doctor 与运维**：​`weft doctor`​/​`--cleanup`​、日志轮转、设置页完整化（US-SET-01..04 全部 AC）  
-**T7.3 发布**：真机全量 ​`-m win_real`​、性能指标复测（PRD §9.3）、README/安装文档、CHANGELOG、​`0.1.0` 构建
+- [ ] **T7.1 P1 功能包**：Metanode、注释/便签、运行历史（含 Run 输出快照）、Memory、Rule Engine、Shell Command、Excel Run Macro、资源预检、绝对路径跳转（对应 US-DES-09/10、US-EXE-09、US-AGT-08、US-TBL-05/AC-4、US-TBL-09、US-XLS-09、US-PKG-06/07）
+- [ ] **T7.2 doctor 与运维**：doctor/cleanup 按 owned 记录清理、动态 box 与网络检查、日志轮转、设置页（US-SET-01..04）
+- [ ] **T7.3 完整 v1 发布**：全量 win_real、同机性能回归、README/安装文档/CHANGELOG、构建正式发布；版本号发布前确定，不预写 0.1.0
 
 ---
 
@@ -241,37 +244,20 @@
 |里程碑|自动化门槛|手动门槛|
 | --------| ---------------------------------| --------------------------------|
 |M1|T1.x 全部 AC 测试绿|CLI demo 录屏|
-|M2|e2e 套件绿|10 分钟搭建测试（PRD G1）|
-|M3|Fake 契约 + win 真机脚本绿|场景 A 实操|
-|M4|mock LLM 套件绿|场景 B 真实模型抽查|
-|M5|NoneSandbox 契约绿 + win 真机绿|场景 C 实操审批|
-|M6|触发器/打包集成测试绿|双机交接实测（PRD G3）|
-|M7|全量 CI + win_real 绿|PRD §4.2 两条成功标准启动跟踪|
+|M2|e2e 与 revision/CAS 测试绿|10 分钟搭建测试（PRD G1）|
+|M3|Fake 契约 + win_real + 首个公开 MVP 检查|场景 A 实操|
+|M4|mock LLM + LLMProxy/越权测试绿|场景 B 真实模型抽查|
+|M5|NoneSandbox 契约 + Sandboxie win_real 绿|场景 C、重命名、stale 冲突实操|
+|M6|触发器/打包集成测试绿|满足外部资源前提的双机交接（PRD G3）|
+|M7|全量 CI + win_real 绿|PRD §4.2 成功标准启动跟踪|
 
-全部完成。当前文档集状态：
+## 文档状态（不代表实现完成）
 
-|文件|内容|状态|
-| ------| -----------------------------------------------------| ------|
-|`docs/01-prd.md`|定位、场景、功能需求、Non-goals、决策 D-01..13|完成|
-|`docs/02-user-stories.md`|88 个故事、9 个 Epic、覆盖矩阵|完成|
-|`docs/03-architecture.md`|进程拓扑、引擎、IPC、Excel/Agent/沙箱、ADR A-01..10|完成|
-|`docs/04-data-model.md`|workflow.json、端口类型、ValueRef、config.toml|完成|
-|`docs/05-api.md`|REST + WS 契约、错误码、事件目录|完成|
-|`docs/06-engineering.md`|工具链、测试分层、Git 规范、agent 约定|完成|
-|`docs/07-roadmap.md`|M0–M7 里程碑、31 张任务卡|完成|
-|`CLAUDE.md`|agent 入口索引与硬性规则|完成|
+当前 01–08 设计文档与 `AGENTS.md` 已建立；所有实现任务仍为 `- [ ]`。`docs/09-nodes-v1.md` 当前不存在，T0.1 建导出器骨架、T1.3 首次由代码节点声明/JSON Schema 自动生成，之后只读更新。
 
-还缺一份规划中的 ​**​`06-nodes-v1.md`​**​ **（节点参数级规格）** ——文档间多处引用了它（Pi 命令行、各节点 params schema 的权威定义）。它篇幅会很大，建议的替代方案：不单独预写，在 roadmap 各任务卡实现节点时，以代码中的 JSON Schema 为准、由脚本导出成文档。如果你希望先写再实现，告诉我。
+以下事项仍未验证或待讨论，不能当成既成真机事实：
 
-另外提醒两点：
-
-1. **文档中的部分技术假设尚未验证，不能直接当作既定事实。**   
-   尤其是三项：
-
-   - Sandboxie 能否可靠收集新增、修改、删除、重命名等变更；
-   - xlwings 在多个 Excel 实例、已打开工作簿、COM 忙碌状态下的真实行为；
-   - pi 当前版本的非交互调用方式、输出格式和参数。
-
-   因此应先执行 ​**M0 的三个 spike**。如果验证结果与文档冲突，先修改架构、验收标准和任务卡，再进入正式实现，避免 agent 按错误假设写出大量代码。
-2. **当前 v1 范围已经接近一个完整的中型产品，不要一次性交给 agent 全量实现。**   
-   建议把第一阶段进一步收敛为 ​**M0 → M1 → M2 → M3**：先做出“画布设计 → 表格处理 → Excel 实时读写 → 缓存与局部执行”的可用产品；确认你确实愿意日常使用后，再做 Agent 和 Sandboxie。否则很容易在底层引擎、UI、Excel、Agent、沙箱五条战线上同时铺摊子，最后每条都只能演示、不能实用。
+1. Sandboxie 独立 box、进程归属、重命名、未知路径、网络拒绝与冲突 apply 必须通过 T0.2。
+2. Excel 多实例、COM 真超时、用户并发编辑与 owned PID 生命周期必须通过 T0.3；性能是同机基准。
+3. pi 非交互调用与沙箱外 LLMProxy 兼容性必须通过 T0.4。
+4. `NoneSandbox` 语义待讨论；`X-Weft-Client: ui` 暂不优化，不能据此声称完成权限控制。

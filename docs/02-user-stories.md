@@ -7,7 +7,7 @@
 |版本|v0.1（草稿）|
 |状态|待确认|
 |上游|`01-prd.md` §7 功能需求|
-|下游|`06-nodes-v1.md`​（节点参数）、​`08-roadmap.md`（任务拆解）、测试代码|
+|下游|`09-nodes-v1.md`​（节点参数，规划）、​`07-roadmap.md`（任务拆解）、测试代码|
 
 ---
 
@@ -17,7 +17,7 @@
 
 - 每个 PRD 需求（​`F-XXX-NN`​）至少对应一条用户故事；每条故事的验收标准（AC）是**可直接转写为测试用例**的 Given/When/Then。
 - agent 实现任务时，以 AC 作为"完成"的客观定义；AC 未全部通过，任务不算完成。
-- AC 中的具体数值、文件名、节点名均为**规范性**内容，实现必须与之一致（节点名以 ​`06-nodes-v1.md` 为准，本文若冲突以节点文档为准）。
+- AC 中的具体数值、文件名、节点名为规范性内容，但受控性能基准除外。代码中的节点声明/JSON Schema 是参数真源，`09-nodes-v1.md` 是自动导出的只读参考；本文始终是行为与 AC 真源，参考文档不得覆盖 AC。
 
 ### 0.2 格式
 
@@ -88,8 +88,8 @@ AC-2  ...
 关联：F-DES-01, F-DES-02
 
 - AC-1 Given 画布 When 在节点面板搜索框输入 ​`read`​ Then 面板只显示名称或描述包含 ​`read`（不区分大小写）的节点，且按分类分组。
-- AC-2 Given 面板中的 ​`Excel Read Range`​ When 拖到画布坐标 (300, 200) 释放 Then 画布出现该节点，​`workflow.json`​ 中新增节点记录含 ​`id`​（UUID）、​`type`​、​`position: {x: 300, y: 200}`​、​`params`（全部为默认值）。
-- AC-3 Given 新添加的节点含必填参数未填 Then 节点显示"未配置"（红）状态。
+- AC-2 Given 面板中的 `Excel Read Range` When 拖到画布坐标 (300, 200) 释放 Then 画布出现该节点，`workflow.json` 中新增节点记录含 `id`（`n_` + 8 hex）、`type`、`position: {x: 300, y: 200}`、`params`（全部为默认值）。
+- AC-3 Given 新添加的节点含必填参数未填 Then 节点显示“未配置”（红）状态。
 - AC-4 Given 面板 When 双击某节点类型 Then 节点添加到画布当前视口中心。
 
 ### US-DES-03 连接端口 [P0] [unit][e2e]
@@ -97,7 +97,7 @@ AC-2  ...
 作为设计者，我想要在节点端口之间拖出连线，且系统只允许类型兼容的连接，以便避免运行期才发现类型错误。  
 关联：F-DES-03
 
-- AC-1 Given ​`Read CSV`​ 的 Table 输出端口 When 拖到 ​`Row Filter`​ 的 Table 输入端口 Then 连线建立，​`workflow.json`​ 的 ​`edges`​ 新增记录含 ​`source, sourcePort, target, targetPort`。
+- AC-1 Given `Read CSV` 的 Table 输出端口 When 拖到 `Row Filter` 的 Table 输入端口 Then 连线建立，`workflow.json` 的 `edges` 新增记录含 `source, sourcePort, target, targetPort, order`；同一 Variable 输入按 order 合并。
 - AC-2 Given ​`Read CSV`​ 的 Table 输出端口 When 拖到 ​`Excel Write Table` 的 Excel 输入端口 Then 连线被拒绝，目标端口显示红色高亮，画布顶部提示"Table 端口不能连接到 Excel 端口"。
 - AC-3 Given 一个输入端口已有连线 When 再拖一条连线到该端口 Then 旧连线被替换（输入端口只允许一条入边），Tool 端口与 Variable 端口除外（允许多条）。
 - AC-4 Given 连线会形成环路（非 Loop Start/End 对） When 释放 Then 连线被拒绝，提示"不允许形成循环，请使用 Loop 节点"。
@@ -141,7 +141,8 @@ AC-2  ...
 - AC-1 Given 画布有任何修改 Then 标题栏显示 ​`*`​ 脏标记；2 秒无新修改后自动保存到 ​`workflow.json`，脏标记消失。
 - AC-2 Given 按 ​`Ctrl+S` Then 立即保存。
 - AC-3 Given 自动保存失败（磁盘只读） Then 脏标记保持并弹出错误提示，不丢失内存中的修改。
-- AC-4 ​`[int]`​ 保存是原子的：先写 ​`workflow.json.tmp`​ 再 rename；中途进程被杀不会留下损坏的 ​`workflow.json`。
+- AC-4 `[int]` 保存是原子的：先写 `workflow.json.tmp` 再 rename；每次成功保存递增整数 `revision`，请求携带读取时 revision 做 CAS，冲突返回 409 且不覆盖他人修改；活跃 Run 仍用冻结快照。
+- AC-5 `[int]` 活跃 Run 中增删节点/连线返回 409；位置、注释等非结构修改允许保存但只影响下一 Run。
 
 ### US-DES-08 撤销/重做、复制/粘贴、框选 [P0] [e2e]
 
@@ -213,14 +214,17 @@ AC-2  ...
 
 ### US-EXE-04 节点输出缓存 [P0] [unit][int]
 
-作为系统，我要缓存节点输出并在输入与参数未变时复用，以便局部执行快速。  
+作为系统，我要只复用语义安全且输入未变的节点输出，以便局部执行快速且不跳过副作用。
 关联：F-EXE-03
 
-- AC-1 ​`[unit]`​ 缓存键 = ​`sha256(node_type + node_version + canonical_json(params) + 各输入端口的内容哈希)`；参数对象的键顺序不影响哈希。
-- AC-2 ​`[int]`​ Given ​`Read CSV`​ 已执行 When 修改 ​`data/sales.csv`​ 内容 Then 下次运行 ​`Read CSV` 重跑（文件节点的输入哈希包含文件 mtime + size）。
-- AC-3 ​`[int]`​ Table 输出缓存为 ​`.runs/cache/<node_id>/<port>.arrow`​；Variable/Message 为 ​`.json`​；Excel 引用为描述符 ​`.json`（见 Q1）。
-- AC-4 Given 缓存文件损坏或版本不匹配 Then 视为未命中，重跑而非报错。
-- AC-5 "打开工作流"时，已有缓存的节点显示为"已执行"状态。
+- AC-1 `[unit]` 每个节点声明 `cache_policy: pure | volatile | side_effect`，默认 `side_effect`；纯表格变换显式声明 `pure`。`side_effect` 节点每次执行，`volatile` 节点每次执行且禁止跨 Run 复用，仅 `pure` 节点可命中输出缓存。
+- AC-2 `[unit]` 缓存键 = `sha256(node_type + node_version + implementation_hash + canonical_json(resolved_params) + 按端口名排序的(port_name, content_hash) + user_code_hash + uv_lock_hash + iteration_index)`；参数对象键顺序不影响哈希，循环外迭代号为 null。
+- AC-3 `[int]` Given `Read CSV` 已执行 When 仅改变 `data/sales.csv` 内容且保持 mtime 与 size 不变 Then 下次运行仍重跑，因为文件输入使用内容 SHA-256 而非 mtime + size。
+- AC-4 `[int]` Given `Write CSV`、实时 `Excel Read Range` 或 `LLM Call` 已有输出 When 再次运行 Then 节点实际执行；Write CSV 体现 `side_effect`，Excel Read 与 LLM 体现 `volatile`，后两者不得跨 Run 复用结果。Excel App/Workbook 描述符可在重新 `resolve()` 成功后复用，但不得据此复用 Excel Read 的表格内容。
+- AC-5 `[int]` Table 输出缓存为 `.runs/cache/<node_id>/<port>.arrow`，Variable/Message/Excel 描述符为 `.json`；缓存损坏或版本不匹配视为未命中并重跑。打开工作流时只有有效 `pure` 缓存使节点显示"已执行"。
+- AC-6 `[int]` 每个 Run 入队时冻结图、参数、变量和节点 manifest 到 `.runs/<run_id>/workflow.json`；活跃 Run 中允许的非结构修改仅影响下一 Run，NodeTool 的固定参数也取该冻结快照。
+- AC-7 `[int]` 每个已执行端口写入 `.runs/<run_id>/outputs/<node_id>/<port>`，`meta.json` 记录 `workflow_revision` 与各节点 `outputs: {port: ValueRef}`；历史端口 API 读取该快照而非临时 IPC 或当前全局缓存，默认随最近 50 次 Run 保留。
+- AC-8 `[unit]` 每个 `workflow.json` 含整数 `revision`；保存携带读取时 revision，CAS 不一致返回 409。运行中结构修改拒绝，非结构修改允许且递增 revision。
 
 ### US-EXE-05 实时状态推送 [P0] [int][e2e]
 
@@ -322,9 +326,10 @@ AC-2  ...
 
 - AC-1 Given 工作流 ​`pyproject.toml`​ 声明依赖 ​`requests`​ When 打开工作流 Then 系统在 ​`<root>/.venv/`​ 执行 ​`uv sync`，UI 显示进度；完成前运行按钮禁用。
 - AC-2 ​`[int]`​ Python Script 节点中 ​`import requests`​ 成功；Weft 本体环境中无 ​`requests`。
-- AC-3 ​`[int]`​ 节点执行进程（worker）由 ​`<root>/.venv/Scripts/python.exe`​ 启动；worker 与引擎通过 ​`03-architecture.md` 定义的 IPC 通信；一个 Run 复用同一个 worker 进程。
-- AC-4 ​`uv sync` 失败（依赖冲突、网络）时，UI 显示 uv 的完整输出，工作流处于"环境异常"状态，可重试。
-- AC-5 Weft 自带节点（Excel、表格等）所需的 ​`polars`​、​`pyarrow`​、​`xlwings`​ 由系统在创建工作流时写入 ​`pyproject.toml`​ 的 ​`[tool.weft.base-deps]`​ 并合并进 ​`dependencies`，用户不可删除。
+- AC-3 `[int]` Worker 由 `<root>/.venv/Scripts/python.exe` 启动已安装的 `weft-worker` 入口，不依赖主机 `PYTHONPATH`；每 Run 懒启动独立 Worker pool（默认并行度 4），每个 Worker 同时只处理一个 `execute`。测试用两个真实子进程的重叠执行证明并行，Run 结束后 pool 全部退出且下一 Run 不继承全局变量。
+- AC-4 `uv sync` 失败（依赖冲突、网络）时，UI 显示 uv 的完整输出，工作流处于"环境异常"状态，可重试。
+- AC-5 创建工作流时，生成器将 `weft-worker==<service_version>` 及用户依赖写入标准 `pyproject.toml` 的 `dependencies` 并锁入 `uv.lock`；主服务与 Worker 版本不一致时拒绝运行。`[tool.weft]` 仅存 Weft 元数据，不声明 uv 会自动合并的自定义依赖段。
+- AC-6 `[unit]` monorepo 中 `weft-worker` 包含 Worker 入口、RPC 与可信 Worker 内置节点实现并依赖 `weft-sdk`；Excel COM 的 xlwings/pywin32 只由主服务环境安装，不要求每个 Worker 安装。
 
 ---
 
@@ -337,18 +342,18 @@ AC-2  ...
 作为设计者，我想要工作流连接到我正在用的那个 Excel，以便实时联动。  
 关联：F-XLS-01
 
-- AC-1 Given 用户已打开 Excel（含 ​`ref.xlsx`​） When 执行 ​`Excel Connect`​（​`mode: attach_visible`​） Then 节点输出 Excel App 引用，描述符含 ​`pid`​、​`visible: true`​、​`workbooks: ["ref.xlsx"]`；用户的 Excel 窗口无任何闪烁或焦点变化。
-- AC-2 Given 没有运行中的 Excel When 执行 Then 启动一个新的可见 Excel 实例并连接；​`Run`​ 结束后该实例**不**被关闭（用户可能要看）。
-- AC-3 Given 多个 Excel 实例 Then 连接到最近活动的实例（​`GetActiveObject`​ 返回者），描述符注明 ​`pid`。
+- AC-1 Given 用户已打开 Excel（含 `ref.xlsx`） When 执行 `Excel Connect`（`mode: attach_visible`） Then 节点输出 Excel App 引用，描述符含 `pid`、`visible: true`、`workbooks: ["ref.xlsx"]`；用户的 Excel 窗口无闪烁或焦点变化。
+- AC-2 Given 没有运行中的 Excel When 执行 Then 启动一个新的可见 Excel 实例并连接；Run 结束后该实例不被关闭（用户可能要看）。
+- AC-3 Given 多个 Excel 实例 Then UI/参数提供实例列表，用户按 PID、窗口标题或已打开工作簿明确选择；不得假定 `GetActiveObject` 返回“最近活动实例”，该行为须在 M0 实测。
 
 ### US-XLS-02 启动独立隐藏实例 [P0] [int-win]
 
 作为设计者，我想要可选地用一个隐藏的 Excel 实例，以便不干扰我手头的工作。  
 关联：F-XLS-02
 
-- AC-1 ​`Excel Connect`​（​`mode: new_hidden`​）启动新 Excel 进程，​`Visible=False`​，​`DisplayAlerts=False`​；描述符 ​`visible: false`。
-- AC-2 Run 结束（成功/失败/取消）时该隐藏实例被关闭，未保存的工作簿按参数 ​`on_finish: discard | save`​ 处理，默认 ​`discard`。
-- AC-3 Weft 服务异常退出时，隐藏实例由 ​`weft doctor --cleanup` 可发现并终止（按进程命令行标记识别）。
+- AC-1 `Excel Connect`（`mode: new_hidden`）启动新 Excel 进程，`Visible=False`，`DisplayAlerts=False`；描述符 `visible: false`，登记 owned PID、进程创建时间、Run 与心跳。
+- AC-2 Run 结束（成功/失败/取消）时关闭该隐藏实例；`on_finish: save | discard` 无默认值，用户必须在运行前显式选择，未保存工作簿逐个列入结果报告，不得静默丢弃。
+- AC-3 Weft 服务异常退出时，`weft doctor --cleanup` 仅依据 Weft 登记且 PID+创建时间+Run/心跳匹配的 owned 隐藏实例进行清理；无法验证归属则不终止并提示人工处理，不依赖未经验证的命令行标记。
 
 ### US-XLS-03 引用、打开、新建工作簿 [P0] [int][int-win]
 
@@ -368,20 +373,21 @@ AC-2  ...
 - AC-1 ​`Excel Read Range`​（​`sheet: "Sheet1"`​，​`range: "A1:E101"`​，​`header: true`）Then 输出 Table 100 行 5 列，列名来自第一行。
 - AC-2 ​`range`​ 留空 → 读取 ​`UsedRange`​；​`range: "Table1"`​ → 读取同名表格对象（ListObject）；​`range: "MyNamed"` → 读取命名区域。
 - AC-3 类型推断：整列为数字 → ​`Float64`​（整数则 ​`Int64`​）；Excel 日期序列号且单元格格式为日期 → ​`Datetime`​；混合 → ​`Utf8`；空单元格 → null。
-- AC-4 ​`[int-win]`​ 读取 10 万单元格（1000×100）耗时 < 3 s（整块 ​`Range.Value` 一次读取，禁止逐格）。
+- AC-4 `[int-win]` 在固定基准机上以整块 `Range.Value` 一次读取 10 万单元格（1000×100），记录受控基准结果，目标 < 3 s；该数值不是任意机器的硬性 AC，测试禁止逐格读取。
 - AC-5 工作表不存在 → 失败并列出可用工作表名。
+- AC-6 `[int]` `Excel Read Range` 为 `volatile`；两次 Run 之间即使用户只修改一个单元格且其他输入描述符不变，也必须重新读取新值，禁止跨 Run 复用表格内容。
 
 ### US-XLS-05 写表到区域 [P0] [int][int-win]
 
 作为设计者，我想要把表写到工作表指定位置，并在用户 Excel 中立即可见，以便实时输出。  
 关联：F-XLS-05
 
-- AC-1 ​`Excel Write Table`​（​`sheet: "本周"`​，​`start: "A1"`​，​`mode: overwrite`​，​`header: true`）Then 从 A1 起写入表头与全部行；用户 Excel 窗口中该工作表立即显示数据；工作表不存在时自动创建。
-- AC-2 ​`mode: append`​ → 从该工作表 ​`start` 列的最后非空行下一行开始写，不写表头。
-- AC-3 ​`mode: overwrite`​ 且 ​`clear_below: true`​（默认）→ 写入前清空 ​`start` 以下、表宽以内的旧内容。
-- AC-4 ​`autofit: true`​ → 写后自适应列宽；​`preserve_format: true`​ → 只写 ​`Value`，不改变目标格式。
-- AC-5 ​`[int-win]` 写 10 万单元格 < 3 s（整块赋值）。
-- AC-6 null 写为空单元格；​`Datetime`​ 写为 Excel 日期并保留原列格式；​`Utf8`​ 以 ​`=`​ 开头的值前缀 ​`'`​ 以防被解释为公式（参数 ​`escape_formula: true` 默认）。
+- AC-1 `Excel Write Table`（`sheet: "本周"`，`start: "A1"`，`mode: overwrite`，`header: true`）Then 从 A1 起写入表头与全部行；可见实例默认模式（`fast_mode: false`）下窗口立即显示数据，工作表不存在时自动创建。
+- AC-2 `mode: append` → 从该工作表 `start` 列的最后非空行下一行开始写，不写表头。
+- AC-3 `mode: overwrite` 且 `clear_below: true`（默认）→ 写入前清空 `start` 以下、表宽以内的旧内容。
+- AC-4 `autofit: true` → 写后自适应列宽；`preserve_format: true` → 只写 `Value`，不改变目标格式。
+- AC-5 `[int-win]` 在固定基准机上整块写入 10 万单元格并记录结果，目标 < 3 s；不作为任意机器硬 AC。
+- AC-6 null 写为空单元格；`Datetime` 写为 Excel 日期并保留原列格式；`Utf8` 以 `=` 开头的值前缀 `'` 以防被解释为公式（参数 `escape_formula: true` 默认）。
 
 ### US-XLS-06 更新零散单元格 [P0] [int][int-win]
 
@@ -424,28 +430,28 @@ AC-2  ...
 作为设计者，我想要在批量写入时暂停重算与刷屏，以便更快。  
 关联：F-XLS-10
 
-- AC-1 ​`Excel Write Table`​ / ​`Excel Cell Update`​ / Loop 体内 Excel 节点在参数 ​`fast_mode: true`​（默认）下，执行前设置 ​`ScreenUpdating=False, Calculation=Manual, EnableEvents=False`，执行后无论成功失败均恢复原值。
-- AC-2 ​`[int-win]` 1000 次 Cell Update 在 fast_mode 下总耗时 < 2 s。
+- AC-1 `fast_mode` 在可见实例默认 false、隐藏实例默认 true；显式开启时执行前设置 `ScreenUpdating=False, Calculation=Manual, EnableEvents=False`，执行后无论成功失败均恢复原值，尤其必须恢复屏幕刷新。
+- AC-2 `[int-win]` 在固定基准机上分别测量 1000 次逐格 Cell Update 与批量合并调用，记录对比结果；逐格 < 2 s 仅作受控优化目标，不作为任意机器硬 AC。
 
 ### US-XLS-11 Excel 操作串行与连接共享 [P0] [unit][int]
 
 作为系统，我要把所有 COM 调用放在专用 STA 线程串行执行，以便避免 COM 线程错误。  
 关联：F-XLS-11
 
-- AC-1 ​`[unit]`​ ​`ExcelWorker`​ 为单例线程，​`CoInitialize`​ 在该线程调用；所有 ​`ExcelBackend`​ 方法通过 ​`worker.submit(fn)`​ 投递并 ​`await` 结果；在其他线程直接调用 COM 对象的代码路径在 debug 模式下触发断言。
-- AC-2 ​`[int]`​ 两个工作流同时运行且都含 Excel 节点时，COM 调用严格交错串行，无 ​`CoInitialize`/RPC_E_WRONG_THREAD 错误。
-- AC-3 同一 Run 内多个 Excel 节点共享同一个 App 连接；Excel 引用通过端口传递的是描述符，worker 端维护 ​`描述符 → COM 对象` 的映射，Run 结束释放。
-- AC-4 Excel 引用缓存（Q1）：缓存中只存描述符；"执行到此"命中缓存时，worker 按描述符重新解析（按名找工作簿、按名找工作表）；解析失败则缓存视为失效，重跑上游。
+- AC-1 `[unit]` `ExcelWorker` 为单例线程，`CoInitialize` 在该线程调用；所有 `ExcelBackend` 方法通过 `worker.submit(fn)` 投递并 await 结果；在其他线程直接调用 COM 对象的代码路径在 debug 模式下触发断言。
+- AC-2 `[int]` 两个工作流同时运行且都含 Excel 节点时，COM 调用严格串行，无 `CoInitialize`/`RPC_E_WRONG_THREAD` 错误。
+- AC-3 同一 Run 内多个 Excel 节点共享同一个 App 连接；Excel 引用通过端口传递描述符，worker 端维护 `描述符 → COM 对象` 映射，Run 结束释放。
+- AC-4 Excel App/Workbook 描述符可在 `resolve()` 成功后复用；工作簿或工作表解析失败则重跑连接上游。实时 Excel Read 是 volatile，每次 Run 都重新读取单元格，不因描述符有效而复用表格内容。
 
 ### US-XLS-12 Excel 不可用时的明确错误 [P0] [int][int-win]
 
 作为设计者，我想要 Excel 出问题时得到明确提示而不是挂死，以便快速处理。  
 关联：F-XLS-12
 
-- AC-1 未安装 Excel（COM 注册表无 ​`Excel.Application`​）→ ​`Excel Connect`​ 在 1 s 内失败，错误 ​`Excel is not installed or not registered`。
-- AC-2 Excel 被模态对话框阻塞（COM 调用返回 ​`RPC_E_CALL_REJECTED`​ / ​`0x800AC472`​）→ 自动重试 3 次（间隔 1 s），仍失败则节点失败，错误 ​`Excel is busy (modal dialog open?)`；UI 提示用户检查 Excel 窗口。
-- AC-3 单次 COM 调用超时 ​`excel_call_timeout`（默认 60 s）→ 节点失败，worker 线程继续可用（超时不杀线程，但标记该调用结果为丢弃）。
-- AC-4 ​`weft doctor` 报告 Excel 版本、是否可连接、Sandboxie 是否安装。
+- AC-1 未安装 Excel（COM 注册表无 `Excel.Application`）→ `Excel Connect` 在 1 s 内失败，错误 `Excel is not installed or not registered`。
+- AC-2 Excel 被模态对话框阻塞（`RPC_E_CALL_REJECTED` / `0x800AC472`）→ 自动重试 3 次（间隔 1 s），仍失败则节点失败，错误 `Excel is busy (modal dialog open?)`；UI 提示用户检查 Excel 窗口。
+- AC-3 单次 COM 调用超过 `excel_call_timeout`（默认 60 s）→ 本次请求失败/结果被丢弃，但 ExcelWorker 仍被旧调用占用，后续 Excel 操作排队且 UI 显示繁忙；不得宣称线程立即可处理下一项。
+- AC-4 `weft doctor` 报告 Excel 版本、可连接实例列表、Sandboxie 动态 box 与网络默认拒绝检查。
 
 ---
 
@@ -453,11 +459,11 @@ AC-2  ...
 
 ### US-TBL-01 Arrow 传递与 Polars 计算 [P0] [unit][int]
 
-作为系统，我要以 Arrow 作为节点间表格格式，以便零拷贝与跨进程。  
+作为系统，我要以 Arrow IPC 文件作为跨进程表格格式，以便统一传输并减少不必要复制。
 关联：F-TBL-01
 
-- AC-1 ​`[unit]`​ 所有 Table 端口值在引擎内为 ​`pyarrow.Table`​；节点实现以 ​`polars.DataFrame`​ 接收并返回，由框架自动转换（​`pl.from_arrow`​ / ​`.to_arrow()`）。
-- AC-2 ​`[int]` 10 万行 × 20 列表格从一个节点传到下一个节点（同一 worker 进程内）< 10 ms；跨进程（经 Arrow IPC 文件内存映射）< 100 ms。
+- AC-1 `[unit]` Table 端口在引擎内为 `pyarrow.Table`；节点实现以 `polars.DataFrame` 接收并返回，由框架转换。v1 只支持内存内数据，不以 Polars lazy 暗示超内存能力。
+- AC-2 `[int]` 跨 Worker 通过 Arrow IPC 文件 + memory-map 读取，记录 10 万行 × 20 列在固定基准机上的结果，目标 < 100 ms；分别测序列化、写盘、哈希、映射和 DataFrame 转换，不宣称全链路零拷贝。
 - AC-3 列名重复、列名为空时节点失败，提示具体列。
 
 ### US-TBL-02 读写文件表格 [P0] [int]
@@ -500,11 +506,11 @@ AC-2  ...
 作为设计者，我想要用表达式新增列或按规则赋值，以便处理无专用节点的场景。  
 关联：F-TBL-05, F-TBL-06
 
-- AC-1 ​`Polars Expression`​：​`expressions: [{alias, expr}]`​，​`expr`​ 为 Polars 表达式字符串（如 ​`pl.col("amount") * 1.1`​），在受限命名空间（仅 ​`pl`）中求值；错误时显示 Polars 原始错误信息。
+- AC-1 `Polars Expression`：`expressions: [{alias, expr}]`，expr 使用 AST 白名单或受控 DSL 表达列引用、字面量、运算符和白名单函数（如 `col("amount") * 1.1`），编译为 Polars 表达式；禁止 Python `eval`，错误显示位置与原因。
 - AC-2 ​`Math Formula`​：简化语法 ​`$amount$ * 1.1 + $tax$`​，​`$col$` 引用列，转为 Polars 表达式执行。
 - AC-3 ​`String Manipulation`​：常用函数 ​`upper, lower, strip, replace, regex_replace, substr, concat, pad`，参数化。
 - AC-4 ​`[P1]`​ ​`Rule Engine`​：有序规则列表 ​`[{condition, value}]`​ + ​`default`​，​`condition`​ 使用 Row Filter 相同的条件语法，首个命中生效，输出列 ​`alias`。
-- AC-5 ​`[unit]`​ 表达式求值禁止访问 ​`__builtins__`、文件、网络；有拒绝测试。
+- AC-5 `[unit]` AST/DSL 拒绝属性访问、import、任意调用、`__builtins__`、文件和网络；If 仍由 simpleeval 求值并遵守函数白名单。
 
 ### US-TBL-06 Table ↔ Variable [P0] [unit][int]
 
@@ -589,25 +595,25 @@ AC-2  ...
 作为设计者，我想要一个 ReAct 循环节点，工具由端口注入，以便 agent 自主完成多步任务。  
 关联：F-AGT-03
 
-- AC-1 ​`Agent Loop`​ 参数：​`llm, system_prompt, task（支持插值）, max_turns（默认 20）, stop_on_text（可选正则）, tool_choice: auto | required`​；输入端口：Message（历史，可选）、Variable、Tool（多条）、Table（可选，渲染进 task）；输出端口：Message（最终回复）、Message（完整轨迹）、Variable（​`final_text`​, ​`turns`​, ​`tool_calls_count`）。
-- AC-2 ​`[unit]`​ 循环逻辑：调用 LLM → 若回复含 ​`tool_calls`​ 则逐个执行并以 ​`role: tool`​ 消息回填 → 再调用 → 直至回复无 tool_calls 或达到 ​`max_turns`​；达到上限时节点状态"已执行"但 ​`Variable.stopped_by = "max_turns"` 并记 WARN。
-- AC-3 ​`[unit]`​ 工具 schema 来自 Tool 端口对象的 ​`name, description, parameters (JSON Schema)`；同名工具冲突时节点在运行前失败。
-- AC-4 ​`[int]` 工具执行异常不终止循环：错误文本作为 tool 结果回填，agent 可自行修正；连续 3 次同一工具失败则终止。
-- AC-5 每轮推送 ​`node.stream`​（文本增量）与 ​`node.tool_call`​（​`tool, args, result_summary, duration_ms`）事件；UI 在节点侧栏以时间线展示。
-- AC-6 ​`[manual]` 用真实模型完成场景 B（分类备注列），结果列正确率人工抽查可接受。
+- AC-1 `Agent Loop` 参数：`llm, system_prompt, task（支持插值）, max_turns（默认 20）, on_max_turns: fail | return_partial（默认 fail）, stop_on_text（可选正则）, tool_choice: auto | required`；输入端口：Message（历史，可选）、Variable、Tool（多条）、Table（可选，渲染进 task）；输出端口：Message（最终回复）、Message（完整轨迹）、Variable（`final_text`, `turns`, `tool_calls_count`, `stopped_by`, `partial`）。
+- AC-2 `[unit]` 每轮先检查 `stop_on_text`，命中即停止；未命中且回复含 `tool_calls` 时逐个执行并回填，无 tool calls 时正常返回。达到 `max_turns` 默认节点失败；仅 `on_max_turns: return_partial` 时允许返回且必须 `partial: true, stopped_by: "max_turns"` 并记 WARN。
+- AC-3 `[unit]` 工具 schema 来自 Tool 端口对象的 `name, description, parameters (JSON Schema)`；同名工具冲突时节点在运行前失败。
+- AC-4 `[int]` 工具执行异常不终止循环：错误文本作为 tool 结果回填，agent 可自行修正；连续 3 次同一工具失败则终止。
+- AC-5 每轮推送 `node.stream`（文本增量）与 `node.tool_call`（`tool, args_redacted, result_summary, duration_ms`）事件；UI 在节点侧栏以时间线展示。
+- AC-6 `[manual]` 用真实模型完成场景 B（分类备注列），结果列正确率人工抽查可接受。
 
 ### US-AGT-04 Node as Tool [P0] [unit][int]
 
-作为设计者，我想要把任一节点包装成工具给 agent，以便 agent 复用确定性能力且受控。  
+作为设计者，我想要把受控节点包装成工具给 agent，以便 agent 复用确定性能力而不获得任意主机执行权限。
 关联：F-AGT-04, F-SBX-07
 
-- AC-1 ​`Node as Tool`​ 节点参数：​`target_node`​（画布上任一节点，下拉）、​`tool_name`​（默认节点名 snake_case）、​`description`​、​`exposed_params: [...]`​（哪些参数由 agent 填，其余固定）、​`result_format: table_markdown | json | text`；输出 Tool 端口。
-- AC-2 ​`[unit]`​ 工具 ​`parameters`​ schema = 目标节点参数 schema 中 ​`exposed_params` 子集；非暴露参数取目标节点当前值。
-- AC-3 ​`[int]`​ agent 调用工具时，目标节点在可信车道以 agent 提供的参数执行一次（独立于其画布状态，不改变其缓存），输出按 ​`result_format`​ 转为字符串回填；执行受 ​`tool_timeout`（默认 120 s）约束。
-- AC-4 ​`[int]`​ 目标节点需要输入端口数据时，取其画布上已缓存的上游输出；上游未执行则工具调用返回错误文本 ​`Upstream of 'X' not executed`。
-- AC-5 每次调用写入审计日志 ​`.runs/<run_id>/audit.jsonl`​：​`ts, run_id, agent_node, tool, args, status, duration_ms, result_hash`。
-- AC-6 ​`target_node` 不能是 Agent 类节点自身或其祖先（防递归）；保存时校验。
-- AC-7 Excel 类节点作为工具时，COM 调用仍经 ExcelWorker 串行（US-XLS-11）。
+- AC-1 `Node as Tool` 参数：`target_node, tool_name, description, exposed_params, result_format: table_markdown | json | text`；下拉仅列出声明 `tool_capability` 的节点，且 `exposed_params` 必须是节点 `tool_exposed_params` 白名单子集。
+- AC-2 `[unit]` 默认仅只读/纯计算节点可包装；Python Script、Shell Command、用户任意代码节点和 Agent 节点一律拒绝。写文件、Excel 写等副作用节点需设计者与调用时双重显式授权，默认逐次确认。
+- AC-3 `[unit]` 工具 parameters schema 是允许暴露参数的子集；非暴露参数取当前 Run 的冻结 `workflow.json`，而非实时画布值。
+- AC-4 `[int]` 调用以 ephemeral 方式执行，不写全局缓存、不改画布状态；需要上游输入时取本 Run 已物化的输入快照，缺失则返回 `Upstream of 'X' not executed`；执行受 `tool_timeout`（默认 120 s）约束。
+- AC-5 每次调用写入 `.runs/<run_id>/audit.jsonl`：`ts, run_id, agent_node, tool, args_redacted, status, duration_ms, result_hash`；不得因审计记录原始 key 或敏感 URL。
+- AC-6 `target_node` 不能是 Agent 类节点自身或其祖先（防递归）；保存时校验。Excel 类只读工具仍经 ExcelWorker 串行，副作用 Excel 工具遵守 AC-2。
+- AC-7 `[int]` 构造未声明工具能力或试图暴露非白名单参数的节点，保存和直接调用均拒绝，不能借 NodeTool 绕过沙箱。
 
 ### US-AGT-05 Sandboxed Tools [P0] [int][int-win]
 
@@ -626,22 +632,22 @@ AC-2  ...
 作为设计者，我想要直接调用原版 pi coding agent 作为一个节点，以便复用其成熟能力。  
 关联：F-AGT-06
 
-- AC-1 ​`Pi Agent`​ 参数：​`task`​（支持插值）、​`cwd`​（默认 Root）、​`pi_path`​（默认取全局设置）、​`model`​（传给 pi 的模型参数，可选）、​`sandbox`​、​`timeout`​、​`extra_args`​；输入 Variable/Message；输出 Variable（​`final_text, exit_code`）与 Message（轨迹）。
-- AC-2 ​`[int-win]`​ 以子进程运行 pi 的非交互模式（​`pi -p "<task>"`​ 或其 JSON 输出模式，具体命令行在 ​`06-nodes-v1.md`​ 固定），​`cwd` 为指定目录，stdout 流式推送到 UI。
-- AC-3 pi 未安装（​`pi_path` 不可执行）→ 运行前失败并链接到"安装指引"。
-- AC-4 ​`sandbox: sandboxie`​ 时 pi 进程在沙箱内，其 API key 通过环境变量注入；​`weft doctor` 验证沙箱内进程能访问网络。
-- AC-5 ​`[manual]`​ 完成场景 C（整理 ​`raw/` 目录），变更列表正确反映 pi 的重命名/移动。
+- AC-1 `Pi Agent` 参数：`task`（支持插值）、`cwd`（默认 Root）、`pi_path`（默认取全局设置）、`llm`（命名配置）、`sandbox`、`timeout`、`extra_args`；输入 Variable/Message；输出 Variable（`final_text, exit_code`）与 Message（轨迹）。
+- AC-2 `[int-win]` 以子进程运行 pi 的非交互模式，具体命令行由 M0 实测并固定到节点声明/自动导出参考；`cwd` 为指定目录，stdout 流式推送到 UI。
+- AC-3 pi 未安装（`pi_path` 不可执行）→ 运行前失败并链接到“安装指引”。
+- AC-4 `[int-win]` pi 在沙箱内只获得本地 `LLMProxy` 地址和 LLM 配置名，由沙箱外代理读取原始 key 并请求允许的 LLM 端点；沙箱 env、stdout、trace 均无原始 key，且直接外网默认拒绝。M0 必须先验证 pi 支持该 OpenAI 兼容本地代理。
+- AC-5 `[manual]` 完成场景 C（整理 `raw/` 目录），变更列表正确反映 pi 的重命名/移动；无法可靠判定时降级为删除+创建并提示。
 
 ### US-AGT-07 Chat Input / Output 与聊天面板 [P0] [int][e2e]
 
 作为设计者，我想要通过聊天触发工作流并看到回复，以便对话式使用。  
 关联：F-AGT-07, F-TRG-03
 
-- AC-1 UI 右侧"聊天"面板，绑定当前工作流；发送消息 → 触发一次 Run，​`Trigger`​ 节点的 Message 端口输出 ​`[{role: user, content}]`​，Variable 端口输出 ​`chat_message, session_id`。
-- AC-2 ​`Chat Output`​ 节点：输入 Message 或 Variable，执行后内容显示为聊天面板中的助手消息；一次 Run 内多个 ​`Chat Output` 按执行顺序显示。
-- AC-3 ​`[int]`​ 流式：​`Chat Output`​ 的上游为 agent 节点时，面板实时显示增量（复用 ​`node.stream`）。
-- AC-4 ​`session_id`​ 在面板"新会话"前保持不变；历史消息由 ​`Memory` 节点（US-AGT-08）或工作流自行维护，面板本身只显示本会话。
-- AC-5 工作流无 ​`Chat Output` 时，Run 结束后面板显示"运行完成（无输出）"。
+- AC-1 UI 发送固定调用 REST `POST /api/workflows/{id}/chat`，经 ChatSource 触发 Run；WS 只推送。Trigger Variable 输出 `{source, ts, session_id, payload}`，聊天文本位于 `payload.message`，Message 端口输出 `[{role: user, content: payload.message}]`。
+- AC-2 `Chat Output` 输入 Message 或 Variable，执行后显示助手消息；一次 Run 多个 Chat Output 按执行顺序显示，事件含 `run_id, session_id, source_node_id, message_id`。
+- AC-3 `[int]` 上游 agent 的 `node.stream` 通过相同 run/session/source/message 映射实时更新；最终 `chat.message` 替换同一消息而非重复追加。
+- AC-4 `session_id` 在“新会话”前保持稳定；UI 会话独立存 `.runs/chat/<session_id>.jsonl`，可供面板恢复，不等于 P1 Memory。需要模型历史时仍显式使用 Memory 或工作流维护。
+- AC-5 工作流无 `Chat Output` 时，Run 结束后面板显示“运行完成（无输出）”。
 
 ### US-AGT-08 Memory 节点 [P1] [int]
 
@@ -696,7 +702,7 @@ AC-2  ...
 
 ### US-SBX-01 沙箱接口可插拔 [P0] [unit]
 
-作为系统，我要定义统一的沙箱接口，以便替换实现。  
+作为系统，我要定义统一的沙箱接口，以便替换实现。
 关联：F-SBX-01
 
 - AC-1 ​`Sandbox`​ 抽象接口：​`spawn(cmd, cwd, env, timeout) -> Process`​、​`read_file(path)`​、​`write_file(path, content)`​、​`list_dir(path)`​、​`collect_changes() -> list[Change]`​、​`apply(changes)`​、​`discard()`​；实现 ​`NoneSandbox`​ 与 ​`SandboxieSandbox`。
@@ -705,48 +711,48 @@ AC-2  ...
 
 ### US-SBX-02 Sandboxie 实现 [P0] [int-win]
 
-作为系统，我要通过 Sandboxie-Plus 启动 agent 工具进程，以便隔离。  
+作为系统，我要通过 Sandboxie-Plus 启动 agent 工具进程，以便隔离并精确归属每个 Run。
 关联：F-SBX-02, F-SBX-03
 
-- AC-1 设置 ​`sandbox.sandboxie.start_exe`​（默认 ​`C:\Program Files\Sandboxie-Plus\Start.exe`​）、​`sandbox.sandboxie.box`​（默认 ​`WeftBox`​）、​`sandbox.sandboxie.root`​（默认 ​`C:\Sandbox\%USER%\WeftBox`）。
-- AC-2 ​`weft doctor`​ 检查 ​`Start.exe`​ 存在、box 存在（​`Start.exe /box:WeftBox /listpids`​ 可执行）、沙箱内 ​`python -c "print(1)"` 可运行且能访问网络。
-- AC-3 每个 Run 使用独立子目录标记（环境变量 ​`WEFT_RUN_ID`​），同一 box 内并发 Run 的变更按进程写入时间与路径归属区分；v1 简化：**同一时刻只允许一个使用沙箱的 Run**，第二个排队。
-- AC-4 Run 结束后沙箱内残留进程被终止（​`Start.exe /box:WeftBox /terminate`）。
+- AC-1 设置 `sandbox.sandboxie.start_exe`（默认 `C:\Program Files\Sandboxie-Plus\Start.exe`）；每个 Run 创建独立 box `WeftBox-<run_id>` 并登记 `{run_id, box, root, owned_pids, process_created_at}`，不靠时间或路径猜测归属。动态 box 创建、删除、列举与终止能力必须先通过 M0 spike。
+- AC-2 `weft doctor` 检查 `Start.exe`、动态 box 生命周期、沙箱内 `python -c "print(1)"` 与网络默认拒绝；显式开启网络时还要验证白名单/防火墙确实生效，不能只检查“能访问网络”。
+- AC-3 不同 Run 可拥有不同 box；终止、清理与变更收集只操作当前 Run 登记的 box/进程树，绝不终止其他 Run 或用户已有 box。
+- AC-4 Run 结束后只终止本 Run box 及其拥有的残留进程树，再按用户审批结果保留或删除 box；异常退出后的清理由登记信息识别，不匹配则不操作。
 
 ### US-SBX-03 沙箱内读真实文件、写入重定向 [P0] [int-win]
 
-作为 Agent，我可以读取真实文件系统但写入不会影响真实文件，以便安全探索。  
+作为 Agent，我可以读取真实文件但写入不会影响真实文件，以便安全探索。
 关联：F-SBX-03
 
-- AC-1 沙箱内 ​`read("D:\flows\demo.weft\data\sales.csv")` 成功返回真实内容。
-- AC-2 沙箱内 ​`write("D:\flows\demo.weft\out\a.txt", ...)`​ 后，真实路径不存在该文件，​`<sandbox root>\drive\D\flows\demo.weft\out\a.txt` 存在。
-- AC-3 沙箱内删除真实文件后，真实文件仍在（Sandboxie 以删除标记记录），​`collect_changes()`​ 报告 ​`deleted`。
+- AC-1 沙箱内 `read("D:\flows\demo.weft\data\sales.csv")` 成功返回真实内容；写入限定 Root 与显式授权目录，其他路径默认拒绝。
+- AC-2 沙箱内 `write("D:\flows\demo.weft\out\a.txt", ...)` 后，真实路径不存在该文件，`<sandbox root>\drive\D\flows\demo.weft\out\a.txt` 存在。
+- AC-3 沙箱内删除真实文件后，真实文件仍在，`collect_changes()` 报告 `deleted`。
+- AC-4 `[int-win]` 尝试写未授权目录、`%APPDATA%` 或访问外网时被拒绝；发现无法归类的 `user\` 等变化时不得静默忽略，`changes.json` 必须 `audit_complete: false` 并在 UI 显示“审计不完整”。
 
 ### US-SBX-04 变更列表与 diff [P0] [int][int-win]
 
-作为设计者，我想要在 Run 结束后看到 agent 做了哪些文件变更，以便审批。  
+作为设计者，我想要在 Run 结束后看到 agent 做了哪些文件变更，以便审批。
 关联：F-SBX-04
 
-- AC-1 Run 结束（成功/失败/取消）后，系统调用 ​`collect_changes()`​，产出 ​`.runs/<run_id>/changes.json`​：​`[{path, kind: created | modified | deleted | renamed, size, is_text, protected}]`。
-- AC-2 UI 弹出"变更审批"面板：按目录树展示，Root 内与 Root 外分组；文本文件（≤ 1 MB，UTF-8 可解码）可展开行级 diff；二进制只显示大小变化。
-- AC-3 ​`[int]`​ ​`GET /api/runs/{id}/changes`​ 与 ​`GET /api/runs/{id}/changes/diff?path=...` 返回对应数据。
-- AC-4 无变更时不弹面板，日志记一条 INFO。
+- AC-1 Run 开始前记录审计范围内真实文件存在性与内容 SHA-256 基线；结束后产出 `.runs/<run_id>/changes.json`，每项含 `{path, kind, size, is_text, protected, baseline_hash, state}`，kind 支持 `created | modified | deleted | renamed`，renamed 另含 `old_path/new_path`，state 为 `pending | applied | conflict | failed | discarded`。
+- AC-2 `[int]` 重命名优先按删除与创建的内容哈希匹配；无法可靠判断时降级为删除+创建并明确提示，不得把复制误报为重命名。
+- AC-3 UI 按目录树展示 Root 内外分组；文本文件（≤ 1 MB，UTF-8 可解码）可展开行级 diff，二进制显示大小与哈希变化；`GET /changes` 与 `/changes/diff` 返回相同事实与 `audit_complete`。
+- AC-4 无变更且审计完整时不弹面板并记 INFO；审计不完整时即使未识别到文件变更也必须提示。
 
 ### US-SBX-05 应用 / 丢弃变更 [P0] [int][int-win]
 
-作为设计者，我想要勾选变更并应用到真实位置或丢弃，以便我掌控最终结果。  
+作为设计者，我想要勾选变更并安全应用到真实位置或丢弃，以便我掌控最终结果。
 关联：F-SBX-05
 
-- AC-1 ​`POST /api/runs/{id}/changes/apply`​ 请求体 ​`{paths: [...]}`​ → 对应文件从沙箱副本复制到真实路径（​`deleted` 则删除真实文件，先移入回收站）；应用结果逐项返回成功/失败。
-- AC-2 ​`POST /api/runs/{id}/changes/discard` → 清空本 Run 的沙箱副本。
-- AC-3 工作流设置 ​`sandbox.auto_apply_in_root: false`​ 默认；为 ​`true` 时 Root 内非受保护变更自动应用，Root 外仍需审批。
-- AC-4 受保护文件（​`workflow.json`​、​`pyproject.toml`​、​`uv.lock`​、​`.runs/**`​、用户级 ​`config.toml`​）在变更列表中标记 ​`protected: true`​，UI 中灰显不可勾选，​`apply` API 收到其路径时整体拒绝（400）。
-
-- AC-5 应用后变更面板标记"已应用"；同一 Run 的变更只能应用一次（幂等：重复请求返回已应用状态）。
+- AC-1 `POST /changes/apply` 请求 `{paths, overwrite_conflicts?: bool}`；应用前重新计算真实目标哈希，与基线不同则该项状态为 `conflict` 并返回 `CHANGE_CONFLICT`，不覆盖。用户查看新 diff 后必须显式 `overwrite_conflicts: true` 才能覆盖。
+- AC-2 覆盖或删除前备份原文件（删除可移入回收站），创建/修改采用临时文件+rename；逐项返回 `applied | conflict | failed`，普通路径不因其他项失败而回滚，不承诺多文件事务全原子。
+- AC-3 `POST /changes/discard` 清空本 Run 未应用沙箱副本并标记 discarded；`sandbox.auto_apply_in_root` 默认 false，开启时也只自动应用 Root 内非受保护且无冲突变更。
+- AC-4 受保护文件（`workflow.json`、`pyproject.toml`、`uv.lock`、`.runs/**`、用户级 `config.toml`）灰显不可勾选；请求含任一 protected 路径则整体 400 且无任何应用。
+- AC-5 已应用项重复请求幂等返回 applied；冲突项须重新确认，失败项可重试，全部状态持久化到 `changes.json`。
 
 ### US-SBX-06 沙箱内无 COM 访问 [P0] [int-win]
 
-作为系统，我要确认沙箱内进程无法驱动主机 Excel，以便隔离边界成立。  
+作为系统，我要确认沙箱内进程无法驱动主机 Excel，以便隔离边界成立。
 关联：F-SBX-06
 
 - AC-1 沙箱内执行 ​`python -c "import win32com.client; win32com.client.GetActiveObject('Excel.Application')"` 失败（找不到活动对象或 COM 被拒绝）。
@@ -754,16 +760,16 @@ AC-2  ...
 
 ### US-SBX-07 审计日志 [P0] [unit][int]
 
-作为设计者，我想要所有 agent 工具调用有统一审计记录，以便事后追查。  
+作为设计者，我想要所有 agent 工具调用有统一审计记录，以便事后追查。
 关联：F-SBX-07
 
-- AC-1 ​`[unit]`​ 审计记录 schema：​`{ts, run_id, node_id, agent_kind: agent_loop | pi, lane: trusted | sandboxed, tool, args_redacted, status: ok | error | rejected, duration_ms, result_hash}`​；​`args_redacted`​ 对含 ​`key/token/password/secret` 的字段打码。
-- AC-2 写入 ​`.runs/<run_id>/audit.jsonl`，追加式、每行一条 JSON。
-- AC-3 UI 历史面板的 Run 详情含"审计"标签页，可按工具/状态过滤。
+- AC-1 `[unit]` 审计记录 schema：`{ts, run_id, node_id, agent_kind: agent_loop | pi, lane: trusted | sandboxed, tool, args_redacted, status: ok | error | rejected, duration_ms, result_hash}`；除 `key/token/password/secret` 字段外，Authorization 认证头、URL userinfo 和敏感 query 参数也必须打码。
+- AC-2 写入 `.runs/<run_id>/audit.jsonl`，追加式、每行一条 JSON；完整 prompt 默认不写 trace，显式开启时必须配置保留期限。
+- AC-3 UI 历史面板含“审计”标签页，可按工具/状态过滤；测试断言原始 API key 不出现在沙箱 env、stdout、audit 或 trace。
 
 ### US-SBX-08 密钥不入工作流目录 [P0] [unit][int]
 
-作为系统，我要保证密钥只存在用户级配置中，以便打包不泄密。  
+作为系统，我要保证密钥只存在用户级配置中，以便打包不泄密。
 关联：F-SBX-08
 
 - AC-1 ​`[unit]`​ ​`workflow.json` 的 JSON Schema 中不存在任何密钥字段；节点参数引用 LLM 仅按配置名。
@@ -772,7 +778,7 @@ AC-2  ...
 
 ### US-SBX-09 服务仅本机监听与 HTTP token [P0] [int]
 
-作为系统，我要默认只监听本机并对触发端点鉴权，以便不暴露风险面。  
+作为系统，我要默认只监听本机并对触发端点鉴权，以便不暴露风险面。
 关联：F-SBX-09
 
 - AC-1 默认绑定 ​`127.0.0.1:7788`​；设置改为 ​`0.0.0.0` 时启动日志打 WARN 且 UI 顶栏常驻提示。
@@ -788,9 +794,9 @@ AC-2  ...
 作为系统，我要把所有触发源统一为同一事件结构，以便下游节点无需区分来源。  
 关联：F-TRG-01
 
-- AC-1 ​`[unit]`​ 事件结构：​`{source: manual | chat | schedule | file | http, ts, payload: dict, session_id?}`​；​`Trigger`​ 节点输出端口：Variable（​`source, ts` 及 payload 平铺）、Message（仅 chat 时非空）、Table（file 触发时的文件清单，其他为空表）。
-- AC-2 ​`Trigger` 节点侧栏按 5 种来源分区配置，每种可独立启用/禁用（F-TRG-07）。
-- AC-3 ​`[int]`​ Run 的 ​`meta.json` 记录完整触发事件。
+- AC-1 `[unit]` 事件结构：`{source: manual | chat | schedule | file | http | excel, ts, session_id?, payload: dict}`；excel 仅预留，v1 不接受运行。Trigger Variable 输出 `{source, ts, session_id?, payload}`，不 flatten；Message 仅 chat 非空，Table 为 file 清单。
+- AC-2 Trigger 节点侧栏按 5 种 v1 来源分区配置，每种独立启停；params 是唯一真源，TriggerManager 派生运行视图，不保存顶层影子 trigger。
+- AC-3 `[int]` Run 的 `meta.json` 记录完整触发事件，聊天文本通过 `payload.message` 读取。
 
 ### US-TRG-02 手动触发 [P0] [int][e2e]
 
@@ -835,7 +841,7 @@ AC-2  ...
 关联：F-TRG-06
 
 - AC-1 ​`POST /api/workflows/{id}/trigger`​，Bearer token（US-SBX-09），body 任意 JSON → ​`source: http`​，​`payload.body`​ 为请求体；响应 202 ​`{run_id}`。
-- AC-2 ​`?wait=true`​ 时阻塞至 Run 结束（上限 ​`http_trigger_wait_timeout`​ 默认 300 s），返回 ​`{run_id, status, outputs}`​，​`outputs`​ 为工作流中 ​`HTTP Response` 节点（P1，若无则为空）设置的内容。
+- AC-2 `?wait=true` 时阻塞至 Run 结束（上限 `http_trigger_wait_timeout` 默认 300 s），返回 `{run_id, status, outputs}`；`HTTP Response` 是 P0 节点，未配置或未执行时 outputs 为 `{}`，在 T6.1 与 HTTP 触发一起交付。
 - AC-3 触发器未启用 http 来源 → 404（不泄露工作流存在性差异：统一 404）。
 
 ### US-TRG-07 来源独立开关与生命周期 [P0] [int]
@@ -878,17 +884,18 @@ AC-2  ...
 - AC-1 UI "打包"对话框：默认排除 ​`.runs/`​、​`.venv/`​、​`__pycache__`​；​`data/`​ 可勾选排除；显示预计体积；产物命名 ​`<name>-<yyyymmdd>.weft.zip`。
 - AC-2 ​`weft pack <workflow-dir> [-o out.zip] [--exclude-data]` 等价。
 - AC-3 ​`[int]`​ 产物 zip 根为 ​`<name>.weft/`​ 单目录；含 ​`workflow.json, pyproject.toml, uv.lock, nodes/, prompts/`；密钥扫描通过（US-SBX-08 AC-2）。
-- AC-4 打包前执行校验：schema 合法、绝对路径警告清单、Loop 配对、未配置节点清单；有 ERROR 级问题时需确认才继续。
+- AC-4 打包前校验 schema、Loop、未配置节点与外部资源：任何 ERROR 必须阻断且不能 force 跳过；绝对路径等 WARNING 展示清单，只有用户显式确认后才继续。
 
 ### US-PKG-04 导入 [P0] [int][e2e]
 
 作为运行者，我想要导入 zip 并直接可跑，以便接收交接。  
 关联：F-PKG-04
 
-- AC-1 UI "导入" → 选 zip 与目标父目录 → 解压、schema 版本检查、​`uv sync`、打开画布；全程进度可见。
-- AC-2 ​`weft unpack a.weft.zip -d D:\flows` 等价。
+- AC-1 UI “导入” → 选 zip 与目标父目录 → 解压、schema 版本检查、`uv sync`、打开画布；全程进度可见。
+- AC-2 `weft unpack a.weft.zip -d D:\flows` 等价。
 - AC-3 zip 内含 Root 外路径（zip slip）→ 拒绝导入。
-- AC-4 ​`[int]`​ 端到端：机器 A ​`pack`​ → 机器 B（干净环境，仅装 Weft + uv）​`unpack`​ → ​`weft run` 成功（CI 中以两个独立临时目录 + 清空缓存模拟）。
+- AC-4 `[int]` 机器 A pack → 机器 B unpack + run；前提为兼容 Weft/uv、声明的外部资源与系统依赖可用、可安装锁定依赖。CI 用两个独立临时目录和本地 wheel 模拟，不宣称无网络/无外部资源也必能运行。
+- AC-5 `[unit]` pack/unpack 保留 workflow.id；在本机执行“复制工作流/duplicate”时生成新 id 和新 revision 历史。
 
 ### US-PKG-05 schema 版本与迁移 [P0] [unit]
 
@@ -939,7 +946,7 @@ AC-2  ...
 
 - AC-1 服务日志 ​`%APPDATA%\weft\logs\weft-<date>.log`，JSON lines，按天轮转，默认保留 14 天。
 - AC-2 Run 日志独立于服务日志（​`.runs/<run_id>/log.jsonl`​）；两者均含 ​`trace_id` 可关联。
-- AC-3 日志级别可在设置中调整，​`DEBUG` 级别记录每次 COM 调用与 LLM 请求摘要（不含密钥与完整 prompt，完整 prompt 仅在 trace 文件中）。
+- AC-3 日志级别可调；DEBUG 记录 COM 调用与 LLM 请求摘要，不含密钥或完整 prompt。完整 prompt 默认也不写 trace，只有显式开启 `trace_full_prompt` 才记录，并按 `trace_retention_days` 清理。
 
 ### US-SET-04 CLI 与 doctor [P0] [int][int-win]
 
@@ -969,4 +976,4 @@ AC-2  ...
 |F-PKG-01..07|US-PKG-01..07|
 |F-SET-01..05|US-SET-01..05|
 
-维护规则：PRD 新增/变更需求时，必须同步本矩阵；AC 与 ​`06-nodes-v1.md` 冲突时以节点文档为准并回改本文。
+维护规则：PRD 新增/变更需求时同步本矩阵。代码中的节点声明/JSON Schema 是参数真源，`09-nodes-v1.md` 仅为自动导出的只读参考；本文始终是行为与 AC 真源，冲突时修正导出器或参考文档，不覆盖 AC。

@@ -66,11 +66,12 @@
 
 同一组测试用例注入 ​`sandbox fixture`​（​`NoneSandbox`​ 影子目录 vs ​`SandboxieSandbox`）：
 
-1. `read_file` 可读取工作流 Root 内外已存在的真实文件。
-2. `write_file`​ 与子进程写出文件后，**真实路径内容保持不变**。
-3. `collect_changes()`​ 准确识别 ​`created`​、​`modified`​、​`deleted`​ 三种状态及文件大小、​`is_text`。
-4. 受保护路径（​`workflow.json`​、​`pyproject.toml`​、​`uv.lock`​、​`.runs/**`​、​`config.toml`​）一律标记 ​`protected: true`​，调用 ​`apply()` 包含任一受保护路径时整体拒绝且不产生部分写入。
-5. `apply()`​ 成功后真实文件更新，再次调用 ​`apply()`​ 幂等返回已应用；​`discard()` 后变更清空且真实文件未动。
+1. `read_file` 可读取真实文件；写入限定 Root/授权目录，越权路径和外网默认拒绝，真实路径内容保持不变。
+2. Run 前建立内容哈希基线；`collect_changes()` 识别 created/modified/deleted，重命名仅在删除+创建内容哈希可匹配时报告 renamed，否则降级并提示。
+3. 未授权目录或 `user\` 未知变化不得静默忽略，必须 `audit_complete: false`。
+4. protected 路径整体拒绝且零应用；普通路径逐项返回，不要求多文件全原子。
+5. apply 成功后真实文件更新，重复 apply 幂等；discard 只清未应用项。收集后修改真实目标会触发 `CHANGE_CONFLICT`，查看新 diff 并显式 overwrite 才允许继续，覆盖/删除前有备份。
+6. 真机附加用例：独立 box 的创建/删除/进程归属、只终止本 Run、网络白名单有效性；这些 win_real 项不能由 NoneSandbox 结果替代。
 
 ---
 
@@ -110,52 +111,59 @@
 
 ## 5. 各核心模块专项测试重点
 
-### 5.1 执行引擎与缓存（​`engine/`）
+### 5.1 执行引擎与缓存（`engine/`）
 
-- **拓扑与环检测**：DAG 正常排序；普通环路必拒；成对嵌套的 ​`Loop Start/End` 正确折叠；未闭合或交叉嵌套的 Loop 必拒。
-- **局部执行作用域（ExecScope）** ：构造带计数器的探针节点（记录实际执行次数），严格验证 ​`to_node`​、​`from_node`​、​`single`​、​`reset` 下每个节点的执行次数与缓存命中状态。
-- **缓存确定性**：参数字典键顺序打乱、无关空白变化，缓存键不变；上游输入文件 ​`mtime`​ 或 ​`size`​ 变化、节点 ​`node_version` 升级、流变量解析值变化，缓存必失效。
-- **并发与取消**：两个无依赖慢节点（各 sleep 0.3s）总耗时 < 0.45s（证明真并行）；执行 0.1s 后触发 ​`cancel`​，Run 在 2s 内进入 ​`cancelled`，Worker 子进程无残留，已完成节点的缓存仍有效。
+- **拓扑与环检测**：DAG 正常排序；普通环路必拒；成对嵌套 Loop 正确折叠；未闭合或交叉嵌套必拒；Variable 入边按显式 order 合并。
+- **局部执行作用域**：用计数探针验证 `to_node/from_node/single/reset` 的实际执行次数和缓存状态；历史端口必须读对应 Run 输出快照。
+- **缓存确定性**：参数键顺序无关；实现代码、用户代码、uv.lock、解析变量、迭代号变化均失效。文件内容变化但 mtime+size 不变仍失效；`Write CSV` 等副作用节点每次执行；LLM 与实时 Excel Read 禁止跨 Run 复用，单元格变化必须反映到下次读取。
+- **冻结与 CAS**：活跃 Run 使用入队时图/变量/manifest，非结构编辑不影响本 Run，NodeTool 固定参数也来自冻结快照；旧 revision 保存返回 409 且不覆盖新文档。
+- **并发与取消**：两个真实 Worker 子进程执行慢节点时时间区间重叠；Run 结束后 pool 无残留，下一 Run 不继承模块全局变量或 run_id；取消只影响当前 Run。
 
-### 5.2 Workflow Worker 与 IPC（​`worker/`）
+### 5.2 Workflow Worker 与 IPC（`weft-worker/`）
 
-- **环境隔离真实验证**：测试工作流声明一个 Weft 本体未安装的轻量纯 Python 小包（或本地 wheel 夹具），验证 Worker 内 ​`import`​ 成功而服务进程内 ​`import` 失败。
-- **崩溃恢复**：构造一个执行 ​`os._exit(137)`​（模拟段错误/OOM 被杀）的恶意节点，验证服务进程不崩溃、该节点状态变为 ​`failed` 并附清晰错误、下一次 Run 能自动拉起新 Worker。
-- **大数据零拷贝通路**：传递 10 万行 × 20 列 Arrow 表，验证 JSON-RPC stdout 行内不包含表格数据本体（单行长度 < 4 KB），只传 ​`ValueRef` 路径与哈希。
+- **环境隔离真实验证**：工作流声明主服务未安装的本地 wheel，Worker 内 import 成功、服务内失败；移除主机 PYTHONPATH 后仍能启动锁定版本的 `weft-worker`。
+- **pool 契约**：单 Worker 不并发 execute，pool 默认 4 提供真实并行；进程崩溃只使当前节点失败，Run 结束所有进程退出，下一 Run 使用全新 pool。
+- **Arrow IPC 文件通路**：10 万行 × 20 列只经 ValueRef 传路径与哈希，stdio 不含表格本体；分别测量序列化、写盘、哈希、memory-map 和 DataFrame 转换，不以“零拷贝”掩盖成本。
 
-### 5.3 Excel 线程安全与异常（​`excel/`）
+### 5.3 Excel 线程安全与异常（`excel/`）
 
-- **STA 线程断言**：在 debug/test 模式下，任何非 ​`ExcelWorker`​ 线程直接访问底层 COM 包装对象立即抛 ​`AssertionError`（US-XLS-11/AC-1）。
-- **跨工作流串行**：同时启动 2 个均含 Excel 读写的工作流，注入延迟，验证调用时间区间严格不重叠且无 ​`RPC_E_WRONG_THREAD`。
-- **模态框阻塞模拟**：通过桩模拟 COM 抛出 ​`0x800AC472`​（​`VBA_E_IGNORE`​ / ​`RPC_E_CALL_REJECTED`​），验证重试 3 次后返回可读的 ​`ExcelBusyError`，而非无限挂起。
-- **隐藏实例零泄漏**：​`win_real`​ 测试前后快照系统 ​`EXCEL.EXE`​ PID 集合，测试结束后不得多出任何新增的隐藏 ​`EXCEL.EXE` 进程。
+- **STA 与串行**：非 ExcelWorker 线程访问 COM 立即断言；跨工作流 COM 调用时间不重叠。
+- **多实例与实时读取**：win_real 打开多个 Excel 实例，用户按 PID/窗口选择；两次 Run 间修改一个单元格，第二次必须读到新值。
+- **超时与并发编辑**：COM 超时后本次请求失败但旧调用仍占 Worker，后续任务排队且 UI 繁忙；用户并发编辑造成的失败须可读，不覆盖未确认内容。
+- **隐藏实例归属**：仅清理 owned PID+创建时间+Run/心跳匹配的实例；fast_mode 结束恢复 ScreenUpdating；未显式选择 save/discard 不得关闭隐藏实例。
 
 ### 5.4 安全与边界测试（必测红线）
 
 |编号|攻击/异常输入|预期防御行为|关联 AC|
 | --------| -----------------------------------------------------------------| ----------------------------------------------------| --------------------------------|
-|SEC-01|`weft unpack`​ 导入含 ​`../../evil.dll` 条目的构造 zip|拒绝解压，返回 400，目标目录外零文件写入|US-PKG-04/AC-3|
-|SEC-02|`If`​ 条件或 ​`Polars Expression`​ 传入 ​`__import__('os').system('calc')`​ 或 ​`().__class__.__base__`|AST/沙箱拦截，节点失败且命令未执行|US-EXE-12/AC-5, US-TBL-05/AC-5|
-|SEC-03|`Prompt Template`​ 传入 ​`{{ ''.__class__.__mro__ }}`|Jinja2 ​`SandboxedEnvironment`​ 拦截 ​`SecurityError`|US-AGT-09/AC-4|
-|SEC-04|工作流目录下某文本文件混入 ​`config.toml`​ 中的真实 ​`api_key`​ 明文，执行 ​`weft pack`|全文扫描命中，打包中止并指出泄漏文件名，不生成 zip|US-SBX-08/AC-2|
-|SEC-05|Run 处于 ​`running`​ 状态，或请求不带 ​`X-Weft-Client: ui`​ 头，调用 ​`PUT /api/workflows/{id}` 修改节点/连线|返回 409 / 403，图结构不变（防 Agent 自改图）|US-AGT-11/AC-2|
-|SEC-06|沙箱内进程修改了 ​`workflow.json`​，调用 ​`POST /changes/apply` 传入该路径|返回 400，全部变更不应用|US-SBX-05/AC-4|
-|SEC-07|未带或带错 Bearer token 调用 ​`POST /trigger` 连续 15 次|前 10 次返回 401，第 11 次起返回 429 限流|US-SBX-09/AC-2|
+|SEC-01|zip 含 `../../evil.dll`|拒绝解压，目标目录外零写入|US-PKG-04/AC-3|
+|SEC-02|If/Polars Expression 传入 `__import__`、`__class__` 等|AST/受控 DSL 拦截，命令未执行|US-EXE-12/AC-5, US-TBL-05/AC-5|
+|SEC-03|Jinja 模板遍历 `__class__.__mro__`|SandboxedEnvironment 拦截|US-AGT-09/AC-4|
+|SEC-04|工作流文件含真实 api_key|打包中止并指出泄漏文件|US-SBX-08/AC-2|
+|SEC-05|运行中改图，或不带 `X-Weft-Client: ui` 调用 PUT|返回 409/403，图结构不变；该 header 仍只是当前既定约束，本轮不增强权限模型|US-AGT-11/AC-2|
+|SEC-06|apply 含 workflow.json 等 protected 路径|整体 400，无任何变更应用|US-SBX-05/AC-4|
+|SEC-07|错误 Bearer token 连续 15 次|前 10 次 401，第 11 次起 429|US-SBX-09/AC-2|
+|SEC-08|NodeTool 指向 Python/Shell/未声明节点或暴露非白名单参数|保存和直接调用均拒绝，无法借可信 lane 绕过沙箱|US-AGT-04/AC-1,2,7|
+|SEC-09|pi/沙箱尝试读取原始 key、直连外网，或写未授权目录|env/stdout/trace 无 key，外网与越权写默认拒绝；代理只允许配置端点|US-AGT-06/AC-4, US-SBX-03/AC-4|
+|SEC-10|收集后真实目标被用户修改，再 apply|返回 `CHANGE_CONFLICT`，不覆盖；查看新 diff 并显式确认后才可覆盖|US-SBX-05/AC-1,2|
+|SEC-11|沙箱产生重命名或未知 `user\` 变更|哈希可判定才报 renamed；否则删除+创建并提示；未知变更使 audit_complete=false|US-SBX-04/AC-1,2,4|
 
 ---
 
 ## 6. 性能基准测试（Performance Benchmarks）
 
-使用 ​`pytest-benchmark`​（标记 ​`@pytest.mark.benchmark`，归入集成/真机门禁），硬性对齐 PRD §9.3：
+使用 `pytest-benchmark`（`@pytest.mark.benchmark`）先建立基线，再在同机回归。报告必须记录 CPU、RAM、OS、Excel/Python/依赖版本、数据类型、冷/热缓存及是否包含序列化/哈希；PRD 数值是受控目标，不是任意机器的通用 CI 硬门槛。
 
-|基准项|测量方法|通过阈值|运行环境|
+|基准项|测量方法|受控目标|运行环境|
 | -------------------| -----------------------------------------------------------------| ------------------------------| --------------|
-|引擎纯调度开销|50 个空操作（No-op）节点线性串联执行，扣除首尾固定开销后除以 50| **&lt; 5 ms / 节点**|Linux/Win CI|
-|节点间 Arrow 传递|100,000 行 × 20 列（混合数值/字符串）经 Worker IPC 往返一次| **&lt; 100 ms**|Linux/Win CI|
-|Excel 整块读取|`Excel Read Range`​ 读取 ​`1000 × 100`（10 万单元格）为 Arrow 表| **&lt; 3.0 s**|`win_real`|
-|Excel 整块写入|`Excel Write Table`​ 将 ​`1000 × 100`​ 表写入可见实例（​`fast_mode=True`）| **&lt; 3.0 s**|`win_real`|
-|WS 状态推送延迟|节点状态变更时刻到测试 WS 客户端收到 ​`node.status` 帧的耗时（p95）| **&lt; 200 ms**|Linux/Win CI|
-|服务冷启动|子进程启动 ​`weft serve --no-browser`​ 到 ​`GET /api/system/version` 返回 200| **&lt; 2.0 s**（含前端首屏可交互 < 5.0 s）|E2E CI|
+|引擎纯调度|50 个 No-op 线性节点，扣除固定开销|< 5 ms / 节点|固定 Linux/Win 基准机|
+|Arrow 跨 Worker|100,000 行 × 20 列 IPC 往返，分别报告序列化、写盘、哈希、映射、转换|< 100 ms|固定 Linux/Win 基准机|
+|Excel 整块读取|1000 × 100 整块读取为 Arrow 表|< 3.0 s|固定 win_real 基准机|
+|Excel 整块写入|1000 × 100 整块写入；另比较逐格与批量合并调用|< 3.0 s|固定 win_real 基准机|
+|WS 状态推送|状态变更到 WS 客户端收到帧，p95|< 200 ms|固定 CI 基准环境|
+|服务冷启动|启动到 version 200；首屏可交互单独测量|< 2.0 s / 5.0 s|固定 E2E 基准环境|
+
+基准结果与环境不符时只记录不阻断普通 PR；同一基准机出现显著回归才阻断。Excel 指标只能由 win_real 验证，Fake/Linux 绿灯不能替代。
 
 ---
 
@@ -181,10 +189,11 @@ test('US-DES-05/AC-1: renders red/yellow/green status bar on canvas nodes', asyn
 
 仓库内置检查脚本，纳入 ​`uv run poe check`：
 
-1. 解析 ​`docs/02-user-stories.md`​ 中所有非 ​`[manual]` 的 AC 条目；
-2. 解析 ​`docs/07-roadmap.md` 中已标记完成的任务卡所声明的【验收】AC 集合；
-3. 扫描 ​`packages/**/tests/`​、​`frontend/src/**/*.test.*`​、​`e2e/`​ 中的 ​`US-XXX-NN/AC-M` 标记；
-4. **若已完成任务卡名下的任一自动化 AC 找不到对应测试函数，脚本退出码为 1，CI 直接失败。**
+1. 解析 `docs/02-user-stories.md` 的全部 US/AC，建立合法引用集合并区分 `[manual]`；
+2. 解析 `docs/07-roadmap.md` 的任务卡，格式必须为 `- [ ] **T…**` 或 `- [x] **T…**`，只有 `[x]` 是完成；任何不存在的 US/AC 引用都立即报错；
+3. 扫描 `packages/**/tests/`、`frontend/src/**/*.test.*`、`e2e/` 中的 US/AC 标记，未知标记同样报错；
+4. 仅对 `[x]` 已完成卡，检查其声明的所有非 manual AC 至少有一个对应测试；缺失则退出 1。manual AC 必须出现在人工验收单，不能要求自动化函数冒充；
+5. 所有任务默认未完成，文档编写或任务卡文字调整不得自动改为 `[x]`。Fake/Linux 结果只能覆盖其声明环境，涉及 win_real 的完成卡还必须记录真机结果。
 
 ### 7.3 代码覆盖率指标
 
@@ -225,11 +234,11 @@ jobs:
 
 供你在本地 Windows 终端在里程碑节点运行：
 
-1. 前置运行 ​`uv run weft doctor`​（确认 Excel、Sandboxie ​`WeftBox`、uv 就绪）；
-2. 记录当前用户的 ​`EXCEL.EXE` 进程列表（确保不误杀你已经打开的工作簿）；
-3. 运行 ​`uv run pytest -m "win_real or benchmark" -v`；
-4. 检查是否有残留隐藏 ​`EXCEL.EXE`​ 或 ​`WeftBox` 残留进程，若有则报错提示；
-5. 输出测试报告至 ​`.test-reports/win-real-<timestamp>.xml`。
+1. 前置运行 `uv run weft doctor`（Excel 实例列表、动态 Sandboxie box、网络默认拒绝、uv 就绪）；
+2. 记录当前 `EXCEL.EXE` PID+创建时间与 Weft owned 实例/box 登记，避免误杀用户工作簿或其他 Run；
+3. 运行 `uv run pytest -m "win_real or benchmark" -v`，性能报告包含基准环境与分阶段耗时；
+4. 检查 owned 隐藏 Excel 与本 Run box 无残留，只能按登记匹配清理，不匹配则报告人工处理；
+5. 输出 `.test-reports/win-real-<timestamp>.xml`；任何 win_real 未运行/失败都明确标为未验证，不能用 Fake 结果补齐。
 
 ### 9.3 里程碑手动验收单（​`[manual]`）
 
