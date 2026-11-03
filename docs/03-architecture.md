@@ -431,7 +431,7 @@ TriggerManager
 
 - 所有 Source 产出统一 `TriggerEvent{source, ts, session_id?, payload}`（US-TRG-01），投入 Engine 执行接口。`source: excel` 仅作 v2 兼容预留，v1 不接受运行。
 - Engine 按工作流 `concurrency_policy` 决定入队/丢弃/取消前者（US-EXE-13），每个 Run 入队即冻结快照。立即执行/入队返回 202 与 `disposition: started|queued`；drop 不创建 Run，返回 200 与 `run_id: null`；队列满返回 409。手动、聊天与 HTTP 触发共用此契约。
-- `HTTP Response` 每次 Run 最多执行一个，向同步 HTTP 触发提供 `{status_code, headers, body}`；未执行返回 `{}`，执行多个则运行失败。异步触发不等待该节点。
+- `HTTP Response` 每次 Run 最多执行一个，向同步 HTTP 触发提供 `{status_code, headers, body}`；未执行返回 `{}`，执行多个则运行失败。`wait=true` 超时且 Run 仍 queued/running 时返回 202 与 `wait_timed_out:true`，Run 继续执行；drop 无论是否 wait 都直接返回 200、`run_id:null`，不返回 status/outputs。异步触发不等待该节点。
 - Trigger 节点 params 是唯一真源；`TriggerManager.activate(workflow)` 在加载时派生运行视图，配置变更时重建，不读取顶层影子 trigger。
 - 防自激（US-TRG-05 AC-5）：Run 活跃期间，引擎把所有写出路径上报 `WatchSource.suppress(path, ttl=debounce*2)`。
 

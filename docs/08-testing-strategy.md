@@ -119,7 +119,8 @@
 - **缓存确定性**：参数键顺序无关；实现代码、用户代码、uv.lock、解析变量、迭代号变化均失效。显式文件输入内容变化但 mtime+size 不变仍失效；List Files 目录条目指纹变化失效；未声明参数不触发隐式文件读取；`Write CSV` 等副作用节点每次执行；LLM 与实时 Excel Read 禁止跨 Run 复用。
 - **冻结与 CAS**：活跃 Run 使用入队时图/变量/manifest，非结构编辑不影响本 Run，NodeTool 固定参数也来自冻结快照；旧 revision 保存返回 409 且不覆盖新文档。
 - **并发与取消**：两个真实 Worker 子进程执行慢节点时时间区间重叠；Run 结束后 pool 无残留，下一 Run 不继承模块全局变量或 run_id；取消只影响当前 Run。NodeTool 与正常节点共享 pool/lane 上限，池满排队，取消与 tool_timeout 能终止排队或执行中的调用。
-- **队列契约**：started/queued=202、策略 drop=200 且无 run_id、队列满=409；手动/聊天/HTTP 触发行为一致。
+- **队列契约**：started/queued=202、策略 drop=200 且无 run_id、队列满=409；手动/聊天/HTTP 触发行为一致。`wait=true` 被 drop 时仍直接返回 200 且无 status/outputs；等待超时返回 202、`wait_timed_out:true` 和当前 queued/running 状态，Run 不被取消。
+- **Wait 正常路径**：正常等待达到 duration_seconds 后才放行下游；取消时不放行。
 
 ### 5.2 Workflow Worker 与 IPC（`weft-worker/`）
 
@@ -252,4 +253,4 @@ jobs:
 - **M3**：打开自己日常用的一份真实 `.xlsx`，放在副屏看着，运行工作流写入新 Sheet 并更新几个汇总单元格，确认无闪烁、不抢焦点、格式不丢。
 - **M4**：接入真实 NewAPI 模型端点，跑场景 B（50 条真实备注分类），抽查 10 条分类质量与轨迹时间线可读性。
 - **M5**：在真实 Sandboxie 下跑 `Pi Agent` 整理测试目录，确认审批前真实目录纹丝不动、审批勾选部分文件后精确落地。
-- **M6**：`weft pack` 产出一个 `.weft.zip`，拷到另一目录（或同事电脑）`weft unpack` + `weft run` 一次跑通。
+- **M6**：`weft pack` 产出一个 `.weft.zip`，拷到另一目录（或同事电脑）`weft unpack` + `weft run` 一次跑通；双方主服务与 Worker 必须精确同版本，版本不同应先看到明确的升级/重锁提示，而不是被当成运行 bug。

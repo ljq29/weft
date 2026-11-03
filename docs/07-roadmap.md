@@ -82,7 +82,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 - [ ] **T1.4 调度器、冻结 Run 与状态机**
 【依赖】T1.3
 【产出】拓扑、ExecScope、并行、分支、失败/取消、Run 队列；ready 出队与跳过传播；入队冻结 workflow/variables/manifest 和 revision，Run 输出快照
-【验收】US-EXE-01/AC-2,3；US-EXE-04/AC-6,7；US-EXE-13/AC-1,2,5；使用合成调度节点验证算法，不引用后续节点 AC
+【验收】US-EXE-01/AC-2,3；US-EXE-04/AC-6,7；US-EXE-13/AC-1,2；使用合成调度节点验证算法，不引用后续节点或 HTTP AC
 
 - [ ] **T1.5 分类缓存层**
 【依赖】T1.4
@@ -97,12 +97,12 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 - [ ] **T1.7 基础表格与文件节点（第一批）**
 【依赖】T1.6
 【产出】`Read/Write CSV·Parquet·JSON`、`Column Filter`、`Row Filter`、`Sorter`、`Column Rename`、`Variable`、`Table Row Count`、`List Files`；写节点声明 side_effect，文件/目录参数声明 cache_inputs
-【验收】US-TBL-02/AC-1,3,4,5；US-TBL-03/AC-1..4,8；US-TBL-06/AC-3,4；US-TBL-07/AC-1；US-EXE-04/AC-3,9
+【验收】US-TBL-02/AC-1,3,4,5；US-TBL-03/AC-1..4,8；US-TBL-06/AC-3,4；US-TBL-07/AC-1；US-EXE-04/AC-3,4,9
 
 - [ ] **T1.8 流程节点（第一批）与 CLI run**
 【依赖】T1.7
-【产出】`Trigger`（仅 manual）、`If`、`Switch`、双命名输入 `Merge`、`Wait`；`weft run` 内嵌模式、`weft serve` 最小 API
-【验收】US-EXE-01/AC-1；US-EXE-02；US-EXE-03；US-EXE-08/AC-1,4；US-EXE-12/AC-1..5；US-TRG-01/AC-1；US-TRG-02/AC-2；**里程碑 Demo**：CSV 闭环成功，第二次运行仅 pure 上游命中，Write CSV 仍执行，`--var` 覆盖生效
+【产出】`Trigger`（仅 manual）、`If`、`Switch`、双命名输入 `Merge`、可正常等待与取消的 `Wait`；`weft run` 内嵌模式、`weft serve` 最小 API
+【验收】US-EXE-01/AC-1；US-EXE-02；US-EXE-03；US-EXE-08/AC-1,4,5；US-EXE-12/AC-1..5；US-TRG-01/AC-1；US-TRG-02/AC-2；**里程碑 Demo**：CSV 闭环成功，第二次运行仅 pure 上游命中，Write CSV 仍执行，`--var` 覆盖生效
 
 ---
 
@@ -111,7 +111,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 - [ ] **T2.1 REST/WS 完整化与本机安全边界**
 【依赖】T1.8
 【产出】`05-api.md` §1–5、§11 中 M2 所需端点与事件；随机 UI 会话令牌、Host/Origin 校验、WS authenticate 后订阅、403 与统一错误码
-【验收】US-SBX-09/AC-4,5；API 集成测试覆盖每个端点的成功与主要错误路径
+【验收】US-SBX-09/AC-4,5；US-EXE-05/AC-5；API 集成测试覆盖每个端点的成功与主要错误路径
 
 - [ ] **T2.2 画布编辑**
 【依赖】T2.1
@@ -166,7 +166,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 - [ ] **T4.1 LLMProxy/LLMClient + mock 服务器**
 【依赖】T1.8 + T0.4 结论
 【产出】主机 LLMProxy、OpenAI 兼容客户端、命名配置、测试连接、mock；key 只在主机侧读取，volatile LLM 节点
-【验收】US-AGT-01/AC-1..4；US-AGT-02/AC-5；US-EXE-04/AC-4；pi 的沙箱内代理验收留在 T5.4，不在本卡虚标
+【验收】US-AGT-01/AC-1..4；US-AGT-02/AC-5；US-EXE-04/AC-10；pi 的沙箱内代理验收留在 T5.4，不在本卡虚标
 
 - [ ] **T4.2 LLM Call + Prompt Template + 统一插值**
 【依赖】T4.1
@@ -220,8 +220,8 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 - [ ] **T6.1 TriggerManager + schedule/watch/http/HTTP Response**
 【依赖】T1.8 + T3.4
-【产出】统一事件、Trigger params 派生视图、APScheduler、watch.watches/watchdog、token/限速/wait、P0 `HTTP Response` 单响应节点（未执行 outputs={}，重复执行失败）、来源健康、无人值守 Excel 目标唯一性预检
-【验收】US-TRG-01/AC-2,3；US-TRG-04/AC-1..4；US-TRG-05/AC-1..5；US-TRG-06/AC-1..4；US-TRG-07/AC-1,2；US-SBX-09/AC-1..3；US-XLS-01/AC-4
+【产出】统一事件、Trigger params 派生视图、APScheduler、watch.watches/watchdog、token/限速/wait 超时与 drop 组合语义、P0 `HTTP Response` 单响应节点（未执行 outputs={}，重复执行失败）、来源健康、无人值守 Excel 目标唯一性预检
+【验收】US-TRG-01/AC-2,3；US-TRG-04/AC-1..4；US-TRG-05/AC-1..5；US-TRG-06/AC-1..4；US-TRG-07/AC-1,2；US-SBX-09/AC-1..3；US-XLS-01/AC-4；US-EXE-13/AC-5
 
 - [ ] **T6.2 打包/导入**
 【依赖】T1.1
@@ -260,7 +260,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 - [ ] **T7.6 Shell Command**
 【依赖】T1.6
-【产出】可信 Worker 命令执行、插值转义、流式日志与退出码
+【产出】可信 Worker 命令执行、PowerShell/cmd 独立转义器与元字符测试、无法安全插值时失败、流式日志与退出码
 【验收】US-TBL-09/AC-1..3
 
 - [ ] **T7.7 Excel Run Macro**
@@ -303,7 +303,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 以下事项仍需真机验证，不能当成既成事实：
 
-1. Sandboxie 独立 box、进程归属、重命名、未知路径、网络拒绝与冲突 apply 必须通过 T0.2；未授权路径“拒绝”AC 在验证前不预先弱化。
+1. Sandboxie 独立 box、进程归属、重命名、未知路径、网络拒绝与冲突 apply 必须通过 T0.2；未授权路径“拒绝”AC 在验证前不预先弱化。若真机证明只能重定向而无法硬拒绝，再将 AC 回退为“真实路径不变、对应变更不可收集/应用”，并明确记录安全能力降级，不在 spike 中临时选择语义。
 2. Excel 多实例、COM 真超时、用户并发编辑与 owned PID 生命周期必须通过 T0.3；性能是同机基准。
 3. pi 非交互调用与沙箱外 LLMProxy 兼容性必须通过 T0.4。
 4. NoneSandbox 已限定为受控影子目录模拟；本机 UI 会话令牌与 Host/Origin 校验是既定安全边界，`X-Weft-Client` 只作操作标记，不构成权限控制。

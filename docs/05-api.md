@@ -98,7 +98,7 @@
 
 |方法|路径|说明|
 | ------| ------| --------------------------------------------------------------------------|
-|POST|`/api/workflows/{id}/trigger`|外部 HTTP 触发（US-TRG-06）。`Authorization: Bearer <workflow_token>`；body 任意 JSON。立即执行/入队 → 202 `{run_id, disposition}`，drop → 200 `{run_id: null, disposition: dropped}`，队列满 → 409。`?wait=true` 同步等待至多 `trigger.http_wait_timeout_s` → `{run_id, status, outputs}`；唯一已执行的 `HTTP Response` 节点提供 `outputs: {status_code, headers, body}`，未执行时 outputs 为 `{}`；同一 Run 执行多个响应节点则运行失败|
+|POST|`/api/workflows/{id}/trigger`|外部 HTTP 触发（US-TRG-06）。`Authorization: Bearer <workflow_token>`；body 任意 JSON。立即执行/入队 → 202 `{run_id, disposition}`，队列满 → 409。`?wait=true` 同步等待至多 `trigger.http_wait_timeout_s`；正常结束 → `{run_id, status, outputs}`，唯一已执行的 `HTTP Response` 提供 `outputs: {status_code, headers, body}`，未执行时 outputs 为 `{}`；等待超时但 Run 仍 queued/running → 202 `{run_id, status, outputs: {}, wait_timed_out: true}`，Run 继续执行；drop（无论是否 wait）→ 200 `{run_id: null, disposition: dropped}`，不返回 status/outputs；同一 Run 执行多个响应节点则运行失败|
 |POST|`/api/workflows/{id}/trigger/token`|生成/轮换 workflow token（需 UI 会话鉴权），返回明文一次|
 |GET|`/api/workflows/{id}/triggers/status`|各来源状态：`{manual: {enabled}, schedule: {enabled, next_fire_times: [...]}, watch: {enabled, health: ok\|error, error?}, ...}`；TriggerManager 从 Trigger 节点 params 派生运行视图|
 

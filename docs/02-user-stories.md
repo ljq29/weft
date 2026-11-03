@@ -78,7 +78,7 @@ AC-2  ...
 作为设计者，我想要新建一个工作流并指定其所在目录，以便从空白开始设计。  
 关联：F-DES-07, F-PKG-01
 
-- AC-1 Given UI 首页 When 点击"新建工作流"并输入名称 `weekly` 与父目录 `D:\flows` Then 系统创建 `D:\flows\weekly.weft\`，内含 `workflow.json`（schema 版本为当前版本、节点列表仅含一个 `Trigger`）、`pyproject.toml`、`data/`、`nodes/`、`prompts/`、`.gitignore`（排除 `.runs/` 与 `.venv/`）。
+- AC-1 Given UI 首页 When 点击"新建工作流"并输入名称 `weekly` 与父目录 `D:\flows` Then 系统创建 `D:\flows\weekly.weft\`，内含 `workflow.json`（schema 版本为当前版本、节点列表仅含一个 `Trigger`）、`pyproject.toml`、`data/`、`nodes/`、`prompts/`、`.gitignore`（排除 `.runs/`、`.venv/` 与 `__pycache__/`）。
 - AC-2 Given 目标目录已存在同名 `.weft` When 新建 Then 系统拒绝并提示"目录已存在"，不覆盖任何文件。
 - AC-3 Given 新建完成 When 查看画布 Then 画布显示一个 `Trigger` 节点，状态为"已配置"（黄）。
 
@@ -225,22 +225,24 @@ AC-2  ...
 - AC-1 `[unit]` 每个节点声明 `cache_policy: pure | volatile | side_effect`，默认 `side_effect`；纯表格变换显式声明 `pure`。`side_effect` 节点每次执行，`volatile` 节点每次执行且禁止跨 Run 复用，仅 `pure` 节点可命中输出缓存。
 - AC-2 `[unit]` 缓存键 = `sha256(node_type + node_version + implementation_hash + canonical_json(resolved_params) + 按端口名排序的(port_name, content_hash) + 按名称排序的(external_input_name, content_hash) + user_code_hash + uv_lock_hash + iteration_index)`；参数对象键顺序不影响哈希，循环外迭代号为 null。只有节点通过 `cache_inputs` 显式声明的 `file | directory` 参数才额外读取外部状态。
 - AC-3 `[int]` Given `Read CSV` 已执行 When 仅改变 `data/sales.csv` 内容且保持 mtime 与 size 不变 Then 下次运行仍重跑，因为其 `path` 声明为 `cache_inputs: file` 并使用内容 SHA-256。
-- AC-4 `[int]` Given `Write CSV`、实时 `Excel Read Range` 或 `LLM Call` 已有输出 When 再次运行 Then 节点实际执行；Write CSV 体现 `side_effect`，Excel Read 与 LLM 体现 `volatile`，后两者不得跨 Run 复用结果。Excel App/Workbook 描述符可在重新 `resolve()` 成功后复用，但不得据此复用 Excel Read 的表格内容。
+- AC-4 `[int]` Given `Write CSV` 已有输出 When 再次运行 Then 节点实际执行并重新写入目标文件，体现 `side_effect`，即使输入与参数未变化也不得被缓存跳过。
 - AC-5 `[int]` Table 输出缓存为 `.runs/cache/<node_id>/<port>.arrow`，Variable/Message/Excel 描述符为 `.json`；缓存损坏或版本不匹配视为未命中并重跑。打开工作流时只有有效 `pure` 缓存使节点显示"已执行"。
 - AC-6 `[int]` 每个 Run 入队时冻结图、参数、变量和节点 manifest 到 `.runs/<run_id>/workflow.json`；活跃 Run 中允许的非结构修改仅影响下一 Run，NodeTool 的固定参数也取该冻结快照。
 - AC-7 `[int]` 每个已执行端口在 `meta.json` 的 `outputs: {port: ValueRef}` 记录不可变值；≤256 KB 的 JSON 可内联，Table 与大 JSON 写入 `.runs/<run_id>/outputs/<node_id>/<port>`。历史端口 API 读取该快照而非临时 IPC 或当前全局缓存，默认随最近 50 次 Run 保留。
 - AC-8 `[unit]` 每个 `workflow.json` 含整数 `revision`；保存携带读取时 revision，CAS 不一致返回 409。运行中结构修改拒绝，非结构修改允许且递增 revision。
 - AC-9 `[int]` `List Files` 的 `path` 声明为 `cache_inputs: directory`；按相同 path/pattern/recursive 规则生成排序后的 `{path,name,size,modified,is_dir}` 指纹，任一条目变化都使缓存失效，未声明参数不得触发隐式文件读取。
+- AC-10 `[int]` Given 实时 `Excel Read Range` 或 `LLM Call` 已有输出 When 再次运行 Then 节点实际执行，体现 `volatile`，不得跨 Run 复用结果。Excel App/Workbook 描述符可在重新 `resolve()` 成功后复用，但不得据此复用 Excel Read 的表格内容。
 
 ### US-EXE-05 实时状态推送 [P0] [int][e2e]
 
 作为设计者，我想要执行过程实时可见，以便不盲等。  
 关联：F-EXE-04
 
-- AC-1 `[int]` 连接 `WS /api/ws` 后，运行期间收到事件序列：`run.started` → 若干 `node.started` / `node.progress` / `node.log` / `node.finished` / `node.failed` → `run.finished`；每个事件含 `run_id, node_id, ts`。
+- AC-1 `[int]` 连接 `WS /api/ws` 并完成 authenticate 与 subscribe 后，运行期间收到事件序列：`run.started` → 若干 `node.started` / `node.progress` / `node.log` / `node.finished` / `node.failed` → `run.finished`；每个事件含 `run_id, node_id, ts`。
 - AC-2 `[int]` agent 节点运行时推送 `node.stream` 事件，`delta` 字段为增量文本，顺序与 LLM 输出一致。
-- AC-3 Given WebSocket 断线重连 Then 客户端通过 `GET /api/runs/{id}` 补齐状态，不丢最终结果。
+- AC-3 Given WebSocket 断线重连 Then 客户端重新 authenticate 并通过 `GET /api/runs/{id}` 补齐状态，不丢最终结果。
 - AC-4 `[e2e]` 底部日志面板按节点分组显示日志，支持筛选级别（INFO/WARN/ERROR）与按节点过滤。
+- AC-5 `[int]` 未认证或令牌无效的 WS 连接不得订阅或接收事件；认证成功前发送 subscribe 返回认证错误并关闭连接。
 
 ### US-EXE-06 端口视图 [P0] [int][e2e]
 
@@ -258,7 +260,7 @@ AC-2  ...
 作为设计者，我想要节点失败时信息清晰且不丢已完成结果，并能用 Try Start/Try End 兜底，以便工作流健壮。
 关联：F-EXE-06
 
-- AC-1 Given `Row Filter` 引用了不存在的列 When 运行 Then `Row Filter` 为错误态，`GroupBy` / `Write CSV` 保持"已配置"，`Read CSV` 保持"已执行"且缓存可用；运行状态为 `failed`。
+- AC-1 Given `Row Filter` 引用了不存在的列 When 运行 Then `Row Filter` 为错误态，`Sorter` / `Write CSV` 保持"已配置"，`Read CSV` 保持"已执行"且缓存可用；运行状态为 `failed`。
 - AC-2 错误信息包含：节点名、异常类型、消息、完整 traceback、输入快照（Table 前 20 行）。
 - AC-3 `[int]` Given `Try Start → 可能失败的节点 → Try End`，且 `Try End` 的 `on_error` 分支已连接 Then 失败时执行 `on_error` 分支，运行状态为 `succeeded`，`Try End` 输出的 `error` 变量含错误信息。
 - AC-4 用户 Python 节点抛出的异常，traceback 只显示用户代码部分，隐藏引擎内部帧。
@@ -272,6 +274,7 @@ AC-2  ...
 - AC-2 `[int]` 正在执行的 Python Script 子进程收到终止信号（Windows：`CTRL_BREAK_EVENT`，3 s 后未退出则 kill）。
 - AC-3 正在执行的 Agent Loop 在当前 LLM 调用返回后停止，不再发起新轮次；进行中的 HTTP 请求被取消。
 - AC-4 已完成节点的缓存保留。
+- AC-5 `[int]` Given `Wait`（`duration_seconds: 0.1`）连接下游探针 When 正常运行 Then Wait 在不少于 0.1 s 后成功结束，下游仅在此后执行一次；未收到取消时不得提前放行下游。
 
 ### US-EXE-09 运行历史 [P1] [int][e2e]
 
@@ -561,7 +564,7 @@ AC-2  ...
 关联：F-TBL-10
 
 - AC-1 `Shell Command`（`command`，`cwd` 默认 Root，`shell: powershell | cmd`，`timeout`，`env`）→ 输出变量 `stdout, stderr, exit_code`；`fail_on_nonzero: true` 默认。
-- AC-2 命令中可用 `{var}` 插值流变量，插值时自动引号转义。
+- AC-2 命令中可用 `{var}` 插值流变量，但 PowerShell 与 cmd 必须使用各自独立、经测试的转义器，不得共用所谓通用引号规则；值无法安全表示为单个字面量时节点失败。两种 shell 均测试空格、单双引号、换行及 `$`、反引号、`%`、`&`、`|`、`>` 等元字符，插值不得改变命令结构或产生额外命令。
 - AC-3 输出实时流式推送到日志面板。
 
 ### US-TBL-10 Table View 与 Table Creator [P0] [e2e][int]
@@ -631,7 +634,7 @@ AC-2  ...
 
 - AC-1 `Sandboxed Tools` 节点参数：`tools: [read, write, edit, list, bash]`（多选）、`cwd`（默认 Root）、`sandbox: inherit | none | sandboxie`（默认 inherit 自全局）、`bash_timeout`；输出 Tool 端口（一个端口承载多个工具）。
 - AC-2 工具语义与 pi 一致：`read(path, offset?, limit?)`、`write(path, content)`、`edit(path, old_string, new_string)`（old_string 必须唯一匹配）、`list(path, pattern?)`、`bash(command, timeout?)`；bash 仅可用于 Sandboxie。
-- AC-3 `[int-win]` `sandbox: sandboxie` 下，`write` 的文件出现在 `C:\Sandbox\<user>\<box>\drive\<盘>\...` 而非真实路径；`read` 可读真实文件；`bash` 进程由 `Start.exe /box:<box> /wait /silent` 启动。
+- AC-3 `[int-win]` `sandbox: sandboxie` 下，`write` 的文件出现在 `C:\Sandbox\<user>\<box>\drive\<盘>\...` 而非真实路径；`read` 可读真实文件；`bash` 进程由 `Start.exe /box:<box> /wait /silent /env:WEFT_RUN_ID=<id>` 启动。
 - AC-4 `[int]` `sandbox: none` 需在节点上显式选择且全局设置 `sandbox.allow_none_sandbox: true`，否则运行前失败 `NoneSandbox is disabled in settings`；none 仅开放受控影子目录 read/write/edit/list，选择 bash 时运行前失败 `bash requires sandboxie`，不得启动直接主机子进程。
 - AC-5 `bash` 输出截断至 `max_output_chars`（默认 20000），尾部注明截断。
 - AC-6 工具调用记入审计日志（同 US-AGT-04 AC-5）。
@@ -852,8 +855,8 @@ AC-2  ...
 作为外部系统，我想要 POST 一个端点触发工作流，以便集成。  
 关联：F-TRG-06, F-TRG-09
 
-- AC-1 `POST /api/workflows/{id}/trigger`，Bearer token（US-SBX-09），body 任意 JSON → `source: http`，`payload.body` 为请求体；立即执行/入队返回 202 `{run_id, disposition}`，drop 返回 200 `{run_id: null, disposition: dropped}`，队列满返回 409。
-- AC-2 `?wait=true` 时阻塞至 Run 结束（上限 `trigger.http_wait_timeout_s` 默认 300 s），返回 `{run_id, status, outputs}`；唯一已执行的 `HTTP Response` 提供 `outputs: {status_code, headers, body}`，未配置或未执行时 outputs 为 `{}`，在 T6.1 与 HTTP 触发一起交付。
+- AC-1 `POST /api/workflows/{id}/trigger`，Bearer token（US-SBX-09），body 任意 JSON → `source: http`，`payload.body` 为请求体；立即执行/入队返回 202 `{run_id, disposition}`，队列满返回 409。drop 无论是否携带 `wait=true` 都返回 200 `{run_id: null, disposition: dropped}`，不返回 status/outputs。
+- AC-2 `?wait=true` 时阻塞至 Run 结束（上限 `trigger.http_wait_timeout_s` 默认 300 s），返回 `{run_id, status, outputs}`；唯一已执行的 `HTTP Response` 提供 `outputs: {status_code, headers, body}`，未配置或未执行时 outputs 为 `{}`。超时且 Run 仍 queued/running 时返回 202 `{run_id, status, outputs: {}, wait_timed_out: true}`，Run 继续执行，客户端可轮询。上述行为在 T6.1 与 HTTP 触发一起交付。
 - AC-3 触发器未启用 http 来源 → 404（不泄露工作流存在性差异：统一 404）。
 - AC-4 `[int]` `HTTP Response` 参数为 `status_code`（默认 200）、`headers`（对象）与 `body`（文本或 JSON）；每个 Run 最多执行一个，执行多个时运行失败，异步触发不等待该节点。
 
