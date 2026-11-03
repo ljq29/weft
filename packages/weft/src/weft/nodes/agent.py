@@ -199,6 +199,129 @@ class NodeToolNode(Node):
         return {"tools": descriptor}
 
 
+class SandboxedToolsNode(Node):
+    type = "agent.sandboxed_tools"
+    category = "agent"
+    name = "Sandboxed Tools"
+    description = "提供沙箱内 read/write/edit/list/bash；沙箱内不支持 COM，Excel 请用 Node as Tool"
+    lane = Lane.TRUSTED_SERVICE
+    outputs = (Port("tools", "tool", "沙箱工具集合"),)
+    params_schema = schema(
+        {
+            "tools": {"type": "array", "description": "read/write/edit/list/bash 多选"},
+            "cwd": {"type": "string", "description": "工作目录，默认 Root"},
+            "sandbox": {
+                "type": "string",
+                "enum": ["inherit", "none", "sandboxie"],
+                "description": "沙箱模式",
+            },
+            "bash_timeout": {"type": "number", "minimum": 0.001, "description": "bash 超时秒数"},
+            "max_output_chars": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "bash 最大输出字符数",
+            },
+            "require_confirmation": {
+                "type": ["boolean", "object"],
+                "description": "全局或逐工具确认设置",
+            },
+        },
+        ["tools"],
+    )
+
+    def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+        config = SettingsStore().read().get("sandbox", {})
+        mode = (
+            config.get("default", "sandboxie")
+            if params.get("sandbox", "inherit") == "inherit"
+            else params["sandbox"]
+        )
+        if mode == "none" and not config.get("allow_none_sandbox", False):
+            raise PermissionError("NoneSandbox is disabled in settings")
+        selected = params["tools"]
+        if "bash" in selected and mode != "sandboxie":
+            raise ValueError("bash requires sandboxie")
+        cwd = str(ctx.resolve(params.get("cwd", ".")))
+        confirmations = params.get("require_confirmation", {})
+        tools = []
+        for name in selected:
+            confirmation = (
+                confirmations.get(name, name in {"write", "edit", "bash"})
+                if isinstance(confirmations, dict)
+                else confirmations
+            )
+            tools.append(
+                {
+                    "kind": "sandboxed",
+                    "name": name,
+                    "description": f"Sandboxed {name}",
+                    "binding": {"sandbox": mode, "cwd": cwd},
+                    "require_confirmation": confirmation,
+                    "bash_timeout": params.get("bash_timeout", 60),
+                    "max_output_chars": params.get("max_output_chars", 20000),
+                }
+            )
+        return {"tools": tools}
+
+
+class PiAgentNode(Node):
+    type = "agent.pi"
+    category = "agent"
+    name = "Pi Agent"
+    description = "在 Sandboxie 中运行原版 pi，经环回 LLMProxy 使用命名配置"
+    lane = Lane.TRUSTED_SERVICE
+    cache_policy = CachePolicy.VOLATILE
+    inputs = (Port("variables", "variable", "模板变量"), Port("message", "message", "历史消息"))
+    outputs = (
+        Port("variable", "variable", "最终文本与退出码"),
+        Port("message", "message", "Pi 轨迹"),
+    )
+    params_schema = schema(
+        {
+            "task": {"type": "string", "description": "任务模板"},
+            "cwd": {"type": "string", "description": "工作目录，默认 Root"},
+            "pi_path": {"type": "string", "description": "pi 可执行文件路径"},
+            "llm": {"type": "string", "description": "命名 LLM 配置"},
+            "sandbox": {
+                "type": "string",
+                "enum": ["inherit", "none", "sandboxie"],
+                "description": "沙箱模式",
+            },
+            "timeout": {"type": "number", "minimum": 0.001, "description": "运行超时秒数"},
+            "extra_args": {"type": "array", "description": "附加 pi 参数"},
+        },
+        ["task", "llm"],
+    )
+
+    def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+        from weft.agent.pi import PiRunner
+
+        config = SettingsStore().read().get("sandbox", {})
+        mode = (
+            config.get("default", "sandboxie")
+            if params.get("sandbox", "inherit") == "inherit"
+            else params["sandbox"]
+        )
+        if mode != "sandboxie":
+            raise ValueError("Pi Agent requires sandboxie")
+        sandbox = ctx.node_tool({"kind": "sandbox", "binding": {"sandbox": mode}}, ctx.node_id)
+        task = render_template(params["task"], ctx.vars, template_inputs(inputs))
+        result = PiRunner(ctx.root, ctx.run_id).run(
+            task=task,
+            cwd=ctx.resolve(params.get("cwd", ".")),
+            pi_path=params.get("pi_path", ""),
+            llm=params["llm"],
+            sandbox=sandbox,
+            timeout=params.get("timeout", 600),
+            extra_args=params.get("extra_args", []),
+            on_event=lambda event: ctx.emit_event("pi.event", event),
+        )
+        return {
+            "variable": {"final_text": result["final_text"], "exit_code": result["exit_code"]},
+            "message": result["trajectory"],
+        }
+
+
 class AgentLoopNode(Node):
     type = "agent.loop"
     category = "agent"
@@ -253,7 +376,7 @@ class AgentLoopNode(Node):
         ]
         tools = [
             ctx.node_tool(tool, ctx.node_id)
-            if isinstance(tool, dict) and tool.get("kind") == "node"
+            if isinstance(tool, dict) and tool.get("kind") in {"node", "sandboxed"}
             else tool
             for tool in tools
         ]

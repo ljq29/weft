@@ -8,6 +8,7 @@ import polars as pl
 from weft_sdk import ToolCapability
 
 from weft.agent.templates import markdown_table
+from weft.agent.tools import ToolRejectedError
 
 
 class NodeTool:
@@ -94,7 +95,7 @@ class NodeTool:
         if self.requires_confirmation:
             if self.engine.confirmation_handler is None:
                 raise PermissionError("Tool call requires confirmation")
-            approved = await self.engine.confirmation_handler(
+            decision = await self.engine.confirmation_handler(
                 {
                     "run_id": self.prepared.record.run_id,
                     "node_id": self.agent_node,
@@ -102,8 +103,12 @@ class NodeTool:
                     "args": args,
                 }
             )
-            if approved is not True:
-                raise PermissionError("Tool call was rejected")
+            if isinstance(decision, dict):
+                if decision.get("approved") is not True:
+                    raise ToolRejectedError("Tool call was rejected")
+                args = decision.get("args", args)
+            elif decision is not True:
+                raise ToolRejectedError("Tool call was rejected")
         params = dict(self.target.params)
         params.update(args)
         inputs = self.engine._tool_inputs(self.prepared, self.target_id)

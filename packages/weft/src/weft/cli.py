@@ -88,6 +88,7 @@ def run_workflow(path: Path, variables: list[str], wait: bool) -> int:
     from weft.agent.client import LLMClient
     from weft.agent.node_tool import NodeTool, validate_node_tools
     from weft.agent.proxy import LLMProxy
+    from weft.agent.sandbox_tools import SandboxManager
     from weft.agent.settings import SettingsStore
     from weft.excel import ExcelWorkerSupervisor
 
@@ -98,8 +99,16 @@ def run_workflow(path: Path, variables: list[str], wait: bool) -> int:
         excel_worker=excel_worker,
         llm_client=llm_client,
     )
-    engine.node_tool_factory = lambda prepared, descriptor, agent_node: NodeTool(
-        prepared, engine, descriptor, agent_node
+    sandbox_manager = SandboxManager()
+    engine.sandbox_manager = sandbox_manager
+    engine.node_tool_factory = lambda prepared, descriptor, agent_node: (
+        NodeTool(prepared, engine, descriptor, agent_node)
+        if descriptor.get("kind") == "node"
+        else (
+            sandbox_manager.create(prepared, descriptor, agent_node)
+            if descriptor.get("kind") == "sandboxed"
+            else sandbox_manager.get(prepared, descriptor["binding"]["sandbox"])
+        )
     )
     document = WorkflowStore(root).load()
     validate_node_tools(document, registry)

@@ -76,7 +76,14 @@ def builtin_registry() -> NodeRegistry:
     from weft_worker.builtin import BUILTIN_NODES
     from weft_worker.builtin_extra import BUILTIN_EXTRA_NODES
 
-    from weft.nodes.agent import AgentLoopNode, LLMCallNode, NodeToolNode, PromptTemplateNode
+    from weft.nodes.agent import (
+        AgentLoopNode,
+        LLMCallNode,
+        NodeToolNode,
+        PiAgentNode,
+        PromptTemplateNode,
+        SandboxedToolsNode,
+    )
     from weft.nodes.excel import EXCEL_NODES
     from weft.nodes.flow import (
         ChatOutputNode,
@@ -103,6 +110,8 @@ def builtin_registry() -> NodeRegistry:
         PromptTemplateNode,
         AgentLoopNode,
         NodeToolNode,
+        SandboxedToolsNode,
+        PiAgentNode,
     ):
         registry.register(node_type)
     for builtin_type in (*BUILTIN_NODES, *BUILTIN_EXTRA_NODES, *EXCEL_NODES):

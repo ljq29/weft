@@ -7,7 +7,9 @@
 |`agent.llm_call`|LLM Call|agent|trusted_service|volatile|通过主机 LLMProxy 执行流式文本或 JSON 补全|
 |`agent.loop`|Agent Loop|agent|trusted_service|volatile|执行可停止、可审计的 ReAct 工具调用循环|
 |`agent.node_tool`|Node as Tool|agent|trusted_service|side_effect|把显式授权的节点包装为受控 Agent 工具|
+|`agent.pi`|Pi Agent|agent|trusted_service|volatile|在 Sandboxie 中运行原版 pi，经环回 LLMProxy 使用命名配置|
 |`agent.prompt_template`|Prompt Template|agent|trusted_service|volatile|用受限 Jinja2 模板组合变量与只读表格|
+|`agent.sandboxed_tools`|Sandboxed Tools|agent|trusted_service|side_effect|提供沙箱内 read/write/edit/list/bash；沙箱内不支持 COM，Excel 请用 Node as Tool|
 |`code.python`|Python Script|code|trusted_worker|side_effect|在可信 Worker 中执行用户 Python 代码|
 |`excel.cell_update`|Excel Cell Update|excel|trusted_service|side_effect|原子更新若干不连续单元格，默认禁止公式|
 |`excel.connect`|Excel Connect|excel|trusted_service|side_effect|连接可见 Excel 或创建独立的可见/隐藏实例|
@@ -230,6 +232,57 @@
 }
 ```
 
+## Pi Agent (`agent.pi`)
+
+在 Sandboxie 中运行原版 pi，经环回 LLMProxy 使用命名配置
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "task": {
+      "type": "string",
+      "description": "任务模板"
+    },
+    "cwd": {
+      "type": "string",
+      "description": "工作目录，默认 Root"
+    },
+    "pi_path": {
+      "type": "string",
+      "description": "pi 可执行文件路径"
+    },
+    "llm": {
+      "type": "string",
+      "description": "命名 LLM 配置"
+    },
+    "sandbox": {
+      "type": "string",
+      "enum": [
+        "inherit",
+        "none",
+        "sandboxie"
+      ],
+      "description": "沙箱模式"
+    },
+    "timeout": {
+      "type": "number",
+      "minimum": 0.001,
+      "description": "运行超时秒数"
+    },
+    "extra_args": {
+      "type": "array",
+      "description": "附加 pi 参数"
+    }
+  },
+  "required": [
+    "task",
+    "llm"
+  ]
+}
+```
+
 ## Prompt Template (`agent.prompt_template`)
 
 用受限 Jinja2 模板组合变量与只读表格
@@ -271,6 +324,56 @@
   },
   "required": [
     "template"
+  ]
+}
+```
+
+## Sandboxed Tools (`agent.sandboxed_tools`)
+
+提供沙箱内 read/write/edit/list/bash；沙箱内不支持 COM，Excel 请用 Node as Tool
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "tools": {
+      "type": "array",
+      "description": "read/write/edit/list/bash 多选"
+    },
+    "cwd": {
+      "type": "string",
+      "description": "工作目录，默认 Root"
+    },
+    "sandbox": {
+      "type": "string",
+      "enum": [
+        "inherit",
+        "none",
+        "sandboxie"
+      ],
+      "description": "沙箱模式"
+    },
+    "bash_timeout": {
+      "type": "number",
+      "minimum": 0.001,
+      "description": "bash 超时秒数"
+    },
+    "max_output_chars": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "bash 最大输出字符数"
+    },
+    "require_confirmation": {
+      "type": [
+        "boolean",
+        "object"
+      ],
+      "description": "全局或逐工具确认设置"
+    }
+  },
+  "required": [
+    "tools"
   ]
 }
 ```

@@ -20,6 +20,8 @@ import { SchemaForm } from "./panels/SchemaForm";
 import { SettingsPanel } from "./panels/SettingsPanel";
 import { TracePanel } from "./panels/TracePanel";
 import { ChatPanel } from "./panels/ChatPanel";
+import { ChangeReviewPanel } from "./panels/ChangeReviewPanel";
+import { ConfirmPanel } from "./panels/ConfirmPanel";
 import { useRunStore } from "./stores/runStore";
 import { toDocument, useWorkflowStore } from "./stores/workflowStore";
 import type { FlowNode } from "./stores/workflowStore";
@@ -486,6 +488,7 @@ function Editor() {
             <TracePanel entries={run.traces[selectedNode.id] ?? []} />
           )}
           {selectedNode && <AuditPanel runId={run.runId} />}
+          {selectedNode && run.runId && <ChangeReviewPanel runId={run.runId} />}
           {selectedNode && Object.hasOwn(run.errors, selectedNode.id) && (
             <pre className="error-details">
               {JSON.stringify(run.errors[selectedNode.id], null, 2)}
@@ -531,6 +534,7 @@ function Editor() {
           </button>
         </div>
       )}
+      {run.runId && <ConfirmPanel runId={run.runId} />}
       {chatOpen && store.document && (
         <ChatPanel
           workflowId={store.document.id}

@@ -193,7 +193,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## M5 沙箱
 
-- [ ] **T5.1 Sandbox 接口 + NoneSandbox 影子目录模拟**
+- [x] **T5.1 Sandbox 接口 + NoneSandbox 影子目录模拟**
 【依赖】T0.2 结论
 【产出】Sandbox 接口、变更模型、受保护路径与契约；NoneSandbox 仅提供受控 read/write/edit/list 影子目录工具，拒绝任意 bash/pi/spawn；实现 `sandbox.allow_none_sandbox`
 【验收】US-SBX-01/AC-1..3；US-SBX-05/AC-4；Linux 契约仅覆盖替身能力，不冒充 Sandboxie 验证
@@ -203,7 +203,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 【产出】独立 `WeftBox-<run_id>`、owned 进程树、helper、默认拒绝网络与环回 LLMProxy 唯一例外、显式白名单、Root/授权目录审计、未知变化提示、只清理本 Run
 【验收】US-SBX-02/AC-1..4；US-SBX-03/AC-1..4；US-SBX-06/AC-1（全部 win_real）
 
-- [ ] **T5.3 基线、重命名与冲突审批流**
+- [x] **T5.3 基线、重命名与冲突审批流**
 【依赖】T5.1
 【产出】内容哈希基线、renamed/降级、audit_complete、逐项状态、备份、200 逐项 stale CHANGE_CONFLICT、显式覆盖、幂等 apply/discard
 【验收】US-SBX-04/AC-1..4；US-SBX-05/AC-1..5
@@ -299,7 +299,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## 文档状态（不代表实现完成）
 
-当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）、M2（T2.1–T2.5）、M3（T3.1–T3.4）与 M4（T4.1–T4.5）的实现及自动化验收已完成；真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过，真实 Excel 的场景 A 主链路也已通过。场景 B 的真实模型人工抽查尚未执行，不能视为已验证。T0.2 因未安装 Sandboxie 而未完成，T0.4 已验证 pi/LLMProxy 但沙箱断网仍待验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
+当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）、M2（T2.1–T2.5）、M3（T3.1–T3.4）与 M4（T4.1–T4.5）的实现及自动化验收已完成；真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过，真实 Excel 的场景 A 主链路也已通过。场景 B 的真实模型人工抽查尚未执行，不能视为已验证。M5 的 NoneSandbox、审批流、工具与 Pi 边界已实现并通过自动化测试；T5.2/T5.4 的 Sandboxie win_real 验收仍未完成，对应任务卡保持未勾选。T0.2 因未安装 Sandboxie 而未完成，T0.4 已验证 pi/LLMProxy 但沙箱断网仍待验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
 
 以下事项仍需真机验证，不能当成既成事实：
 

@@ -51,6 +51,21 @@ class ChatClearRequest(BaseModel):
     clear_memory: bool = False
 
 
+class ConfirmRequest(BaseModel):
+    request_id: str
+    decision: str
+    modified_args: dict[str, Any] | None = None
+
+
+class ChangeApplyRequest(BaseModel):
+    paths: list[str]
+    overwrite_conflicts: bool = False
+
+
+class ChangeDiscardRequest(BaseModel):
+    paths: list[str] | None = None
+
+
 class BrowseRequest(BaseModel):
     path: str
     dirs_only: bool = False
@@ -73,16 +88,34 @@ def create_app(
     app.state.roots = {}
     app.state.bus = EventBus()
     from weft.agent.node_tool import NodeTool
+    from weft.agent.sandbox_tools import SandboxManager
     from weft.excel import ExcelWorkerSupervisor
 
     excel_worker = ExcelWorkerSupervisor()
+    sandbox_manager = SandboxManager()
     engine = Engine(
         lambda root, run_id: WorkerPool(WorkflowEnvironment(root), run_id),
         excel_worker=excel_worker,
     )
-    engine.node_tool_factory = lambda prepared, descriptor, agent_node: NodeTool(
-        prepared, engine, descriptor, agent_node
+    engine.sandbox_manager = sandbox_manager
+    app.state.sandbox = sandbox_manager
+    engine.node_tool_factory = lambda prepared, descriptor, agent_node: (
+        NodeTool(prepared, engine, descriptor, agent_node)
+        if descriptor.get("kind") == "node"
+        else (
+            sandbox_manager.create(prepared, descriptor, agent_node)
+            if descriptor.get("kind") == "sandboxed"
+            else sandbox_manager.get(prepared, descriptor["binding"]["sandbox"])
+        )
     )
+    from weft.agent.confirmation import ConfirmationManager
+
+    confirmations = ConfirmationManager(engine)
+    app.state.confirmations = confirmations
+    engine.confirmation_handler = lambda request: confirmations.request(
+        engine.runs[request["run_id"]], request
+    )
+    sandbox_manager.confirmation_handler = engine.confirmation_handler
     engine.event_sink = app.state.bus.publish
     app.state.engine = engine
     app.state.excel = excel_worker
@@ -428,6 +461,17 @@ def create_app(
         app.state.engine.cancel(run_id)
         return {"cancelled": True}
 
+    @app.post("/api/runs/{run_id}/confirm")
+    def confirm(run_id: str, request: ConfirmRequest) -> Any:
+        if request.decision not in {"approve", "reject"}:
+            return error("INVALID_CONFIRMATION", "decision 必须为 approve 或 reject", 400)
+        resolved = app.state.confirmations.resolve(
+            request.request_id, request.decision, request.modified_args
+        )
+        if not resolved:
+            return error("CONFIRMATION_NOT_FOUND", "确认请求不存在或已结束", 404)
+        return {"resolved": True}
+
     @app.get("/api/runs/{run_id}/log")
     def logs(run_id: str) -> list[dict[str, Any]]:
         path = run_root(app, run_id) / "log.jsonl"
@@ -448,6 +492,42 @@ def create_app(
         if not path.exists():
             return []
         return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+    @app.get("/api/runs/{run_id}/changes")
+    def changes(run_id: str) -> Any:
+        from weft.sandbox.review import ChangeReviewStore
+
+        try:
+            return ChangeReviewStore(run_root(app, run_id), run_id).load().to_dict()
+        except FileNotFoundError:
+            return error("CHANGES_NOT_READY", "变更尚未生成", 404)
+
+    @app.get("/api/runs/{run_id}/changes/diff")
+    def change_diff(run_id: str, path: str) -> Any:
+        from weft.sandbox.review import ChangeReviewStore
+
+        return ChangeReviewStore(run_root(app, run_id), run_id).diff(Path(path))
+
+    @app.post("/api/runs/{run_id}/changes/apply")
+    def apply_changes(run_id: str, request: ChangeApplyRequest) -> Any:
+        from weft.sandbox.review import ChangeReviewStore, ProtectedChangeError
+
+        try:
+            results = ChangeReviewStore(run_root(app, run_id), run_id).apply(
+                [Path(path) for path in request.paths], request.overwrite_conflicts
+            )
+        except ProtectedChangeError as exception:
+            return error("PROTECTED_CHANGE", str(exception), 400)
+        return {"results": [change.to_dict() for change in results]}
+
+    @app.post("/api/runs/{run_id}/changes/discard")
+    def discard_changes(run_id: str, request: ChangeDiscardRequest) -> Any:
+        from weft.sandbox.review import ChangeReviewStore
+
+        results = ChangeReviewStore(run_root(app, run_id), run_id).discard(
+            [Path(path) for path in request.paths] if request.paths is not None else None
+        )
+        return {"results": [change.to_dict() for change in results]}
 
     @app.post("/api/workflows/{workflow_id}/reset")
     def reset(workflow_id: str) -> dict[str, bool]:

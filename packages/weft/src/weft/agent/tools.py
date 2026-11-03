@@ -26,6 +26,10 @@ class ToolFailureLimitError(RuntimeError):
     pass
 
 
+class ToolRejectedError(PermissionError):
+    pass
+
+
 @dataclass
 class ToolDispatchResult:
     text: str
@@ -77,6 +81,9 @@ class ToolDispatcher:
             text = str(result)
             self.failures.pop(name, None)
             return self._finish(name, args, status, started, text)
+        except ToolRejectedError as error:
+            text = f"Tool rejected: {error}"
+            return self._finish(name, args, "rejected", started, text)
         except Exception as error:
             status = "error"
             self.failures[name] = self.failures.get(name, 0) + 1

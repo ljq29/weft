@@ -67,6 +67,7 @@ class Engine:
         self.llm_client = llm_client
         self.confirmation_handler: Any = None
         self.node_tool_factory: Any = None
+        self.sandbox_manager: Any = None
         self.service_slots = {"trusted_service": asyncio.Semaphore(4)}
         self.event_sink: Any = None
 
@@ -76,6 +77,8 @@ class Engine:
         self.worker_pools.clear()
         if self.excel_worker is not None:
             self.excel_worker.close()
+        if self.sandbox_manager is not None:
+            self.sandbox_manager.close()
 
     def prepare(
         self,
@@ -209,6 +212,8 @@ class Engine:
         pool = self.worker_pools.pop(prepared.record.run_id, None)
         if pool is not None:
             pool.close()
+        if self.sandbox_manager is not None:
+            self.sandbox_manager.finish(prepared)
         if self.excel_worker is not None:
             try:
                 await self.excel_worker.release_run(prepared.record.run_id)
