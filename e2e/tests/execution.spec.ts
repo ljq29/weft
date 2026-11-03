@@ -18,6 +18,9 @@ async function request(path: string, method = "GET", body?: unknown) {
 }
 
 test("US-EXE-01/AC-1, US-EXE-05/AC-4, US-EXE-06/AC-1,4,5: run and preview CSV in browser", async ({ page }, testInfo) => {
+  page.on("response", (response) => {
+    if (response.status() >= 400) console.log("HTTP", response.status(), response.url());
+  });
   await page.goto(`/?token=${token()}`);
   await page.getByLabel("工作流名称").fill("execute");
   await page.getByLabel("父目录").fill(testInfo.outputPath());

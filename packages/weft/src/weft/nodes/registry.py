@@ -76,6 +76,7 @@ def builtin_registry() -> NodeRegistry:
     from weft_worker.builtin import BUILTIN_NODES
     from weft_worker.builtin_extra import BUILTIN_EXTRA_NODES
 
+    from weft.nodes.excel import EXCEL_NODES
     from weft.nodes.flow import (
         IfNode,
         LoopEndNode,
@@ -97,6 +98,6 @@ def builtin_registry() -> NodeRegistry:
         LoopEndNode,
     ):
         registry.register(node_type)
-    for builtin_type in (*BUILTIN_NODES, *BUILTIN_EXTRA_NODES):
+    for builtin_type in (*BUILTIN_NODES, *BUILTIN_EXTRA_NODES, *EXCEL_NODES):
         registry.register(builtin_type)
     return registry

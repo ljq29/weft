@@ -85,15 +85,21 @@ def run_workflow(path: Path, variables: list[str], wait: bool) -> int:
     environment.sync()
     registry = builtin_registry()
     registry.load_directory(root / "nodes")
-    engine = Engine(lambda root, run_id: WorkerPool(environment, run_id))
+    from weft.excel import ExcelWorkerSupervisor
+
+    excel_worker = ExcelWorkerSupervisor()
+    engine = Engine(lambda root, run_id: WorkerPool(environment, run_id), excel_worker=excel_worker)
     prepared = engine.prepare(
         WorkflowStore(root).load(),
         root,
         registry,
         trigger={"source": "manual", "ts": "", "payload": {"overrides": overrides}},
     )
-    with ExecutionLock(root, prepared.record.run_id).acquire():
-        record = asyncio.run(engine.run(prepared))
+    try:
+        with ExecutionLock(root, prepared.record.run_id).acquire():
+            record = asyncio.run(engine.run(prepared))
+    finally:
+        engine.close()
     if wait:
         for node_id, node in record.nodes.items():
             print(f"{node_id}: {node.status}")

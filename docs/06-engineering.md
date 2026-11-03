@@ -97,8 +97,8 @@ weft/
 ## 5. 常用命令
 
 ```bash
-# 后端
-uv sync                                   # 根 workspace 同步
+# 后端（默认使用中国镜像；可用 UV_INDEX_URL 显式覆盖）
+UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple uv sync  # 根 workspace 同步
 uv run weft serve --no-browser            # 启动开发服务
 uv run pytest                             # 单元
 uv run pytest -m integration              # 集成

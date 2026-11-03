@@ -23,6 +23,8 @@ import type { NodeTypeDecl, WorkflowDocument } from "./types/workflow";
 import "@xyflow/react/dist/style.css";
 import "./styles.css";
 
+let saveQueue: Promise<void> = Promise.resolve();
+
 interface StoredNode {
   id: string;
   type: string;
@@ -65,20 +67,24 @@ function Editor() {
     [store.nodeTypes],
   );
 
-  const save = useCallback(async () => {
-    const state = useWorkflowStore.getState();
-    if (!state.document) return;
-    try {
-      const document = toDocument(state, viewport.current);
-      const saved = await api<WorkflowDocument>(
-        `/workflows/${state.document.id}`,
-        { method: "PUT", body: JSON.stringify(document) },
-      );
-      state.markSaved(saved.revision);
-      setError("");
-    } catch (reason) {
-      setError(String(reason));
-    }
+  const save = useCallback(() => {
+    const operation = saveQueue.then(async () => {
+      const state = useWorkflowStore.getState();
+      if (!state.document) return;
+      try {
+        const document = toDocument(state, viewport.current);
+        const saved = await api<WorkflowDocument>(
+          `/workflows/${state.document.id}`,
+          { method: "PUT", body: JSON.stringify(document) },
+        );
+        state.markSaved(saved.revision);
+        setError("");
+      } catch (reason) {
+        setError(String(reason));
+      }
+    });
+    saveQueue = operation;
+    return operation;
   }, []);
 
   useEffect(() => {
@@ -502,6 +508,7 @@ function Editor() {
       {preview && store.document && (
         <PortView
           workflowId={store.document.id}
+          runId={run.runId}
           nodeId={preview.nodeId}
           port={preview.port}
           onClose={() => {

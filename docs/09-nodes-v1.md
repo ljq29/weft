@@ -5,6 +5,14 @@
 |类型|名称|分类|执行 lane|缓存策略|说明|
 | --- | --- | --- | --- | --- | --- |
 |`code.python`|Python Script|code|trusted_worker|side_effect|在可信 Worker 中执行用户 Python 代码|
+|`excel.cell_update`|Excel Cell Update|excel|trusted_service|side_effect|原子更新若干不连续单元格，默认禁止公式|
+|`excel.connect`|Excel Connect|excel|trusted_service|side_effect|连接可见 Excel 或创建独立的可见/隐藏实例|
+|`excel.read_range`|Excel Read Range|excel|trusted_service|volatile|实时读取 Excel 区域、表对象或命名区域为表格|
+|`excel.save`|Excel Save|excel|trusted_service|side_effect|显式保存或另存工作簿，不隐式覆盖文件|
+|`excel.sheet`|Excel Sheet|excel|trusted_service|side_effect|创建、删除、重命名或清空工作表|
+|`excel.sheet_names`|Excel Sheet Names|excel|trusted_service|volatile|列出工作表名、索引与可见状态|
+|`excel.workbook`|Excel Workbook|excel|trusted_service|side_effect|引用已打开工作簿、打开文件或新建工作簿|
+|`excel.write_table`|Excel Write Table|excel|trusted_service|side_effect|整块写入、追加或覆盖 Excel 工作表区域|
 |`file.copy`|File Copy|file|trusted_worker|side_effect|复制文件或目录|
 |`file.delete`|File Delete|file|trusted_worker|side_effect|移入回收站或永久删除|
 |`file.list`|List Files|file|trusted_worker|pure|列出目录中的文件与目录|
@@ -84,6 +92,301 @@
     }
   },
   "required": []
+}
+```
+
+## Excel Cell Update (`excel.cell_update`)
+
+原子更新若干不连续单元格，默认禁止公式
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sheet": {
+      "type": "string",
+      "description": "目标工作表"
+    },
+    "cells": {
+      "type": "array",
+      "description": "单元格地址与值列表"
+    },
+    "allow_formula": {
+      "type": "boolean",
+      "description": "是否允许公式"
+    }
+  },
+  "required": [
+    "sheet"
+  ]
+}
+```
+
+## Excel Connect (`excel.connect`)
+
+连接可见 Excel 或创建独立的可见/隐藏实例
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "attach_visible",
+        "new_visible",
+        "new_hidden"
+      ],
+      "description": "连接模式"
+    },
+    "target": {
+      "type": "object",
+      "description": "稳定工作簿/路径及显式 PID 选择提示",
+      "properties": {
+        "workbook": {
+          "type": "string",
+          "description": "工作簿名"
+        },
+        "path": {
+          "type": "string",
+          "description": "工作簿完整路径"
+        },
+        "pid": {
+          "type": "integer",
+          "description": "显式实例 PID"
+        },
+        "window_title": {
+          "type": "string",
+          "description": "窗口标题提示"
+        }
+      }
+    },
+    "on_finish": {
+      "type": "string",
+      "enum": [
+        "save",
+        "discard"
+      ],
+      "description": "隐藏实例结束时的显式保存或放弃选择"
+    }
+  },
+  "required": [
+    "mode"
+  ]
+}
+```
+
+## Excel Read Range (`excel.read_range`)
+
+实时读取 Excel 区域、表对象或命名区域为表格
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sheet": {
+      "type": "string",
+      "description": "工作表名"
+    },
+    "range": {
+      "type": "string",
+      "description": "A1 区域、表对象或命名区域；空为 UsedRange"
+    },
+    "header": {
+      "type": "boolean",
+      "description": "首行为表头"
+    },
+    "dtype_hints": {
+      "type": "object",
+      "description": "按列指定 Arrow 类型"
+    }
+  },
+  "required": [
+    "sheet"
+  ]
+}
+```
+
+## Excel Save (`excel.save`)
+
+显式保存或另存工作簿，不隐式覆盖文件
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "save",
+        "save_as"
+      ],
+      "description": "保存方式"
+    },
+    "path": {
+      "type": "string",
+      "description": "相对 Root 的另存路径"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "xlsx",
+        "xlsm",
+        "csv"
+      ],
+      "description": "文件格式"
+    },
+    "overwrite": {
+      "type": "boolean",
+      "description": "是否允许覆盖已有文件"
+    }
+  },
+  "required": [
+    "mode"
+  ]
+}
+```
+
+## Excel Sheet (`excel.sheet`)
+
+创建、删除、重命名或清空工作表
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "create",
+        "delete",
+        "rename",
+        "clear"
+      ],
+      "description": "工作表操作"
+    },
+    "name": {
+      "type": "string",
+      "description": "原工作表名"
+    },
+    "new_name": {
+      "type": "string",
+      "description": "重命名目标"
+    }
+  },
+  "required": [
+    "action",
+    "name"
+  ]
+}
+```
+
+## Excel Sheet Names (`excel.sheet_names`)
+
+列出工作表名、索引与可见状态
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {},
+  "required": []
+}
+```
+
+## Excel Workbook (`excel.workbook`)
+
+引用已打开工作簿、打开文件或新建工作簿
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "open_existing",
+        "open_file",
+        "new"
+      ],
+      "description": "工作簿获取方式"
+    },
+    "name": {
+      "type": "string",
+      "description": "已打开工作簿名"
+    },
+    "path": {
+      "type": "string",
+      "description": "相对 Root 的工作簿文件路径"
+    }
+  },
+  "required": [
+    "mode"
+  ]
+}
+```
+
+## Excel Write Table (`excel.write_table`)
+
+整块写入、追加或覆盖 Excel 工作表区域
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sheet": {
+      "type": "string",
+      "description": "目标工作表"
+    },
+    "start": {
+      "type": "string",
+      "description": "起始单元格"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "overwrite",
+        "append"
+      ],
+      "description": "写入模式"
+    },
+    "header": {
+      "type": "boolean",
+      "description": "是否写表头"
+    },
+    "clear_below": {
+      "type": "boolean",
+      "description": "覆盖前清空下方旧内容"
+    },
+    "allow_formula": {
+      "type": "boolean",
+      "description": "是否允许公式字符串"
+    },
+    "autofit": {
+      "type": "boolean",
+      "description": "写后自适应列宽"
+    },
+    "preserve_format": {
+      "type": "boolean",
+      "description": "保留目标格式"
+    },
+    "fast_mode": {
+      "type": "boolean",
+      "description": "临时关闭刷新、事件和自动计算"
+    }
+  },
+  "required": [
+    "sheet",
+    "start",
+    "mode"
+  ]
 }
 ```
 

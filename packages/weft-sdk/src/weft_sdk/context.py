@@ -20,6 +20,7 @@ class Context:
     log: Callable[[str, str], None]
     progress: Callable[[float, str | None], None]
     cancelled: Callable[[], bool]
+    excel: object | None = None
 
 
 _current: ContextVar[Context | None] = ContextVar("weft_context", default=None)
@@ -40,6 +41,7 @@ def activate(
     log: Callable[[str, str], None] | None = None,
     progress: Callable[[float, str | None], None] | None = None,
     cancelled: Callable[[], bool] | None = None,
+    excel: object | None = None,
 ) -> Iterator[None]:
     context = Context(
         root=root,
@@ -48,6 +50,7 @@ def activate(
         log=log or (lambda level, message: None),
         progress=progress or (lambda fraction, message: None),
         cancelled=cancelled or (lambda: False),
+        excel=excel,
     )
     token = _current.set(context)
     try:
@@ -63,6 +66,11 @@ def __getattr__(name: str) -> object:
         return _get().run_id
     if name == "vars":
         return _get().variables
+    if name == "excel":
+        service = _get().excel
+        if service is None:
+            raise RuntimeError("Excel service is not configured")
+        return service
     raise AttributeError(name)
 
 

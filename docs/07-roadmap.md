@@ -138,22 +138,22 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## M3 Excel 联动
 
-- [ ] **T3.1 ExcelBackend 接口 + Fake 实现**
+- [x] **T3.1 ExcelBackend 接口 + Fake 实现**
 【依赖】T1.3（可与 M2 并行）
 【产出】ExcelBackend、Fake、描述符与共用契约；实时读取 volatile，App/Workbook 仅在 resolve 成功后复用
 【验收】US-XLS-03/AC-4；US-XLS-04/AC-6（Fake 部分）；Linux 契约绿但不代替真机
 
-- [ ] **T3.2 ExcelWorker**
+- [x] **T3.2 ExcelWorker**
 【依赖】T3.1
 【产出】独立 ExcelWorker 子进程与监督器、STA 串行队列、跨宿主 `Local\WeftExcelCOM` 互斥、超时后繁忙/排队、达阈值终止重建、owned RefRegistry、fast_mode 状态恢复
 【验收】US-XLS-11/AC-1..3,5；US-XLS-12/AC-1..3,5
 
-- [ ] **T3.3 XlwingsBackend**
+- [x] **T3.3 XlwingsBackend**
 【依赖】T3.2 + T0.3 结论
 【产出】多实例 PID/窗口选择、稳定目标与用户级 `excel-targets.toml`、attach/new_hidden、整块读写、cell update、sheet/save、统一 allow_formula、显式 save|discard、owned PID 清理、可见 false/隐藏 true 的 fast_mode
 【验收】US-XLS-01..08、US-XLS-10 的 `[int-win]` AC；固定基准机记录 US-XLS-04/AC-4、US-XLS-05/AC-5、US-XLS-10/AC-2 结果
 
-- [ ] **T3.4 Excel 节点 + 描述符解析与 MVP 发布**
+- [x] **T3.4 Excel 节点 + 描述符解析与 MVP 发布**
 【依赖】T3.3
 【产出】Excel 节点；描述符重解析；实时 Read 每次执行；场景 A 与公开 MVP 发布包
 【验收】US-XLS-11/AC-4；US-XLS-04/AC-6（win_real）；US-EXE-06/AC-2；场景 A 真机通过
@@ -299,11 +299,11 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## 文档状态（不代表实现完成）
 
-当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）与 M2（T2.1–T2.5）已完成，真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过；T0.2 因未安装 Sandboxie 而未完成，T0.4 已验证 pi/LLMProxy 但沙箱断网仍待验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
+当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）、M2（T2.1–T2.5）与 M3（T3.1–T3.4）已完成；真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过，真实 Excel 的场景 A 主链路也已通过。T0.2 因未安装 Sandboxie 而未完成，T0.4 已验证 pi/LLMProxy 但沙箱断网仍待验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
 
 以下事项仍需真机验证，不能当成既成事实：
 
 1. Sandboxie 独立 box、进程归属、重命名、未知路径、网络拒绝与冲突 apply 必须通过 T0.2；未授权路径“拒绝”AC 在验证前不预先弱化。若真机证明只能重定向而无法硬拒绝，再将 AC 回退为“真实路径不变、对应变更不可收集/应用”，并明确记录安全能力降级，不在 spike 中临时选择语义。
-2. Excel 多实例、COM 真超时、用户并发编辑与 owned PID 生命周期必须通过 T0.3；性能是同机基准。
+2. Excel 多实例、COM 真超时与 owned PID 生命周期已通过 T0.3 和 M3；性能结果以同机基准为准，正式后端写入优化目标尚未达成。
 3. pi 非交互调用与沙箱外 LLMProxy 兼容性必须通过 T0.4。
 4. NoneSandbox 已限定为受控影子目录模拟；本机 UI 会话令牌与 Host/Origin 校验是既定安全边界，`X-Weft-Client` 只作操作标记，不构成权限控制。

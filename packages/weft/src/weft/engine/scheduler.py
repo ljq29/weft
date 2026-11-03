@@ -57,11 +57,19 @@ def schema_with_variables(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 class Engine:
-    def __init__(self, worker_pool_factory: Any = None) -> None:
+    def __init__(self, worker_pool_factory: Any = None, excel_worker: Any = None) -> None:
         self.runs: dict[str, PreparedRun] = {}
         self.worker_pool_factory = worker_pool_factory
         self.worker_pools: dict[str, Any] = {}
+        self.excel_worker = excel_worker
         self.event_sink: Any = None
+
+    def close(self) -> None:
+        for pool in self.worker_pools.values():
+            pool.close()
+        self.worker_pools.clear()
+        if self.excel_worker is not None:
+            self.excel_worker.close()
 
     def prepare(
         self,
@@ -184,6 +192,12 @@ class Engine:
         pool = self.worker_pools.pop(prepared.record.run_id, None)
         if pool is not None:
             pool.close()
+        if self.excel_worker is not None:
+            try:
+                await self.excel_worker.release_run(prepared.record.run_id)
+            except Exception as error:
+                record.status = "failed"
+                self._event(prepared, "run.warning", "", {"message": str(error)})
         self._event(prepared, "run.finished", "", {"status": record.status, "usage": record.usage})
         self._write_meta(prepared)
         record.finished.set()
@@ -394,6 +408,8 @@ class Engine:
         variables: dict[str, Any],
         params: dict[str, Any],
     ) -> dict[str, Any]:
+        from weft.nodes.excel import ExcelClient
+
         with weft_ctx.activate(
             root=prepared.root,
             run_id=prepared.record.run_id,
@@ -408,6 +424,7 @@ class Engine:
                 {"fraction": fraction, "message": message},
             ),
             cancelled=prepared.cancel_event.is_set,
+            excel=ExcelClient(self.excel_worker) if self.excel_worker is not None else None,
         ):
             return declaration.execute(weft_ctx, inputs, params)
 

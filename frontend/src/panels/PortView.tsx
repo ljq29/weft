@@ -16,11 +16,13 @@ function formatValue(value: unknown): string {
 
 export function PortView({
   workflowId,
+  runId,
   nodeId,
   port,
   onClose,
 }: {
   workflowId: string;
+  runId: string;
   nodeId: string;
   port: string;
   onClose: () => void;
@@ -41,10 +43,12 @@ export function PortView({
           sort_by: sortBy,
           desc: String(descending),
         });
-        const response = await fetch(
-          `/api/workflows/${workflowId}/nodes/${nodeId}/ports/${port}?${query}`,
-          { headers: { Authorization: `Bearer ${sessionToken()}` } },
-        );
+        const base = runId
+          ? `/api/runs/${runId}/nodes/${nodeId}/ports/${port}`
+          : `/api/workflows/${workflowId}/nodes/${nodeId}/ports/${port}`;
+        const response = await fetch(`${base}?${query}`, {
+          headers: { Authorization: `Bearer ${sessionToken()}` },
+        });
         if (!response.ok) throw new Error("节点未执行");
         const table = tableFromIPC(await response.arrayBuffer());
         setColumns(table.schema.fields.map((field) => field.name));
@@ -64,7 +68,7 @@ export function PortView({
       }
     };
     void load();
-  }, [workflowId, nodeId, port, offset, sortBy, descending]);
+  }, [workflowId, runId, nodeId, port, offset, sortBy, descending]);
   return (
     <div className="modal-backdrop" role="dialog" aria-label="端口预览">
       <section className="port-view">

@@ -72,8 +72,10 @@ class WorkflowEnvironment:
         self.sync()
 
     def run_uv(self, *args: str) -> None:
+        environment = os.environ.copy()
+        environment.setdefault("UV_INDEX_URL", "https://pypi.tuna.tsinghua.edu.cn/simple")
         result = subprocess.run(
-            ["uv", *args], cwd=self.root, capture_output=True, text=True, env=os.environ.copy()
+            ["uv", *args], cwd=self.root, capture_output=True, text=True, env=environment
         )
         if result.returncode != 0:
             raise EnvironmentError(result.stdout + result.stderr)

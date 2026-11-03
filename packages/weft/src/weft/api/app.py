@@ -63,9 +63,17 @@ def create_app(
     app.state.session = session
     app.state.roots = {}
     app.state.bus = EventBus()
-    engine = Engine(lambda root, run_id: WorkerPool(WorkflowEnvironment(root), run_id))
+    from weft.excel import ExcelWorkerSupervisor
+
+    excel_worker = ExcelWorkerSupervisor()
+    engine = Engine(
+        lambda root, run_id: WorkerPool(WorkflowEnvironment(root), run_id),
+        excel_worker=excel_worker,
+    )
     engine.event_sink = app.state.bus.publish
     app.state.engine = engine
+    app.state.excel = excel_worker
+    app.router.add_event_handler("shutdown", engine.close)
     app.state.coordinator = RunCoordinator(engine)
     app.state.registry = builtin_registry()
     allowed_hosts = (
