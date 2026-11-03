@@ -55,6 +55,11 @@ describe("T2.2 canvas editor", () => {
     expect(html).toContain("审计");
   });
 
+  it("US-PKG-03/AC-1; US-PKG-04/AC-1: renders pack and import actions", () => {
+    const html = renderToStaticMarkup(<App />);
+    expect(html).toContain("导入工作流");
+  });
+
   it("US-SBX-04/AC-3; US-SBX-05/AC-1: renders the change review entry", () => {
     const html = renderToStaticMarkup(<ChangeReviewPanel runId="r_1" />);
     expect(html).toContain("变更审批");

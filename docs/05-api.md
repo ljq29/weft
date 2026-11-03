@@ -117,7 +117,7 @@
 
 |方法|路径|说明|
 | ------| ------| --------------------------------------------------------------------------------------|
-|POST|`/api/workflows/{id}/pack`|`{exclude_data: bool, confirm_warnings?: bool}` → `{job_id}`；任何 schema、Loop 等 ERROR 都阻断，不能用 force 跳过；只有 WARNING 可在 `confirm_warnings: true` 后继续|
+|POST|`/api/workflows/{id}/pack`|`{exclude_data: bool, confirm_warnings?: bool, output?: str}` → `{job_id, path}`；任何 schema、Loop 等 ERROR 都阻断，不能用 force 跳过；只有 WARNING 可在 `confirm_warnings: true` 后继续|
 |GET|`/api/workflows/{id}/pack/preflight`|打包预检报告：`{errors, warnings, abs_paths: [{node_id, param, value}], size_estimate}`|
 |POST|`/api/workflows/unpack`|`{zip_path, dest_dir}` → `{id, path}`；zip slip → 400；导入保留 workflow id，本机“复制工作流”操作另生成新 id|
 

@@ -233,6 +233,7 @@ class XlwingsBackend:
                 "title": app.Caption,
                 "visible": bool(app.Visible),
                 "workbooks": [book.Name for book in app.Workbooks],
+                "paths": [book.FullName for book in app.Workbooks if book.Path],
             }
             for app in self._instances()
         ]

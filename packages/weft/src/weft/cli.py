@@ -141,6 +141,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=7788)
     serve.add_argument("--no-browser", action="store_true")
+    serve.add_argument("--no-triggers", action="store_true")
+    pack = subparsers.add_parser("pack", help="pack a portable workflow")
+    pack.add_argument("path", type=Path)
+    pack.add_argument("-o", "--output", type=Path)
+    pack.add_argument("--exclude-data", action="store_true")
+    pack.add_argument("--confirm-warnings", action="store_true")
+    pack.add_argument("--json", action="store_true")
+    unpack = subparsers.add_parser("unpack", help="import a packed workflow")
+    unpack.add_argument("path", type=Path)
+    unpack.add_argument("-d", "--dest-dir", type=Path, required=True)
+    unpack.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     if args.version:
         print(f"weft {__version__}")
@@ -154,7 +165,34 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         if not args.no_browser:
             webbrowser.open(f"http://{args.host}:{args.port}")
-        uvicorn.run(create_app(), host=args.host, port=args.port)
+        uvicorn.run(
+            create_app(
+                host=args.host,
+                port=args.port,
+                enable_triggers=not args.no_triggers,
+            ),
+            host=args.host,
+            port=args.port,
+        )
+        return 0
+    if args.command == "pack":
+        from weft.workflow.packaging import PackError, pack_workflow
+
+        try:
+            path = pack_workflow(args.path, args.output, args.exclude_data, args.confirm_warnings)
+        except PackError as exception:
+            print(json.dumps(exception.report.as_dict(), ensure_ascii=False))
+            return 1
+        print(json.dumps({"path": str(path)}) if args.json else str(path))
+        return 0
+    if args.command == "unpack":
+        from weft.workflow.packaging import unpack_workflow
+
+        root = unpack_workflow(args.path, args.dest_dir)
+        from weft.workflow import WorkflowStore
+
+        result = {"id": WorkflowStore(root).load().id, "path": str(root)}
+        print(json.dumps(result) if args.json else str(root))
         return 0
     parser.print_help()
     return 0

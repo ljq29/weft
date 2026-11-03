@@ -60,7 +60,7 @@ python_version = "3.12"
 packages = ["weft", "weft_worker", "weft_sdk"]
 
 [[tool.mypy.overrides]]
-module = ["pyarrow", "simpleeval"]
+module = ["pyarrow", "simpleeval", "apscheduler.*", "watchdog.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

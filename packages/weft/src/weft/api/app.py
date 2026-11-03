@@ -71,12 +71,34 @@ class BrowseRequest(BaseModel):
     dirs_only: bool = False
 
 
+class PackRequest(BaseModel):
+    exclude_data: bool = False
+    confirm_warnings: bool = False
+    output: str | None = None
+
+
+class UnpackRequest(BaseModel):
+    zip_path: str
+    dest_dir: str
+
+
 def create_app(
     token: str | None = None,
     host: str = "127.0.0.1",
     port: int = 7788,
     session: Session | None = None,
+    enable_triggers: bool = True,
 ) -> FastAPI:
+    if host not in {"127.0.0.1", "localhost", "::1"}:
+        from weft.agent.settings import SettingsStore
+
+        token = token or (session.token if session is not None else "")
+        token = token or SettingsStore().read().get("server", {}).get("global_token", "")
+        if not token:
+            raise ValueError("Non-local listen requires server.global_token")
+        import logging
+
+        logging.getLogger("weft").warning("Weft is listening on a non-local host")
     if session is None:
         session = (
             create_session(host, port)
@@ -125,6 +147,17 @@ def create_app(
 
     app.state.chat = ChatSource(app.state.coordinator)
     app.state.registry = builtin_registry()
+    engine.registry = app.state.registry
+    from weft.triggers.http import HttpSource
+    from weft.triggers.manager import TriggerManager
+
+    app.state.http = HttpSource(app.state.coordinator)
+    app.state.triggers = (
+        TriggerManager(app.state.coordinator, app.state.roots) if enable_triggers else None
+    )
+    engine.trigger_manager = app.state.triggers
+    if app.state.triggers is not None:
+        app.router.add_event_handler("shutdown", app.state.triggers.close)
     allowed_hosts = (
         {f"{host}:{port}", f"localhost:{port}"} if host == "127.0.0.1" else {f"{host}:{port}"}
     )
@@ -156,7 +189,12 @@ def create_app(
 
     @app.get("/api/system/version")
     def version() -> dict[str, Any]:
-        return {"version": __version__, "schema_version": 1}
+        return {
+            "version": __version__,
+            "schema_version": 1,
+            "host": host,
+            "warning": "非本机监听已启用" if host not in {"127.0.0.1", "localhost", "::1"} else "",
+        }
 
     from weft.agent.client import LLMClient
     from weft.agent.proxy import LLMProxy
@@ -250,11 +288,13 @@ def create_app(
         return {"id": document.id, "path": str(root)}
 
     @app.post("/api/workflows/open")
-    def open_workflow(request: OpenRequest) -> dict[str, Any]:
+    async def open_workflow(request: OpenRequest) -> dict[str, Any]:
         root = Path(request.path).resolve()
         WorkflowEnvironment(root).sync()
         document = WorkflowStore(root).load()
         app.state.roots[document.id] = root
+        if app.state.triggers is not None:
+            app.state.triggers.activate(document, root)
         return {"id": document.id, "path": str(root), "env_status": "ok"}
 
     @app.get("/api/workflows/{workflow_id}")
@@ -262,12 +302,14 @@ def create_app(
         return WorkflowStore(root_for(app, workflow_id)).load().model_dump(mode="json")
 
     @app.put("/api/workflows/{workflow_id}")
-    def put_workflow(workflow_id: str, document: WorkflowDocument, request: Request) -> Any:
+    async def put_workflow(workflow_id: str, document: WorkflowDocument, request: Request) -> Any:
         if request.headers.get("x-weft-client") != "ui":
             return error("FORBIDDEN", "缺少 UI 操作标记", 403)
         from weft.agent.node_tool import validate_node_tools
+        from weft.triggers.manager import validate_trigger_config
 
         try:
+            validate_trigger_config(document)
             validate_node_tools(document, app.state.registry)
         except (ValueError, PermissionError) as exc:
             return error("NODE_TOOL_NOT_AUTHORIZED", str(exc), 400)
@@ -278,6 +320,8 @@ def create_app(
                 document.revision,
                 run_active=workflow_run_active(app, workflow_id),
             )
+            if app.state.triggers is not None:
+                app.state.triggers.activate(saved, root)
             return saved.model_dump(mode="json")
         except ValueError as exc:
             return error("REVISION_CONFLICT", str(exc), 409)
@@ -296,6 +340,8 @@ def create_app(
                 expected,
                 run_active=workflow_run_active(app, workflow_id),
             )
+            if app.state.triggers is not None:
+                app.state.triggers.activate(saved, root)
             return saved.model_dump(mode="json")
         except ValueError as exc:
             return error("REVISION_CONFLICT", str(exc), 409)
@@ -303,6 +349,8 @@ def create_app(
     @app.delete("/api/workflows/{workflow_id}")
     def close_workflow(workflow_id: str, purge_cache: bool = False) -> dict[str, bool]:
         root = root_for(app, workflow_id)
+        if app.state.triggers is not None:
+            app.state.triggers.deactivate(workflow_id)
         app.state.roots.pop(workflow_id)
         if purge_cache:
             CacheManager(root).reset_all()
@@ -323,6 +371,56 @@ def create_app(
         (target / "workflow.json").write_text(document.model_dump_json(indent=2), encoding="utf-8")
         app.state.roots[document.id] = target
         return {"id": document.id, "path": str(target), "revision": 1}
+
+    @app.get("/api/workflows/{workflow_id}/pack/preflight")
+    def pack_preflight(workflow_id: str, exclude_data: bool = False) -> dict[str, Any]:
+        from weft.workflow.packaging import preflight
+
+        root = root_for(app, workflow_id)
+        return preflight(root, app.state.registry, exclude_data).as_dict()
+
+    @app.post("/api/workflows/{workflow_id}/pack")
+    def pack(workflow_id: str, request: PackRequest) -> Any:
+        from weft.workflow.packaging import PackError, pack_workflow
+
+        try:
+            path = pack_workflow(
+                root_for(app, workflow_id),
+                Path(request.output) if request.output else None,
+                request.exclude_data,
+                request.confirm_warnings,
+                app.state.registry,
+            )
+        except PackError as exception:
+            return JSONResponse(
+                status_code=400 if exception.report.errors else 409,
+                content={
+                    "error": {
+                        "code": "PACK_PREFLIGHT_FAILED",
+                        "message": str(exception),
+                        "detail": exception.report.as_dict(),
+                    }
+                },
+            )
+        job_id = f"pack_{secrets.token_hex(6)}"
+        return {"job_id": job_id, "path": str(path)}
+
+    @app.post("/api/workflows/unpack")
+    async def unpack(request: UnpackRequest) -> Any:
+        from weft.worker.environment import EnvironmentError as WorkflowEnvironmentError
+        from weft.workflow.packaging import UnpackError, unpack_workflow
+
+        try:
+            root = await asyncio.to_thread(
+                unpack_workflow, Path(request.zip_path), Path(request.dest_dir)
+            )
+            document = WorkflowStore(root).load()
+        except (OSError, ValueError, UnpackError, WorkflowEnvironmentError) as exception:
+            return error("UNPACK_FAILED", str(exception), 400)
+        app.state.roots[document.id] = root
+        if app.state.triggers is not None:
+            app.state.triggers.activate(document, root)
+        return {"id": document.id, "path": str(root)}
 
     @app.get("/api/workflows/{workflow_id}/env")
     def environment(workflow_id: str) -> dict[str, Any]:
@@ -390,6 +488,42 @@ def create_app(
     @app.get("/api/nodes/types")
     def node_types() -> list[dict[str, Any]]:
         return [node.manifest({}) for node in app.state.registry.all()]
+
+    @app.get("/api/workflows/{workflow_id}/triggers/status")
+    def trigger_health(workflow_id: str) -> Any:
+        if app.state.triggers is None:
+            return {}
+        return app.state.triggers.health.get(workflow_id, {})
+
+    @app.post("/api/workflows/{workflow_id}/trigger")
+    async def http_trigger(workflow_id: str, request: Request, wait: bool = False) -> Any:
+        from weft.engine.errors import RunQueueFullError
+        from weft.triggers.http import HttpTriggerDisabledError
+
+        root = root_for(app, workflow_id)
+        try:
+            result = await app.state.http.trigger(
+                WorkflowStore(root).load(),
+                root,
+                app.state.registry,
+                await request.json(),
+                request.headers.get("authorization", "").removeprefix("Bearer "),
+                request.client.host if request.client else "unknown",
+                wait,
+            )
+        except HttpTriggerDisabledError:
+            return error("NOT_FOUND", "触发器不存在或未启用", 404)
+        except PermissionError as exception:
+            limited = "Too many" in str(exception)
+            return error(
+                "RATE_LIMITED" if limited else "UNAUTHORIZED",
+                str(exception),
+                429 if limited else 401,
+            )
+        except RunQueueFullError as exception:
+            return error("RUN_QUEUE_FULL", str(exception), 409)
+        status = 200 if result.get("disposition") == "dropped" else 202
+        return JSONResponse(result, status_code=status)
 
     @app.post("/api/workflows/{workflow_id}/runs", status_code=202)
     async def run(workflow_id: str, request: RunRequest) -> Any:

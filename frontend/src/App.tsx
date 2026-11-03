@@ -22,6 +22,7 @@ import { TracePanel } from "./panels/TracePanel";
 import { ChatPanel } from "./panels/ChatPanel";
 import { ChangeReviewPanel } from "./panels/ChangeReviewPanel";
 import { ConfirmPanel } from "./panels/ConfirmPanel";
+import { TriggerStatusPanel } from "./panels/TriggerStatusPanel";
 import { useRunStore } from "./stores/runStore";
 import { toDocument, useWorkflowStore } from "./stores/workflowStore";
 import type { FlowNode } from "./stores/workflowStore";
@@ -62,6 +63,7 @@ function Editor() {
   } | null>(null);
   const setNodeTypes = useWorkflowStore((state) => state.setNodeTypes);
   const [error, setError] = useState("");
+  const [serverWarning, setServerWarning] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [name, setName] = useState("weekly");
@@ -104,6 +106,16 @@ function Editor() {
         setError(String(reason));
       });
   }, [setNodeTypes]);
+
+  useEffect(() => {
+    void api<{ warning: string }>("/system/version")
+      .then((system) => {
+        setServerWarning(system.warning);
+      })
+      .catch(() => {
+        setServerWarning("");
+      });
+  }, []);
 
   useEffect(() => {
     if (!store.document) return;
@@ -239,6 +251,66 @@ function Editor() {
       WorkflowDocument & { nodes: unknown[]; edges: unknown[] }
     >(`/workflows/${result.id}`);
     load(document);
+  };
+
+  const importWorkflow = async () => {
+    const zipPath = window.prompt("工作流 zip 路径");
+    if (!zipPath) return;
+    const destDir = window.prompt("导入目标父目录", parent);
+    if (!destDir) return;
+    try {
+      const result = await api<{ id: string; path: string }>(
+        "/workflows/unpack",
+        {
+          method: "POST",
+          body: JSON.stringify({ zip_path: zipPath, dest_dir: destDir }),
+        },
+      );
+      setRoot(result.path);
+      const document = await api<
+        WorkflowDocument & { nodes: unknown[]; edges: unknown[] }
+      >(`/workflows/${result.id}`);
+      load(document);
+      setError("");
+    } catch (reason) {
+      setError(String(reason));
+    }
+  };
+
+  const pack = async () => {
+    const document = store.document;
+    if (!document) return;
+    try {
+      const report = await api<{
+        errors: { message: string }[];
+        warnings: { message: string }[];
+        size_estimate: number;
+      }>(`/workflows/${document.id}/pack/preflight`);
+      if (report.errors.length) {
+        setError(report.errors.map((item) => item.message).join("\n"));
+        return;
+      }
+      const summary = report.warnings.map((item) => item.message).join("\n");
+      if (
+        report.warnings.length &&
+        !window.confirm(`发现打包警告：\n${summary}\n是否继续？`)
+      )
+        return;
+      const result = await api<{ path: string }>(
+        `/workflows/${document.id}/pack`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            exclude_data: window.confirm("是否排除 data/ 数据目录？"),
+            confirm_warnings: true,
+          }),
+        },
+      );
+      window.alert(`打包完成：${result.path}`);
+      setError("");
+    } catch (reason) {
+      setError(String(reason));
+    }
   };
 
   const addAtCenter = (type: string) => {
@@ -387,6 +459,10 @@ function Editor() {
         />
         <button onClick={() => void create()}>新建工作流</button>
         <button onClick={() => void open()}>打开工作流</button>
+        <button onClick={() => void importWorkflow()}>导入工作流</button>
+        {store.document && (
+          <button onClick={() => void pack()}>打包工作流</button>
+        )}
         <button
           onClick={() => {
             setSettingsOpen(true);
@@ -421,6 +497,7 @@ function Editor() {
           </button>
         )}
       </header>
+      {serverWarning && <div role="alert">{serverWarning}</div>}
       {error && (
         <div role="alert" className="error-banner">
           {error}
@@ -482,6 +559,12 @@ function Editor() {
               onChange={(params) => {
                 store.updateParams(selectedNode.id, params);
               }}
+            />
+          )}
+          {selectedNode?.data.type === "flow.trigger" && (
+            <TriggerStatusPanel
+              workflowId={store.document?.id ?? ""}
+              params={selectedNode.data.params}
             />
           )}
           {selectedNode && (

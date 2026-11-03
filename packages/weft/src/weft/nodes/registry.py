@@ -87,6 +87,7 @@ def builtin_registry() -> NodeRegistry:
     from weft.nodes.excel import EXCEL_NODES
     from weft.nodes.flow import (
         ChatOutputNode,
+        HttpResponseNode,
         IfNode,
         LoopEndNode,
         LoopStartNode,
@@ -100,6 +101,7 @@ def builtin_registry() -> NodeRegistry:
     for node_type in (
         TriggerNode,
         ChatOutputNode,
+        HttpResponseNode,
         IfNode,
         SwitchNode,
         MergeNode,

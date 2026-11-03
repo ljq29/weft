@@ -61,6 +61,7 @@ class Engine:
         self, worker_pool_factory: Any = None, excel_worker: Any = None, llm_client: Any = None
     ) -> None:
         self.runs: dict[str, PreparedRun] = {}
+        self.registry: Any = None
         self.worker_pool_factory = worker_pool_factory
         self.worker_pools: dict[str, Any] = {}
         self.excel_worker = excel_worker
@@ -68,6 +69,8 @@ class Engine:
         self.confirmation_handler: Any = None
         self.node_tool_factory: Any = None
         self.sandbox_manager: Any = None
+        self.http_responses: dict[str, dict[str, Any]] = {}
+        self.trigger_manager: Any = None
         self.service_slots = {"trusted_service": asyncio.Semaphore(4)}
         self.event_sink: Any = None
 
@@ -243,6 +246,23 @@ class Engine:
         try:
             inputs, variables = self._inputs(prepared, node_id)
             params = self._resolve_params(node.params, variables)
+            if self.trigger_manager is not None and node.type.startswith(
+                (
+                    "table.write_",
+                    "file.copy",
+                    "file.move",
+                    "file.rename",
+                    "file.delete",
+                    "excel.save",
+                )
+            ):
+                for key in ("path", "target", "destination"):
+                    value = params.get(key)
+                    if isinstance(value, str):
+                        path = Path(value)
+                        self.trigger_manager.suppress(
+                            path if path.is_absolute() else prepared.root / path
+                        )
             if declaration.cache_policy == "pure":
                 cache_key = self._cache_key(prepared, node, params)
                 cached = cache.load(node_id, cache_key)
@@ -722,6 +742,10 @@ class Engine:
     def _event(
         self, prepared: PreparedRun, event: str, node_id: str, data: dict[str, Any] | None = None
     ) -> None:
+        if event == "http.response":
+            if prepared.record.run_id in self.http_responses:
+                raise ValueError("Only one HTTP Response may execute per Run")
+            self.http_responses[prepared.record.run_id] = data or {}
         line = {
             "event": event,
             "run_id": prepared.record.run_id,

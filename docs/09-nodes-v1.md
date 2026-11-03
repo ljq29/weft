@@ -26,6 +26,7 @@
 |`file.path_join`|Path Join|file|trusted_worker|pure|拼接并规范化路径|
 |`file.rename`|File Rename|file|trusted_worker|side_effect|重命名文件或目录|
 |`flow.chat_output`|Chat Output|flow|trusted_service|side_effect|将 Message 或 Variable 作为助手消息推送到聊天会话|
+|`flow.http_response`|HTTP Response|flow|trusted_service|side_effect|为同步 HTTP 触发提供唯一响应；重复执行会失败|
 |`flow.if`|If|flow|trusted_service|pure|按受限 Python 表达式选择分支|
 |`flow.loop_end`|Loop End|flow|trusted_service|side_effect|收集循环体输出|
 |`flow.loop_start`|Loop Start|flow|trusted_service|side_effect|按行、按块或计数启动循环|
@@ -901,6 +902,30 @@
   "type": "object",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "properties": {}
+}
+```
+
+## HTTP Response (`flow.http_response`)
+
+为同步 HTTP 触发提供唯一响应；重复执行会失败
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status_code": {
+      "type": "integer",
+      "description": "HTTP 状态码"
+    },
+    "headers": {
+      "type": "object",
+      "description": "响应头"
+    },
+    "body": {
+      "description": "文本或 JSON 响应体"
+    }
+  }
 }
 ```
 

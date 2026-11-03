@@ -218,12 +218,12 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## M6 触发器 + 打包
 
-- [ ] **T6.1 TriggerManager + schedule/watch/http/HTTP Response**
+- [x] **T6.1 TriggerManager + schedule/watch/http/HTTP Response**
 【依赖】T1.8 + T3.4
 【产出】统一事件、Trigger params 派生视图、APScheduler、watch.watches/watchdog、token/限速/wait 超时与 drop 组合语义、P0 `HTTP Response` 单响应节点（未执行 outputs={}，重复执行失败）、来源健康、无人值守 Excel 目标唯一性预检
 【验收】US-TRG-01/AC-2,3；US-TRG-04/AC-1..4；US-TRG-05/AC-1..5；US-TRG-06/AC-1..4；US-TRG-07/AC-1,2；US-SBX-09/AC-1..3；US-XLS-01/AC-4；US-EXE-13/AC-5
 
-- [ ] **T6.2 打包/导入**
+- [x] **T6.2 打包/导入**
 【依赖】T1.1
 【产出】pack 排除规则/预检/密钥扫描/绝对路径 WARNING 清单、ERROR 阻断/WARNING 显式确认、unpack zip slip 防护与 uv sync、导入保留 id/本机 duplicate 新 id
 【验收】US-PKG-01/AC-1,2；US-PKG-03/AC-1..4；US-PKG-04/AC-1..5；US-SBX-08/AC-1..3
@@ -299,7 +299,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## 文档状态（不代表实现完成）
 
-当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）、M2（T2.1–T2.5）、M3（T3.1–T3.4）与 M4（T4.1–T4.5）的实现及自动化验收已完成；真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过，真实 Excel 的场景 A 主链路也已通过。场景 B 的真实模型人工抽查尚未执行，不能视为已验证。M5 的 NoneSandbox、审批流、工具与 Pi 边界已实现并通过自动化测试；T5.2/T5.4 的 Sandboxie win_real 验收仍未完成，对应任务卡保持未勾选。T0.2 因未安装 Sandboxie 而未完成，T0.4 已验证 pi/LLMProxy 但沙箱断网仍待验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
+当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）、M2（T2.1–T2.5）、M3（T3.1–T3.4）与 M4（T4.1–T4.5）的实现及自动化验收已完成；真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过，真实 Excel 的场景 A 主链路也已通过。场景 B 的真实模型人工抽查尚未执行，不能视为已验证。M6（T6.1–T6.2）的触发器、打包、导入与浏览器/独立目录交接自动化已通过；真实双机交接仍受外部资源、兼容 Weft/uv 与锁定依赖可用性约束，尚未执行。M5 的 NoneSandbox、审批流、工具与 Pi 边界已实现并通过自动化测试；T5.2/T5.4 的 Sandboxie win_real 验收仍未完成，对应任务卡保持未勾选。T0.2 因未安装 Sandboxie 而未完成，T0.4 已验证 pi/LLMProxy 但沙箱断网仍待验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
 
 以下事项仍需真机验证，不能当成既成事实：
 

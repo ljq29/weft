@@ -113,6 +113,34 @@ class ChatOutputNode(Node):
         return {"message": [{"role": "assistant", "content": content}]}
 
 
+class HttpResponseNode(Node):
+    type = "flow.http_response"
+    category = "flow"
+    name = "HTTP Response"
+    description = "为同步 HTTP 触发提供唯一响应；重复执行会失败"
+    lane = Lane.TRUSTED_SERVICE
+    inputs = (Port("flow", "flow", "可选执行顺序"),)
+    outputs = (Port("response", "variable", "HTTP 响应"),)
+    params_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+            "status_code": {"type": "integer", "description": "HTTP 状态码"},
+            "headers": {"type": "object", "description": "响应头"},
+            "body": {"description": "文本或 JSON 响应体"},
+        },
+    }
+
+    def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+        response = {
+            "status_code": params.get("status_code", 200),
+            "headers": params.get("headers", {}),
+            "body": params.get("body", ""),
+        }
+        ctx.emit_event("http.response", response)
+        return {"response": response}
+
+
 class IfNode(Node):
     type = "flow.if"
     category = "flow"
