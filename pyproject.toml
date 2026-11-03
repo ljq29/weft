@@ -1,0 +1,96 @@
+[project]
+name = "weft-monorepo"
+version = "0.0.0"
+description = "Development workspace for Weft"
+requires-python = ">=3.12"
+dependencies = [
+  "weft==0.0.0",
+  "weft-worker==0.0.0",
+  "weft-sdk==0.0.0",
+]
+
+[dependency-groups]
+dev = [
+  "import-linter>=2.3",
+  "mypy>=1.15",
+  "poethepoet>=0.33",
+  "pytest>=8.3",
+  "ruff>=0.9",
+  "types-jsonschema>=4.23",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+weft = { workspace = true }
+weft-worker = { workspace = true }
+weft-sdk = { workspace = true }
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+markers = [
+  "integration: service, filesystem, and process integration tests",
+  "win_real: tests requiring real Windows Excel, Sandboxie, or pi",
+  "benchmark: controlled performance benchmarks",
+]
+testpaths = ["packages"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["design", "frontend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "TID"]
+ignore = ["B008"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"weft.engine.api".msg = "Engine must not import API modules"
+"weft.engine.triggers".msg = "Engine must not import concrete triggers"
+"weft.engine.agent".msg = "Engine must not import agent implementations"
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+packages = ["weft", "weft_worker", "weft_sdk"]
+
+[[tool.mypy.overrides]]
+module = ["pyarrow", "simpleeval"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["weft.engine.lock"]
+disable_error_code = ["attr-defined"]
+
+[tool.importlinter]
+root_packages = ["weft_sdk"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "weft-sdk stays independent"
+type = "forbidden"
+source_modules = ["weft_sdk"]
+forbidden_modules = ["weft", "weft_worker"]
+
+[tool.poe.tasks]
+check = { sequence = ["lint", "test", "frontend-check", "coverage", "export-nodes-check"] }
+lint = { sequence = ["ruff-check", "ruff-format", "mypy-linux", "mypy-win32", "imports"] }
+ruff-check = "ruff check ."
+ruff-format = "ruff format --check packages scripts"
+mypy-linux = "mypy packages/weft/src packages/weft-worker/src packages/weft-sdk/src"
+mypy-win32 = "mypy --platform win32 packages/weft/src packages/weft-worker/src packages/weft-sdk/src"
+imports = "lint-imports --config pyproject.toml"
+test = "pytest -m \"not integration and not win_real\""
+integration = "pytest -m integration"
+coverage = "python scripts/coverage_matrix.py"
+export-nodes = "python -m weft.nodes.export"
+export-nodes-check = "python -m weft.nodes.export --output docs/09-nodes-v1.md --check"
+frontend-check = { sequence = ["frontend-lint", "frontend-typecheck", "frontend-test"] }
+frontend-lint = { shell = "pnpm -C frontend lint" }
+frontend-typecheck = { shell = "pnpm -C frontend typecheck" }
+frontend-test = { shell = "pnpm -C frontend test" }
+frontend-dev = { shell = "pnpm -C frontend dev" }

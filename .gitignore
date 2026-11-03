@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Weft runtime
+.runs/
+.test-reports/
+
+# Editors and OS
+.DS_Store
+Thumbs.db

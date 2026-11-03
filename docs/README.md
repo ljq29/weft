@@ -1,6 +1,6 @@
 # Weft 文档索引
 
-Weft 是本地优先的 Windows 可视化工作流工具，融合表格数据流、Excel COM 实时联动和沙箱化 AI agent。当前处于设计阶段，仓库尚无实现代码。
+Weft 是本地优先的 Windows 可视化工作流工具，融合表格数据流、Excel COM 实时联动和沙箱化 AI agent。T0.1 已通过 Linux/Windows 本地检查，远程双平台 CI 待配置仓库后确认；M1 与 M2 功能按 roadmap 逐卡验收。
 
 ## 阅读顺序
 

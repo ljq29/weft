@@ -1,0 +1,12 @@
+{
+  "name": "weft-monorepo",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "dev": "pnpm -C frontend dev",
+    "build": "pnpm -C frontend build",
+    "test": "pnpm -C frontend test",
+    "lint": "pnpm -C frontend lint",
+    "typecheck": "pnpm -C frontend typecheck"
+  }
+}

@@ -1,6 +1,6 @@
 # Weft Agent 工作指南
 
-Weft 是本地优先的可视化工作流工具：KNIME 式表格数据流 + Excel COM 实时联动 + 沙箱化 AI agent 节点。Windows v1，Python 后端 + React 前端，当前处于设计阶段。
+Weft 是本地优先的可视化工作流工具：KNIME 式表格数据流 + Excel COM 实时联动 + 沙箱化 AI agent 节点。Windows v1，Python 后端 + React 前端；T0.1 仓库骨架已通过 Linux/Windows 本地检查，远程双平台 CI 待配置仓库后确认，后续按 roadmap 推进。
 
 ## 文档索引（代码与文档冲突时以文档为准并报告）
 
@@ -21,7 +21,7 @@ Weft 是本地优先的可视化工作流工具：KNIME 式表格数据流 + Exc
 
 ```bash
 uv sync                          # 根 workspace 同步
-uv run weft serve --no-browser   # 开发服务 127.0.0.1:7788
+uv run weft serve --no-browser   # T1.8 后：开发服务 127.0.0.1:7788
 uv run poe check                 # 提交前自检：ruff + mypy + pytest + 前端 lint/test
 uv run pytest -m integration     # 集成测试（Linux 用 Fake backends）
 pnpm -C frontend dev             # 前端 dev server
