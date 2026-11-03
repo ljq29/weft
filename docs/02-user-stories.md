@@ -97,7 +97,7 @@ AC-2  ...
 作为设计者，我想要在节点端口之间拖出连线，且系统只允许类型兼容的连接，以便避免运行期才发现类型错误。  
 关联：F-DES-03
 
-- AC-1 Given `Read CSV` 的 Table 输出端口 When 拖到 `Row Filter` 的 Table 输入端口 Then 连线建立，`workflow.json` 的 `edges` 新增记录含 `source, sourcePort, target, targetPort, order`；同一 Variable 输入按 order 合并。
+- AC-1 Given `Read CSV` 的 Table 输出端口 When 拖到 `Row Filter` 的 Table 输入端口 Then 连线建立，`workflow.json` 的 `edges` 新增记录含 `id, source, sourcePort, target, targetPort, order`；`id` 唯一且匹配 `^e_[0-9a-f]{8}$`，同一 Variable 输入按 order 合并。
 - AC-2 Given `Read CSV` 的 Table 输出端口 When 拖到 `Excel Write Table` 的 Excel 输入端口 Then 连线被拒绝，目标端口显示红色高亮，画布顶部提示"Table 端口不能连接到 Excel 端口"。
 - AC-3 Given 一个输入端口已有连线 When 再拖一条连线到该端口 Then 旧连线被替换（输入端口只允许一条入边），Tool 端口与 Variable 端口除外（允许多条）。
 - AC-4 Given 连线会形成环路（非 Loop Start/End 对） When 释放 Then 连线被拒绝，提示"不允许形成循环，请使用 Loop 节点"。
@@ -120,7 +120,7 @@ AC-2  ...
 作为设计者，我想要一眼看出每个节点处于什么状态，以便知道工作流跑到哪了。  
 关联：F-DES-05
 
-- AC-1 节点底部有状态条，颜色与含义：红 = 未配置、黄 = 已配置未执行、绿 = 已执行、蓝色流动动画 = 执行中、红叉图标 = 错误、灰 = 已跳过（分支未命中）。
+- AC-1 节点底部有状态条，颜色与含义：红 = 未配置、黄 = 已配置未执行、绿 = 已执行、蓝色流动动画 = 执行中、红叉图标 = 错误、灰 = 已跳过（仅分支未命中 `skipped_branch`）。`out_of_scope` 与失败后的 `skipped_upstream` 显示已配置（黄），不得显示为灰色分支跳过。
 - AC-2 Given 工作流执行中 When 后端推送 `node.status` 事件 Then 对应节点状态在 200 ms 内更新。
 - AC-3 Given 节点为错误态 When 悬停 Then 显示错误摘要（第一行）；点击则在侧栏显示完整 traceback。
 
@@ -161,7 +161,7 @@ AC-2  ...
 
 - AC-1 Given 框选 3 个相连节点 When 右键"折叠为 Metanode" Then 画布显示一个 Metanode，其输入/输出端口为原选区与外部的所有连线端口，连线自动重连。
 - AC-2 Given 双击 Metanode Then 进入子画布编辑，面包屑显示 `demo > Metanode 1`。
-- AC-3 `[int]` `workflow.json` 中 Metanode 存为 `type: "metanode"`，`params.graph` 内嵌子图（节点、边），执行语义与展开后等价。
+- AC-3 `[int]` `workflow.json` 中 Metanode 存为 `type: "flow.metanode"`，`params.graph` 内嵌子图（节点、边），`params.interface.inputs/outputs` 将每个外部端口名映射到 `{node, port}`；外部端口名唯一、类型与被映射内部端口一致，执行语义与展开后等价。`meta_<id>/` 仅用于展开后的内部执行 ID，不改变持久化节点 ID 规则。
 - AC-4 右键"展开 Metanode"可逆操作，恢复原节点与连线。
 
 ### US-DES-10 节点注释与便签 [P1] [e2e]
@@ -222,16 +222,18 @@ AC-2  ...
 作为系统，我要只复用语义安全且输入未变的节点输出，以便局部执行快速且不跳过副作用。
 关联：F-EXE-03
 
-- AC-1 `[unit]` 每个节点声明 `cache_policy: pure | volatile | side_effect`，默认 `side_effect`；纯表格变换显式声明 `pure`。`side_effect` 节点每次执行，`volatile` 节点每次执行且禁止跨 Run 复用，仅 `pure` 节点可命中输出缓存。
+- AC-1 `[unit]` 每个节点声明 `cache_policy: pure | volatile | side_effect`，默认 `side_effect`。`pure` 的结果仅由声明输入决定，可命中缓存；`volatile` 的结果依赖实时外部状态或具有非确定性，禁止跨 Run 复用；`side_effect` 产生需要每次执行的外部效果，禁止缓存跳过。工具授权由 `tool_capability` 独立判断。
 - AC-2 `[unit]` 缓存键 = `sha256(node_type + node_version + implementation_hash + canonical_json(resolved_params) + 按端口名排序的(port_name, content_hash) + 按名称排序的(external_input_name, content_hash) + user_code_hash + uv_lock_hash + iteration_index)`；参数对象键顺序不影响哈希，循环外迭代号为 null。只有节点通过 `cache_inputs` 显式声明的 `file | directory` 参数才额外读取外部状态。
 - AC-3 `[int]` Given `Read CSV` 已执行 When 仅改变 `data/sales.csv` 内容且保持 mtime 与 size 不变 Then 下次运行仍重跑，因为其 `path` 声明为 `cache_inputs: file` 并使用内容 SHA-256。
 - AC-4 `[int]` Given `Write CSV` 已有输出 When 再次运行 Then 节点实际执行并重新写入目标文件，体现 `side_effect`，即使输入与参数未变化也不得被缓存跳过。
-- AC-5 `[int]` Table 输出缓存为 `.runs/cache/<node_id>/<port>.arrow`，Variable/Message/Excel 描述符为 `.json`；缓存损坏或版本不匹配视为未命中并重跑。打开工作流时只有有效 `pure` 缓存使节点显示"已执行"。
+- AC-5 `[int]` Table 输出缓存为 `.runs/cache/<node_id>/<port>.arrow`，Variable/Message/Excel 描述符为 `.json`；`meta.json` 另存 outputs 与可选 `activated_ports`。缓存损坏或版本不匹配视为未命中并重跑。打开工作流时只有有效 `pure` 缓存使节点显示"已执行"。
 - AC-6 `[int]` 每个 Run 入队时冻结图、参数、变量和节点 manifest 到 `.runs/<run_id>/workflow.json`；活跃 Run 中允许的非结构修改仅影响下一 Run，NodeTool 的固定参数也取该冻结快照。
-- AC-7 `[int]` 每个已执行端口在 `meta.json` 的 `outputs: {port: ValueRef}` 记录不可变值；≤256 KB 的 JSON 可内联，Table 与大 JSON 写入 `.runs/<run_id>/outputs/<node_id>/<port>`。历史端口 API 读取该快照而非临时 IPC 或当前全局缓存，默认随最近 50 次 Run 保留。
+- AC-7 `[int]` 每个已执行端口在 `meta.json` 的 `outputs: {port: ValueRef}` 记录不可变值；≤256 KB 的 JSON 可内联，Table 与大 JSON 写入 `.runs/<run_id>/outputs/<node_id>/<port>`。缓存命中时也复制文件值到本 Run outputs 并复用已有哈希，缓存重置或 LRU 删除后历史快照仍可读。历史端口 API 不读临时 IPC 或当前全局缓存，默认随最近 50 次 Run 保留。
 - AC-8 `[unit]` 每个 `workflow.json` 含整数 `revision`；保存携带读取时 revision，CAS 不一致返回 409。运行中结构修改拒绝，非结构修改允许且递增 revision。
 - AC-9 `[int]` `List Files` 的 `path` 声明为 `cache_inputs: directory`；按相同 path/pattern/recursive 规则生成排序后的 `{path,name,size,modified,is_dir}` 指纹，任一条目变化都使缓存失效，未声明参数不得触发隐式文件读取。
 - AC-10 `[int]` Given 实时 `Excel Read Range` 或 `LLM Call` 已有输出 When 再次运行 Then 节点实际执行，体现 `volatile`，不得跨 Run 复用结果。Excel App/Workbook 描述符可在重新 `resolve()` 成功后复用，但不得据此复用 Excel Read 的表格内容。
+- AC-11 `[unit]` 节点注册表测试逐项核对内置节点的预期缓存策略：`Read CSV`、`Row Filter`、`Sorter` 与纯表格变换为 `pure`；实时 `Excel Read Range`、`LLM Call` 为 `volatile`；文件/Excel 写入为 `side_effect`。新增节点必须同步更新预期矩阵，不得依赖缺省值隐式分类。
+- AC-12 `[int]` If/Switch 的 `activated_ports` 与 outputs 一同缓存并写入 Run 记录；第二次运行缓存命中时重放同一分支决策，下游执行路径与首次一致。
 
 ### US-EXE-05 实时状态推送 [P0] [int][e2e]
 
@@ -272,7 +274,7 @@ AC-2  ...
 
 - AC-1 Given 一个运行中的 `Wait` 节点（`duration_seconds: 30`） When 点击"停止" Then 运行在 2 s 内变为 `cancelled`，`Wait` 节点为"已取消"状态，下游不执行。
 - AC-2 `[int]` 正在执行的 Python Script 子进程收到终止信号（Windows：`CTRL_BREAK_EVENT`，3 s 后未退出则 kill）。
-- AC-3 正在执行的 Agent Loop 在当前 LLM 调用返回后停止，不再发起新轮次；进行中的 HTTP 请求被取消。
+- AC-3 正在执行的 Agent Loop 立即取消在途 HTTP 请求，当前 LLM 调用以取消结束，不等待正常响应，也不再发起新一轮；正在执行或排队的工具调用继承同一 Run 取消上下文。
 - AC-4 已完成节点的缓存保留。
 - AC-5 `[int]` Given `Wait`（`duration_seconds: 0.1`）连接下游探针 When 正常运行 Then Wait 在不少于 0.1 s 后成功结束，下游仅在此后执行一次；未收到取消时不得提前放行下游。
 
@@ -317,6 +319,7 @@ AC-2  ...
 - AC-3 `[int]` `Merge` 固定两个命名 Table 输入 `left/right`，每端口最多一条入边，并声明 `accepts_partial_inputs=true`；仅命中一侧时接收该侧数据并执行，两侧均 skipped 时 Merge 也 skipped。
 - AC-4 表达式求值错误（引用不存在的变量、语法错）时 `If` 节点失败，错误信息含表达式原文与位置。
 - AC-5 `[unit]` 表达式沙箱禁止 `import`、属性访问 `__xxx__`、函数调用白名单外的函数；有对应的拒绝测试。
+- AC-6 `[int]` 菱形 `If → A/B → Merge` 分别命中 true、false 时，未命中侧传播 `skipped_branch`，Merge 等待两侧输入均到终态后执行；双侧 skipped 时 Merge 跳过并继续传播。所有节点最终进入终态，不重复执行；与 ExecScope 相交时 scope 外节点记录 `out_of_scope` 且 UI 保持已配置。
 
 ### US-EXE-13 运行互斥与排队 [P0] [int]
 
@@ -328,6 +331,7 @@ AC-2  ...
 - AC-3 不同工作流之间可并行运行，但 Excel 操作全局串行（见 US-XLS-11）。
 - AC-4 `GET /api/workflows/{id}/runs?status=queued` 可查看队列。
 - AC-5 `[int]` 立即执行/入队返回 202 `{run_id, disposition: started|queued}`；策略 drop 返回 200 `{run_id: null, disposition: dropped}`；手动、聊天和 HTTP 触发使用同一规则。
+- AC-6 `[int]` 服务运行时 `weft run` 只调用服务 API；服务未运行时内嵌 CLI 与服务模式共用每工作流跨进程执行锁，锁记录 PID、进程创建时间与 Run ID，缓存访问受同锁保护。服务与 CLI、两个内嵌 CLI 同时触发时不得产生两个活跃 Run；不同进程中的 Excel 调用仍经 Windows `Local\WeftExcelCOM`（POSIX CI 使用等价跨进程互斥实现）互斥串行，异常退出按进程身份回收 stale 锁。
 
 ### US-EXE-14 工作流独立执行环境 [P0] [int]
 
@@ -336,7 +340,7 @@ AC-2  ...
 
 - AC-1 Given 工作流 `pyproject.toml` 声明依赖 `requests` When 打开工作流 Then 系统在 `<root>/.venv/` 执行 `uv sync`，UI 显示进度；完成前运行按钮禁用。
 - AC-2 `[int]` Python Script 节点中 `import requests` 成功；Weft 本体环境中无 `requests`。
-- AC-3 `[int]` Worker 由 `<root>/.venv/Scripts/python.exe` 启动已安装的 `weft-worker` 入口，不依赖主机 `PYTHONPATH`；每 Run 懒启动独立 Worker pool（默认并行度 4），每个 Worker 同时只处理一个 `execute`。测试用两个真实子进程的重叠执行证明并行，Run 结束后 pool 全部退出且下一 Run 不继承全局变量。
+- AC-3 `[int]` Windows 下 Worker 由 `<root>/.venv/Scripts/python.exe` 启动，POSIX 测试环境由 `<root>/.venv/bin/python` 启动，均执行已安装的 `weft-worker` 入口且不依赖主机 `PYTHONPATH`；每 Run 懒启动独立 Worker pool（默认并行度 4），每个 Worker 同时只处理一个 `execute`。测试用两个真实子进程的重叠执行证明并行，Run 结束后 pool 全部退出且下一 Run 不继承全局变量。
 - AC-4 `uv sync` 失败（依赖冲突、网络）时，UI 显示 uv 的完整输出，工作流处于"环境异常"状态，可重试。
 - AC-5 创建工作流时，生成器将 `weft-worker==<service_version>` 及用户依赖写入标准 `pyproject.toml` 的 `dependencies` 并锁入 `uv.lock`；主服务与 Worker 版本不一致时拒绝运行。`[tool.weft]` 仅存 Weft 元数据，不声明 uv 会自动合并的自定义依赖段。
 - AC-6 `[unit]` monorepo 中 `weft-worker` 包含 Worker 入口、RPC 与可信 Worker 内置节点实现并依赖 `weft-sdk`；Excel COM 的 xlwings/pywin32 只由主服务环境安装，不要求每个 Worker 安装。
@@ -355,7 +359,7 @@ AC-2  ...
 
 - AC-1 Given 用户已打开 Excel（含 `ref.xlsx`） When 执行 `Excel Connect`（`mode: attach_visible`） Then 节点输出 Excel App 引用，描述符含 `pid`、`visible: true`、`workbooks: ["ref.xlsx"]`；用户的 Excel 窗口无闪烁或焦点变化。
 - AC-2 Given 没有运行中的 Excel When 执行 Then 启动一个新的可见 Excel 实例并连接；Run 结束后该实例不被关闭（用户可能要看）。
-- AC-3 Given 多个 Excel 实例 Then UI/参数提供实例列表，用户按 PID、窗口标题或已打开工作簿明确选择并持久化该目标；不得假定 `GetActiveObject` 返回“最近活动实例”，该行为须在 M0 实测。
+- AC-3 Given 多个 Excel 实例 Then UI/参数提供实例列表，用户按 PID、窗口标题或已打开工作簿明确选择；工作流只保存工作簿名/路径等稳定目标，最近 PID/窗口选择按 `(workflow_id, node_id)` 存入 `%APPDATA%/weft/excel-targets.toml` 且不进入打包产物；不得假定 `GetActiveObject` 返回“最近活动实例”，该行为须在 M0 实测。
 - AC-4 `[int]` Given schedule/watch/http 等无人值守 Run When 已保存目标无法解析或匹配多个实例 Then 运行前失败并列出原因，不随机 attach，也不自动改用隐藏实例；PID 变化后仅在已选工作簿等稳定身份能唯一匹配时重新解析。
 
 ### US-XLS-02 启动独立隐藏实例 [P0] [int-win]
@@ -399,7 +403,7 @@ AC-2  ...
 - AC-3 `mode: overwrite` 且 `clear_below: true`（默认）→ 写入前清空 `start` 以下、表宽以内的旧内容。
 - AC-4 `autofit: true` → 写后自适应列宽；`preserve_format: true` → 只写 `Value`，不改变目标格式。
 - AC-5 `[int-win]` 在固定基准机上整块写入 10 万单元格并记录结果，目标 < 3 s；不作为任意机器硬 AC。
-- AC-6 null 写为空单元格；`Datetime` 写为 Excel 日期并保留原列格式；`Utf8` 以 `=` 开头的值前缀 `'` 以防被解释为公式（参数 `escape_formula: true` 默认）。
+- AC-6 null 写为空单元格；`Datetime` 写为 Excel 日期并保留原列格式；`allow_formula: false`（默认）时，`Utf8` 以 `=` 开头的值前缀 `'` 以防被解释为公式；`allow_formula: true` 时才作为公式写入。
 
 ### US-XLS-06 更新零散单元格 [P0] [int][int-win]
 
@@ -407,7 +411,7 @@ AC-2  ...
 关联：F-XLS-06
 
 - AC-1 `Excel Cell Update` 参数 `cells` 为列表 `[{address: "B2", value: 42}, {address: "D5", value: "done"}]`，或从输入 Table（列 `address, value`）读取；执行后对应单元格更新。
-- AC-2 `value` 以 `=` 开头且参数 `allow_formula: true` 时写入公式。
+- AC-2 `allow_formula: false`（默认）时，`value` 以 `=` 开头也按普通文本写入；仅 `allow_formula: true` 时写入公式。
 - AC-3 地址非法时整节点失败且不写入任何单元格（先校验全部地址）。
 
 ### US-XLS-07 工作表管理 [P0] [int][int-win]
@@ -450,10 +454,11 @@ AC-2  ...
 作为系统，我要把所有 COM 调用放在专用 STA 线程串行执行，以便避免 COM 线程错误。  
 关联：F-XLS-11
 
-- AC-1 `[unit]` `ExcelWorker` 为单例线程，`CoInitialize` 在该线程调用；所有 `ExcelBackend` 方法通过 `worker.submit(fn)` 投递并 await 结果；在其他线程直接调用 COM 对象的代码路径在 debug 模式下触发断言。
-- AC-2 `[int]` 两个工作流同时运行且都含 Excel 节点时，COM 调用严格串行，无 `CoInitialize`/`RPC_E_WRONG_THREAD` 错误。
+- AC-1 `[unit]` 服务或内嵌 CLI 通过监督器管理独立 `ExcelWorker` 子进程；COM 只在子进程的单 STA 线程执行并在该线程调用 `CoInitialize`，所有 `ExcelBackend` 方法通过 `worker.submit(fn)` 投递并 await 结果；在其他线程直接调用 COM 对象的代码路径在 debug 模式下触发断言。
+- AC-2 `[int]` 两个工作流同时运行且都含 Excel 节点时，COM 调用严格串行，无 `CoInitialize`/`RPC_E_WRONG_THREAD` 错误；服务与内嵌 CLI、多个内嵌 CLI 之间通过 Windows `Local\WeftExcelCOM`（POSIX CI 使用等价跨进程互斥实现）互斥锁保持同样的全局串行。
 - AC-3 同一 Run 内多个 Excel 节点共享同一个 App 连接；Excel 引用通过端口传递描述符，worker 端维护 `描述符 → COM 对象` 映射，Run 结束释放。
 - AC-4 Excel App/Workbook 描述符可在 `resolve()` 成功后复用；工作簿或工作表解析失败则重跑连接上游。实时 Excel Read 是 volatile，每次 Run 都重新读取单元格，不因描述符有效而复用表格内容。
+- AC-5 `[int]` 连续超时达到 `excel.restart_after_timeouts`（默认 3）或监督心跳确认进程失效时，监督器终止并重建 ExcelWorker；后续新请求可恢复，排队请求以 `EXCEL_WORKER_RESTARTED` 明确失败，不自动重放，服务与其他非 Excel 节点保持运行。
 
 ### US-XLS-12 Excel 不可用时的明确错误 [P0] [int][int-win]
 
@@ -462,8 +467,9 @@ AC-2  ...
 
 - AC-1 未安装 Excel（COM 注册表无 `Excel.Application`）→ `Excel Connect` 在 1 s 内失败，错误 `Excel is not installed or not registered`。
 - AC-2 Excel 被模态对话框阻塞（`RPC_E_CALL_REJECTED` / `0x800AC472`）→ 自动重试 3 次（间隔 1 s），仍失败则节点失败，错误 `Excel is busy (modal dialog open?)`；UI 提示用户检查 Excel 窗口。
-- AC-3 单次 COM 调用超过 `excel.call_timeout`（默认 60 s）→ 本次请求失败/结果被丢弃，但 ExcelWorker 仍被旧调用占用，后续 Excel 操作排队且 UI 显示繁忙；不得宣称线程立即可处理下一项。
+- AC-3 单次 COM 调用超过 `excel.call_timeout`（默认 60 s）→ 本次请求失败/结果被丢弃，但 ExcelWorker 仍被旧调用占用，后续 Excel 操作排队且 UI 显示繁忙；达到恢复阈值后按 US-XLS-11 AC-5 重建，不宣称超时后立即可处理下一项。
 - AC-4 `weft doctor` 报告 Excel 版本、可连接实例列表、Sandboxie 动态 box 与网络默认拒绝检查。
+- AC-5 `[int-win]` 注入不可中断的 COM 调用使 ExcelWorker wedged 后，系统能按阈值重建 Worker 并恢复新请求；超时写请求和重建时排队请求均报告结果未知/失败，不自动重放，不 kill 用户可见 Excel。
 
 ---
 
@@ -484,7 +490,7 @@ AC-2  ...
 关联：F-TBL-02
 
 - AC-1 `Read CSV`（`path, encoding: auto, separator: auto, header: true, skip_rows: 0`）→ 读 `data/sales.csv` 得 1000 行 5 列；`encoding: auto` 依次尝试 `utf-8-sig, utf-8, gbk`。
-- AC-2 `Read Parquet`、`Read JSON`（lines 或 array 两种格式自动检测）、`Read Excel File`（`sheet`，经 `fastexcel`/`openpyxl`，不经 COM，可在 Excel 关闭时使用）。
+- AC-2 `Read Parquet`、`Read JSON`（lines 或 array 两种格式自动检测）、`Read Excel File`（`sheet`，经 `fastexcel`，不经 COM，可在 Excel 关闭时使用）。
 - AC-3 `Write CSV`（`path, encoding: utf-8-sig, separator: ","`）、`Write Parquet`、`Write JSON`、`Write Excel File`（`sheet`，用 `xlsxwriter`，整文件覆盖）。
 - AC-4 写节点参数 `overwrite: true` 默认；`false` 且文件存在则失败。
 - AC-5 路径相对 Root；写入时自动创建父目录。
@@ -550,7 +556,7 @@ AC-2  ...
 作为设计者，我想要在节点里写 Python，以便处理任何特殊逻辑。  
 关联：F-TBL-09
 
-- AC-1 `Python Script` 节点参数：`source: inline | file`，`code`（inline 时）或 `path`（相对 Root，通常在 `nodes/` 下），`inputs: [{port, var}]`，`outputs: [{var, port, type}]`。执行时每个输入 Table 端口绑定为同名 `polars.DataFrame` 变量，流变量以 `vars` 字典注入，用户代码结束后按 `outputs` 声明读取变量作为输出端口值。
+- AC-1 `Python Script` 节点参数：`source: inline | file`，`code`（inline 时）或 `path`（相对 Root，通常在 `nodes/` 下），`inputs: [{port, var}]`，`outputs: [{var, port, type}]`。这些参数是 `DynamicPortGroup` 的配置来源，保存时实例化并校验端口唯一性；端口改名/删除使对应连线失效，实例化清单进入节点 manifest 与缓存键。执行时每个输入 Table 端口绑定为同名 `polars.DataFrame` 变量，流变量以 `vars` 字典注入，用户代码结束后按 `outputs` 声明读取变量作为输出端口值。
 - AC-2 代码可以是脚本体（直接执行）或定义 `def run(inputs: dict, vars: dict) -> dict:`；两种形式均支持，后者优先。
 - AC-3 `[int]` 输出变量类型不符（声明 Table 但得到 `str`）→ 节点失败，提示 `Output 'df' expected Table, got str`。
 - AC-4 `print()` 输出作为 INFO 日志推送到 UI；未捕获异常的 traceback 仅显示用户代码帧（见 US-EXE-07 AC-4）。
@@ -651,7 +657,7 @@ AC-2  ...
 - AC-5 `[manual]` 完成场景 C（整理 `raw/` 目录），变更列表正确反映 pi 的重命名/移动；无法可靠判定时降级为删除+创建并提示。
 - AC-6 `[unit]` `sandbox: none` 时 Pi Agent 运行前失败 `Pi Agent requires sandboxie`，不得以直接子进程方式绕过审批与隔离。
 
-### US-AGT-07 Chat Input / Output 与聊天面板 [P0] [int][e2e]
+### US-AGT-07 聊天触发 / Chat Output 与聊天面板 [P0] [int][e2e]
 
 作为设计者，我想要通过聊天触发工作流并看到回复，以便对话式使用。  
 关联：F-AGT-07, F-TRG-03
@@ -696,7 +702,7 @@ AC-2  ...
 关联：F-AGT-11
 
 - AC-1 `[unit]` Tool 端口可承载的工具类型只有 `NodeTool` 与 `SandboxedTool`；不存在任何修改图结构的内置工具。
-- AC-2 `[int]` 工作流修改 API（`PUT /api/workflows/{id}`）要求有效 UI 会话令牌和请求头 `X-Weft-Client: ui`；令牌缺失/无效返回 401，缺少 header 返回 403，运行期间（Run 活跃）拒绝修改图结构返回 409。该自定义头不替代鉴权。
+- AC-2 `[int]` 工作流修改 API（`PUT /api/workflows/{id}`）要求有效 UI 会话令牌和请求头 `X-Weft-Client: ui`；令牌缺失/无效返回 401，缺少 header 返回 403，运行期间（Run 活跃）拒绝修改图结构返回 409。该自定义头仅区分 UI 操作、减少误调用，不替代鉴权，也不构成 agent 不得改图的安全边界。
 - AC-3 沙箱内进程对 `workflow.json` 的写入落在沙箱副本，默认在变更审批中被标记为"受保护文件"，不可勾选应用（US-SBX-05）。
 
 ### US-AGT-12 人工介入确认 [P1] [int][e2e]
@@ -819,7 +825,7 @@ AC-2  ...
 关联：F-TRG-02
 
 - AC-1 UI "运行"按钮 → `source: manual`，payload 为空对象；可在运行对话框中临时覆盖流变量（`payload.overrides`）。
-- AC-2 `weft run <path-to-workflow> [--var k=v ...] [--wait]` 退出码：成功 0、失败 1、取消 2；`--wait` 时输出各节点状态行；服务未启动时 CLI 以内嵌模式直接执行（不依赖服务进程）。
+- AC-2 `weft run <path-to-workflow> [--var k=v ...] [--wait]` 退出码：成功 0、失败 1、取消 2；`--wait` 时输出各节点状态行。服务可用时 CLI 只调用服务 API；服务未启动时以内嵌模式直接执行，并按 US-EXE-13 AC-6 获取共享跨进程执行锁，不得绕过单活跃 Run 或全局 Excel 串行。
 
 ### US-TRG-03 聊天触发 [P0] [int][e2e]
 

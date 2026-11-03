@@ -23,26 +23,30 @@
 │                                      ▼                                             │
 │  ┌──────────────────── weft 服务进程（Weft 自带环境） ────────────────────┐          │
 │  │ FastAPI / WorkflowStore / Engine / TriggerManager                     │          │
-│  │ ExcelWorker（全局 STA 串行） / SandboxManager / AgentRuntime           │◄─┐ COM    │
-│  │ LLMProxy（主机读取原始 key；只允许配置的 LLM 端点）                     │  │       │
-│  └───────┬──────────────────────────────┬───────────────────────────────┘  │       │
-│          │ JSON-RPC stdio + Arrow IPC   │ Start.exe /box:WeftBox-<run_id> │        │
-│          ▼                              ▼                                 │        │
-│  ┌──────────────────┐          ┌───────────────────────┐          ┌─────────┴─────┐ │
-│  │ Worker pool / Run │          │ Sandboxie / 独立 box  │          │ Excel.exe     │ │
-│  │ 默认 4，结束全退出 │          │ tools / pi            │          │ 可见或隐藏    │ │
-│  │ (<root>/.venv)    │          │ 网络默认拒绝          │          └───────────────┘ │
-│  └──────────────────┘          └──────────┬────────────┘                            │
-└───────────────────────────────────────────┼─────────────────────────────────────────┘
-        沙箱仅访问本地代理地址 + 配置名        │ HTTPS（由主机 LLMProxy 签发）
+│  │ ExcelWorkerSupervisor / SandboxManager / AgentRuntime                  │          │
+│  │ LLMProxy（主机读取原始 key；只允许配置的 LLM 端点）                     │          │
+│  └───────┬──────────────────────────────┬───────────────────────┬─────────┘          │
+│          │ JSON-RPC stdio + Arrow IPC   │ Start.exe /box:...    │ 监督/重启         │
+│          ▼                              ▼                       ▼                    │
+│  ┌──────────────────┐          ┌───────────────────────┐  ┌──────────────────────┐ │
+│  │ Worker pool / Run │          │ Sandboxie / 独立 box  │  │ ExcelWorker 子进程   │ │
+│  │ 默认 4，结束全退出 │          │ tools / pi            │  │ 单 STA 线程串行 COM  │ │
+│  │ (<root>/.venv)    │          │ 网络默认拒绝          │  └──────────┬───────────┘ │
+│  └──────────────────┘          └──────────┬────────────┘             ▼ COM           │
+│                                            │                    ┌───────────────┐    │
+│                                            │                    │ Excel.exe     │    │
+│                                            │                    │ 可见或隐藏    │    │
+│                                            │                    └───────────────┘    │
+└────────────────────────────────────────────┼──────────────────────────────────────────┘
+        沙箱仅访问本地代理地址 + 配置名         │ HTTPS（由主机 LLMProxy 签发）
                                              ▼
                                   OpenAI 兼容网关（NewAPI 等）
 ```
 
 要点：
 
-- **三类子进程**：Workflow Worker（可信车道的节点执行）、沙箱内进程（非可信车道）、Excel（被驱动的外部程序）。
-- **ExcelWorker 在服务进程内**而不在 Workflow Worker 内——理由见 §5.2。
+- **四类子进程**：Workflow Worker（可信车道的节点执行）、沙箱内进程（非可信车道）、ExcelWorker（独立 STA 执行与故障隔离）、Excel（被驱动的外部程序）。
+- **ExcelWorker 由服务监督但独立于服务进程和 Workflow Worker**——理由见 §5.2。
 - 服务进程必须以登录用户普通进程运行（PRD §9.1），不能是 Windows 服务。
 
 ### 1.2 代码分层（服务进程内）
@@ -50,9 +54,10 @@
 ```
 weft/
 ├── api/            # FastAPI 路由、WS、DTO —— 只做协议转换，不含业务
+├── application/    # Run/Workflow 等用例服务与组合根，协调 Engine 和外部接口
 ├── engine/         # 调度器、Run 状态机、冻结快照、缓存、循环/分支；暴露执行接口
 ├── nodes/          # 服务侧节点注册与服务 lane 实现；声明/JSON Schema 为参数真源
-├── excel/          # ExcelBackend 接口、XlwingsBackend、FakeBackend、ExcelWorker
+├── excel/          # ExcelBackend、ExcelWorker 入口及监督器、Xlwings/Fake 实现
 ├── agent/          # LLMProxy/Client、Agent Loop、工具协议、审计
 ├── sandbox/        # Sandbox 接口、NoneSandbox、SandboxieSandbox、变更收集
 ├── triggers/       # TriggerManager 与 5 种触发源；从 Trigger params 派生运行视图
@@ -63,7 +68,7 @@ packages/weft-worker/  # 独立包：Worker 入口、RPC、可信 Worker 内置�
 packages/weft-sdk/     # weft_ctx 与声明协议，不依赖主包/Worker
 ```
 
-Engine 只暴露执行接口，trigger/agent 在上层调用，组合根负责注入；Engine 不 import 具体 triggers/agent。`api → application services → engine → {node contracts, workflow}`，excel/sandbox 等以接口注入；`weft-worker` 与主服务同版本并依赖 `weft-sdk`，禁止主机 `PYTHONPATH` 隐式复用。
+Engine 只暴露执行接口，trigger/agent 在上层调用，组合根负责注入；Engine 不 import 具体 triggers/agent。`api/cli/triggers/agent → application → engine → {node contracts, workflow}`，excel/sandbox 等以接口注入；`weft-worker` 与主服务同版本并依赖 `weft-sdk`，禁止主机 `PYTHONPATH` 隐式复用。
 
 ---
 
@@ -103,15 +108,18 @@ Engine 只暴露执行接口，trigger/agent 在上层调用，组合根负责�
           post_run: collect_changes → changes.json → 清理沙箱进程 → 关闭隐藏 Excel
 ```
 
-节点状态机（与 UI 状态灯对应）：
+节点执行状态与画布显示状态分开定义：
 
 ```
 unconfigured ──配置完整──► configured ──调度──► running ──► executed
                                  ▲                 │  ├──► failed
                                  │                 │  └──► cancelled
-                                 │                 └──(分支未命中)──► skipped
+                                 │                 └──(分支未命中)──► skipped_branch
                                  └──── 参数/上游变化、重置 ─────────────┘
 ```
+
+- `out_of_scope` 表示未纳入本次 ExecScope，`skipped_branch` 表示分支未命中，`skipped_upstream` 表示因上游失败或跳过而无法执行；三者不是同一种 UI 状态。
+- `out_of_scope` 与失败后的 `skipped_upstream` 在画布显示为 `configured`（黄）；`skipped_branch` 显示为 `skipped`（灰）。WS 保留具体执行状态，不由后端提前压扁成 UI 颜色。
 
 ### 2.3 调度算法
 
@@ -124,12 +132,14 @@ async def run(graph, scope: ExecScope):
         for n in list(ready):
             ready.remove(n)                        # 每个节点最多出队一次
             if n not in scope:
-                mark(n, skipped_by_scope)
-                release_downstream(n, skipped=True) # 跳过同样递减下游 indeg 并传播
+                mark(n, out_of_scope)
+                release_downstream(n, scope_only=True)
                 continue
-            if cache_hit(n):
+            cached = load_cache(n)                  # outputs + activated_ports
+            if cached is not None:
+                materialize_run_outputs(n, cached.outputs)
                 mark(n, executed_from_cache)
-                release_downstream(n)
+                release_downstream(n, cached.activated_ports)
                 continue
             inflight.add(spawn(execute(n)))
         if not inflight:
@@ -140,14 +150,16 @@ async def run(graph, scope: ExecScope):
             if n.failed and not inside_try(n):
                 cancel_all()
                 return FAILED
-            release_downstream(n)                  # 分支节点只释放命中的下游
+            release_downstream(n, getattr(n, "activated_ports", None))
     assert all_nodes_terminal(graph)
 ```
 
+`release_downstream` 同时处理成功与跳过：未激活输出端口传播 `skipped_branch`；普通节点任一必需输入 skipped 时自身跳过并继续传播。声明 `accepts_partial_inputs=True` 的 Merge 等所有输入到达成功或 skipped 终态后，至少一个成功输入则执行，全部 skipped 则自身跳过并传播。`scope_only=True` 只释放依赖，不计作 skipped 输入：scope 内下游读取最近有效执行/缓存快照，缺失时由 from_node/single 的预检拒绝；scope 外节点不显示成分支未命中。
+
 - **ExecScope**：由"整体运行 / 执行到此 / 从此开始 / 仅本节点"计算出的节点集合（`02-user-stories.md` US-EXE-02/03）。
 - **并行度**：`trusted_worker` 节点默认并行上限 4（可配）；`trusted_service` 中 Excel 节点由 ExcelWorker 天然串行；Agent 节点并行上限 2（LLM 限速考虑）。
-- **分支**：`If/Switch` 执行后向引擎返回 `activated_ports`；未激活端口的下游整条链标记 `skipped`，`Merge` 类节点声明 `accepts_partial_inputs=True` 才能在部分输入 skipped 时执行。
-- **循环**：虚拟循环节点内部是一个递归的 `run(subgraph, scope=all)`，每次迭代使用独立的 `IterationContext(index, total)`，缓存键混入迭代号（US-EXE-10 AC-4）。循环体内禁止再出现 Trigger。
+- **分支**：`If/Switch` 执行后向引擎返回 `activated_ports`；缓存命中必须重放同一决策。未命中分支和 Merge 按上述规则传播，不允许节点因 indeg 永不归零而停留在非终态。
+- **循环**：Loop Start/End 是声明性节点，不独立调用 `execute`。折叠后的虚拟循环节点由 Engine 在服务侧执行，内部是一个递归的 `run(subgraph, scope=all)`；虚拟节点本身不写普通节点缓存。每次迭代使用独立的 `IterationContext(index, total)`，循环体节点按自身策略缓存且缓存键混入迭代号（US-EXE-10 AC-4）。循环体内禁止再出现 Trigger。
 
 ### 2.4 冻结快照、缓存与 Run 输出
 
@@ -155,21 +167,27 @@ async def run(graph, scope: ExecScope):
 
 |项|规则|
 | ----------| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|执行策略|节点声明 `cache_policy: pure | volatile | side_effect`，缺省为 `side_effect`。副作用节点每次执行；LLM、实时 Excel Read 等 `volatile` 节点每次执行且禁止跨 Run 复用；只有显式声明的纯计算可复用输出|
+|执行策略|节点声明 `cache_policy: pure | volatile | side_effect`，缺省为 `side_effect`。`pure` 的结果仅由声明输入决定，可复用；`volatile` 的结果依赖实时外部状态或具有非确定性，禁止跨 Run 复用；`side_effect` 产生需要每次执行的外部效果，禁止缓存跳过。工具授权仍由 `tool_capability` 独立判断，不能由缓存策略推断|
 |键|`sha256(node_type ‖ node_version ‖ implementation_hash ‖ canonical_json(resolved_params) ‖ sorted(port_name, content_hash) ‖ sorted(external_input_name, content_hash) ‖ user_code_hash ‖ uv_lock_hash ‖ iteration_index)`；`resolved_params` 是流变量注入后的参数|
 |输入哈希|Table：Arrow IPC 文件 SHA-256；Variable/Message：canonical JSON 哈希；Excel 描述符：描述符 JSON 哈希。节点用 `cache_inputs` 显式声明引用外部状态的参数：`file` 对内容做 SHA-256，不用 mtime/size 代替；`directory` 按该节点相同的 path/pattern/recursive 规则枚举，对排序后的 `{path,name,size,modified,is_dir}` canonical JSON 做 SHA-256。未声明的参数只哈希字面值，不被隐式当作文件|
-|缓存位置|`<root>/.runs/cache/<node_id>/<port>.{arrow,json}` + `<node_id>/meta.json`（含键、版本、写入时间）|
-|Run 输出|`meta.json` 记录各节点 `outputs: {port: ValueRef}`；小 JSON 可不可变地内联，Table 与大 JSON 写入 `.runs/<run_id>/outputs/<node_id>/<port>`；历史端口 API 只读该快照，不读临时 IPC 或当前全局缓存|
+|缓存位置|`<root>/.runs/cache/<node_id>/<port>.{arrow,json}` + `<node_id>/meta.json`（含键、版本、写入时间、outputs 与可选 `activated_ports`）。If/Switch 的分支决策与 outputs 使用同一缓存键|
+|Run 输出|`meta.json` 记录各节点 `outputs: {port: ValueRef}` 与实际 `activated_ports`；小 JSON 可不可变地内联，Table 与大 JSON 写入 `.runs/<run_id>/outputs/<node_id>/<port>`。缓存命中时也须物化 Run 快照：v1 复制文件值并复用已有哈希，不重复计算；历史端口 API 只读该快照，不读临时 IPC 或当前全局缓存|
 |失效|键不匹配、meta 缺失或损坏、用户重置；Excel App/Workbook 描述符仅在 `resolve()` 成功后复用，失败时重跑对应连接节点；这不代表复用 Excel Read 的表格内容|
-|清理|"重置全部"清空全局纯缓存；Run 输出默认随最近 50 次 Run 保留；缓存超过 `cache_max_mb`（默认 2 GB）按 LRU 删除；`.runs/chat/` 与 `.runs/memory/` 默认按 30 天清理，0 表示不自动清理|
+|清理|"重置全部"清空全局纯缓存；Run 输出默认随最近 50 次 Run 保留；缓存超过 `cache.max_mb`（默认 2 GB）按 LRU 删除。缓存重置或 LRU 删除不得影响已物化的 Run 快照；`.runs/chat/` 与 `.runs/memory/` 默认按 30 天清理，0 表示不自动清理|
 
 ### 2.5 取消
 
 - Run 级 `asyncio.CancelledError` 传播到所有 inflight 节点。
 - `trusted_worker` 节点：向拥有该任务的 Worker 发送 `cancel(node_exec_id)` RPC；用户代码通过 `weft_ctx.check_cancelled()` 协作取消；3 s 后未响应则 `CTRL_BREAK_EVENT`，再 3 s 后 kill。Run 终止时关闭整个 pool，其他 Run 不受影响。
-- Agent 节点：取消 HTTP 流；当前轮返回后不再发起。
-- Excel 节点：COM 调用无法中断，超时只放弃本次结果；ExcelWorker 仍被旧调用占用，后续 Excel 操作继续排队，UI 显示繁忙。
+- Agent 节点：立即取消在途 HTTP 流，当前 LLM 调用以取消结束，不等待正常响应，也不再发起新一轮；工具调用继承同一 Run 取消上下文。
+- Excel 节点：COM 调用无法中断，超时只放弃本次结果；ExcelWorker 仍被旧调用占用时 UI 显示繁忙，达到恢复阈值后按 §5.2 重建 Worker，排队请求以明确错误结束且不自动重放。
 - 沙箱进程：只终止本 Run 独立 box 及其拥有的进程树，不发送全局 box 终止命令。
+
+### 2.6 服务与内嵌 CLI 的执行互斥
+
+`weft run` 发现服务可用时只调用服务 API，不启动第二个 Engine。服务未运行时，内嵌 CLI 可以启动 Engine，但与服务模式共用 `<root>/.runs/engine.lock` 跨进程锁；锁记录 PID、进程创建时间与 Run ID，stale 锁只在进程身份不匹配时回收。每个工作流的 Run 调度、队列和缓存访问都受该锁约束，因此服务与 CLI、两个内嵌 CLI 都不能绕过单活跃 Run。
+
+不同工作流的内嵌宿主可以并行，但 Excel COM 还须通过 §5.2 的 `Local\WeftExcelCOM` 登录会话级互斥锁全局串行。进程内队列不能替代跨进程锁。
 
 ---
 
@@ -239,17 +257,18 @@ class RowFilter(Node):
     inputs = [Port("in", PortType.TABLE)]
     outputs = [Port("out", PortType.TABLE)]
     params_schema = {...}            # JSON Schema draft 2020-12，参数真源
+    ui_hints = {}                    # 条件显隐、列名联动等展示提示，不含业务规则
     tool_exposed_params = []         # 允许经 NodeTool 暴露的参数白名单
-    portable_params = ["path"]       # 标记 format: weft-path 的字段（打包检查）
-    external_resources = []          # 运行前预检（US-PKG-07）
+    portable_params = ["path"]       # 需打包可移植性检查的 params 路径列表
+    external_resources = []          # ExternalResource(param, kind)，运行前只读预检
     cache_inputs = []                # ExternalInput(name, kind=file|directory)，纳入内容哈希
 
     def execute(self, ctx: NodeContext, inputs: dict, params: dict) -> dict:
         ...
 ```
 
-- **动态输入**：节点可声明 `DynamicPortGroup(prefix="in_", port_type=PortType.TABLE, min_ports=2)`；保存时实例化为 `in_1...in_N` 命名端口，每个端口遵守单入边规则。Concatenate 使用该声明；Merge 使用两个固定命名输入和 `accepts_partial_inputs=True`。不引入普通数据端口的多入边模式。
-- **声明部分**（type、version、ports、schema、cache_inputs）在服务进程与 Worker 两侧都可加载，用于 UI 表单生成、校验、缓存键；**实现部分**只在声明的 lane 对应的进程中加载。
+- **动态输入**：节点可声明 `DynamicPortGroup(prefix="in_", port_type=PortType.TABLE, min_ports=2)`；保存时实例化为 `in_1...in_N` 命名端口，每个端口遵守单入边规则。Concatenate 使用该声明；Merge 使用两个固定命名输入和 `accepts_partial_inputs=True`。Python Script 的 `params.inputs/outputs` 是 DynamicPortGroup 的配置来源，不是第二套端口机制：保存时生成端口并校验唯一性，端口改名/删除使对应连线失效，实例化端口清单进入节点 manifest 与缓存键。不引入普通数据端口的多入边模式。
+- **声明部分**（type、version、ports、schema、cache_inputs、ui_hints、portable_params、external_resources）在服务进程与 Worker 两侧都可加载，用于 UI 表单生成、校验、缓存键与资源预检；**实现部分**只在声明的 lane 对应的进程中加载。
 - 注册表：内置节点通过包内扫描；用户节点通过 `<root>/nodes/*.py` 中的 `@weft.node` 装饰器注册，仅对该工作流可见。
 - 节点 `execute` 对 Table 端口接收/返回 `polars.DataFrame`，框架负责 Arrow 转换（US-TBL-01 AC-1）。
 - 节点通过 `ctx` 访问日志、进度、取消、Root、以及（仅 `trusted_service` lane）`ctx.excel`、`ctx.llm`、`ctx.sandbox` 服务句柄。
@@ -262,9 +281,9 @@ class RowFilter(Node):
 |Excel|`trusted_service`|必须经 ExcelWorker（§5）|
 |Agent（LLM Call、Agent Loop、Pi、Node as Tool、Prompt、Memory、Chat）|`trusted_service`|需要 LLM 客户端、审计、WS 流式推送、工具分发|
 |Sandboxed Tools|`sandboxed`（声明性，不执行）|提供工具给 Agent|
-|流程（Trigger、If、Switch、Loop、Try Start、Try End、Variable、Merge、Wait、HTTP Response）|`trusted_service`|引擎语义节点，轻量|
+|流程（Trigger、If、Switch、Loop、Try Start、Try End、Variable、Merge、Wait、HTTP Response）|`trusted_service`|引擎语义节点，轻量；Loop 仅声明归属，实际由折叠后的虚拟节点执行|
 
-`trusted_service` 节点若需要 Table 输入，服务进程读取 Arrow 文件（服务本体环境自带 pyarrow/polars）。
+`trusted_service` 节点若需要 Table 输入，服务进程读取 Arrow 文件（服务本体环境自带 pyarrow/polars）。Loop Start/End 不独立调用 `execute` 或写缓存，详见 §2.3。
 
 ### 4.3 Node as Tool 的执行路径
 
@@ -311,17 +330,17 @@ class ExcelBackend(Protocol):
 
 ### 5.2 ExcelWorker
 
-- 服务进程内的**单例线程**，线程启动时 `pythoncom.CoInitialize()`（STA）。
-- 所有 `ExcelBackend` 调用通过 `await worker.submit(fn, *args)`，内部为 `queue.Queue` + `concurrent.futures.Future`。
-- 放在服务进程而非 Workflow Worker 的原因：
+- 服务进程通过 `ExcelWorkerSupervisor` 管理一个**独立 ExcelWorker 子进程**；子进程内只有一个执行 COM 的 STA 线程，线程启动时 `pythoncom.CoInitialize()`。所有 `ExcelBackend` 调用通过 `await worker.submit(fn, *args)` 投递，子进程内部为 `queue.Queue` + `concurrent.futures.Future`。
+- 每个宿主（服务或内嵌 CLI）可有自己的 ExcelWorker，但所有进程执行 COM 前必须获取登录会话级 `Local\WeftExcelCOM` 互斥锁，保证不同工作流和不同宿主之间也严格串行。
+- 不放在 Workflow Worker 内的原因：
 
-  1. 用户可见 Excel 实例是**全局资源**，多工作流共享一条串行队列（US-EXE-13 AC-3）。
+  1. 用户可见 Excel 实例是**全局资源**，需要跨 Run 管理连接与串行（US-EXE-13 AC-3）。
   2. Workflow Worker pool 随 Run 结束全部退出，COM 连接若放其中会使隐藏实例生命周期失控。
-  3. 经授权的 NodeTool 调 Excel 节点时与 Agent 同在服务进程，路径最短。
-- 代价：只有服务进程环境安装 `xlwings` + `pywin32`，Workflow Worker 不重复安装；非 Windows 可用 Fake 做契约测试，但不得据此宣称真机验证。
-- 实例与引用：`RefRegistry` 维护描述符→COM 对象及 owned PID/进程创建时间/Run/心跳；多实例让用户按 PID/窗口/工作簿选择并持久化目标，不猜测最近活动实例。无人值守 Run 必须唯一解析该目标；PID 变化时可按已选工作簿重新解析，无法解析或匹配多个实例时运行失败，不自动改连其他实例，也不默认回退隐藏实例。Run 结束释放引用，attach 可见实例不关闭；new_hidden 必须由用户显式选择 save/discard，报告未保存工作簿。
+  3. 独立 ExcelWorker 卡死时可被监督器终止重建，不必杀死服务或其他 Run。
+- 代价：只有主服务环境安装 `xlwings` + `pywin32`，Workflow Worker 不重复安装；非 Windows 可用 Fake 做契约测试，但不得据此宣称真机验证。
+- 实例与引用：`RefRegistry` 维护描述符→COM 对象及 owned PID/进程创建时间/Run/心跳。工作流只保存工作簿名、相对路径、attach 模式等稳定目标；用户按 PID/窗口/工作簿做出的最近实例选择按 `(workflow_id, node_id)` 存入 `%APPDATA%/weft/excel-targets.toml`，PID 与窗口信息仅为运行时提示，不进入打包产物。无人值守 Run 按稳定身份重新解析；无法解析或匹配多个实例时运行失败，不自动改连其他实例，也不默认回退隐藏实例。Run 结束释放引用，attach 可见实例不关闭；new_hidden 必须由用户显式选择 save/discard，报告未保存工作簿。
 - fast_mode：可见实例默认 false，隐藏实例默认 true；结束时恢复 ScreenUpdating、Calculation、EnableEvents。
-- 超时：`submit` 带 timeout；超时后本次请求失败/结果被丢弃，但 ExcelWorker 仍被旧 COM 调用占用，后续任务继续排队且 UI 显示繁忙，不宣称立即可用。
+- 超时与恢复：`submit` 带 timeout；超时后本次请求失败/结果被丢弃，旧 COM 调用仍占用 Worker 时后续任务排队且 UI 显示繁忙。连续超时达到 `excel.restart_after_timeouts`（默认 3）或监督心跳确认进程失效后，终止并重建 ExcelWorker；排队请求以 `EXCEL_WORKER_RESTARTED` 失败，不自动重放任何请求，尤其超时写操作结果未知。不得为恢复而 kill 用户可见 Excel；owned 隐藏实例仍按归属登记清理。
 - 错误映射：`pywintypes.com_error` 的 HRESULT → 可读错误（`0x800AC472` 等 → "Excel is busy"），见 US-XLS-12。
 
 ### 5.3 描述符
@@ -483,7 +502,7 @@ PRD D-01..D-13 之外，本文新增：
 | ------------------------------------------------------------| ----------------------| --------------------------------------------------------------------------------------|
 |Sandboxie 变更收集、归属与外泄|漏报、误杀其他 Run、数据外泄|M0 验证独立 box、owned 进程树、重命名、网络默认拒绝、未知路径；只审计 Root/授权目录，未知变化必须 audit_complete=false|
 |xlwings attach 多实例行为|连错实例|M0 实测；提供 PID/窗口/工作簿实例列表，由用户选择，不假设 GetActiveObject 是最近活动实例|
-|COM 调用不可中断|取消不即时、队列阻塞|超时只放弃请求；Worker 保持繁忙，后续排队；UI 明确提示，fast_mode 仅作受控优化|
+|COM 调用不可中断|取消不即时、队列阻塞|超时只放弃请求并显示繁忙；独立 ExcelWorker 达阈值后重建，排队请求明确失败且写操作不自动重放；fast_mode 仅作受控优化|
 |pi CLI 与密钥代理兼容性|Pi 节点脆弱或 key 泄漏|M0 验证本地 OpenAI 兼容 LLMProxy；版本检测；key 不下发，解析失败降级为原文透传|
 |JSON Schema 表单库对复杂参数（条件显隐、列名联动）支持不足|节点配置体验差|允许节点声明 `ui_hints`；个别复杂节点允许自定义面板组件（逃生舱）|
 |mock LLM 与真实模型行为差异|AC 通过但真实不可用|`[manual]` 验收层保留；录制真实响应作为回放测试素材|

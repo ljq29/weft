@@ -35,13 +35,16 @@ weft/
 │   │   ├── api/               # REST/WS 客户端（由 05-api.md 手写对应，勿自动生成后手改）
 │   │   └── types/             # 与 04-data-model.md 对应的 TS 类型
 │   └── tests/
+├── scripts/
+│   ├── coverage_matrix.py     # AC 覆盖门禁
+│   └── weft-test-win.ps1      # Windows 真机回归
 └── e2e/                       # Playwright
 ```
 
 规则：
 
 - `weft-sdk` 不得依赖 `weft` 或 `weft-worker`；`weft` 与 `weft-worker` 均依赖 `weft-sdk`，主服务与工作流锁定的 `weft-worker` 必须同版本。
-- 分层依赖方向违规（如 `engine` import `api`）由 `ruff` 的 `flake8-tidy-imports` banned-api 规则 + import-linter 检查，CI 强制。Engine 只暴露执行接口，trigger/agent 位于上层并调用接口，由组合根注入；Engine 不 import 具体 triggers/agent。
+- 分层依赖方向违规（如 `engine` import `api`）由 `ruff` 的 `flake8-tidy-imports` banned-api 规则 + import-linter 检查，CI 强制。Engine 只暴露执行接口，trigger/agent 位于上层并调用接口，由 `application/` 用例服务与组合根注入；Engine 不 import 具体 triggers/agent。
 - 前端 `types/` 与后端 Pydantic 模型不自动同步，变更 `04-data-model.md` 时两侧手动更新。代码中的节点声明/JSON Schema 是参数真源，`09-nodes-v1.md` 由导出器生成且只读；用户故事仍是行为与 AC 真源。
 
 ## 2. 语言与工具链版本
@@ -52,8 +55,8 @@ weft/
 |包管理|uv（workspace 模式）|不用 pip/poetry|
 |Node|22 LTS + pnpm||
 |TypeScript|5.x，`strict: true`||
-|后端主要依赖|fastapi, uvicorn, pydantic v2, polars, pyarrow, xlwings (win), pywin32 (win), apscheduler, watchdog, httpx, loguru, jinja2, simpleeval, send2trash|新增依赖须在 PR 描述说明理由|
-|前端主要依赖|react 18, @xyflow/react 12, zustand, @tanstack/react-query, @tanstack/react-table, apache-arrow||
+|后端主要依赖|fastapi, uvicorn, pydantic v2, jsonschema, polars, pyarrow, fastexcel, xlsxwriter, xlwings (win), pywin32 (win), apscheduler, watchdog, httpx, loguru, jinja2, simpleeval, send2trash|jsonschema 校验节点 schema；fastexcel 读 Excel 文件、xlsxwriter 写 Excel 文件；新增依赖须在 PR 描述说明理由|
+|前端主要依赖|react 18, @xyflow/react 12, zustand, @tanstack/react-query, @tanstack/react-table, apache-arrow, react-diff-view, react-markdown|diff 用于变更审批，Markdown 用于聊天；新增依赖须在 PR 描述说明理由|
 
 ## 3. 代码风格
 

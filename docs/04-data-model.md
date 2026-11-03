@@ -15,9 +15,9 @@
 
 ```
 <name>.weft/
-├── workflow.json          # 图定义（§2），唯一必需文件
-├── pyproject.toml         # 依赖声明；[tool.weft] 段存元数据
-├── uv.lock                # 锁定（uv 生成）
+├── workflow.json          # 图定义（§2），打开/解析时唯一必需
+├── pyproject.toml         # 依赖声明；执行/打包必需；[tool.weft] 段存元数据
+├── uv.lock                # 锁定（uv 生成）；执行/打包必需
 ├── nodes/                 # 用户自定义节点（@weft.node）
 ├── prompts/               # prompt 文件（Prompt Template source: file）
 ├── data/                  # 约定的数据目录（非强制）
@@ -75,8 +75,7 @@
         "watch": {"enabled": false, "watches": [{"path": "data/inbox", "pattern": "*.xlsx",
                       "events": ["created"], "debounce_ms": 2000, "recursive": false}]},
         "http": {"enabled": false, "token_hash": "sha256:..."}
-      },
-      "disabled": false
+      }
     },
     {
       "id": "n_0000c3d4",              // "n_" + 8 hex
@@ -89,12 +88,11 @@
         "column": "amount",
         "operator": ">",
         "value": {"$var": "threshold"} // 变量绑定（US-DES-06）
-      },
-      "disabled": false
+      }
     }
   ],
   "edges": [
-    {"id": "e_c3d4", "source": "n_0000a1b2", "sourcePort": "variable",
+    {"id": "e_0000c3d4", "source": "n_0000a1b2", "sourcePort": "variable",
      "target": "n_0000c3d4", "targetPort": "variables", "order": 0}
   ],
   "notes": [
@@ -108,10 +106,11 @@
 
 |规则|级别|
 | ---------------------------------------------------------| --------------------|
-|`nodes[].id` 唯一且匹配 `^n_[0-9a-f]{8}$`；`edges` 引用的节点与端口存在|ERROR|
+|`nodes[].id` 唯一且匹配 `^n_[0-9a-f]{8}$`；`edges[].id` 唯一且匹配 `^e_[0-9a-f]{8}$`；`edges` 引用的节点与端口存在|ERROR|
 |边两端端口类型兼容（§3.3）|ERROR|
 |非 Tool/Variable 输入端口入边 ≤ 1；同一 Variable 输入端口的 `edges[].order` 为唯一整数|ERROR|
-|动态输入通过实例化多个命名端口表达（如 Concatenate 的 `in_1...in_N`，N ≥ 2），每个命名端口仍最多一条入边；不允许单端口承载多条普通数据入边|ERROR|
+|动态输入通过实例化多个命名端口表达（如 Concatenate 的 `in_1...in_N`，N ≥ 2），每个命名端口仍最多一条入边；Python Script 的 `params.inputs/outputs` 也由此生成端口，端口改名/删除使对应连线失效；不允许单端口承载多条普通数据入边|ERROR|
+|Metanode 使用 `flow.metanode`；`params.interface` 的外部端口名唯一并映射到存在的内部 `{node, port}`，两端类型兼容；`meta_<id>/` 仅为内部执行 ID 前缀|ERROR|
 |Merge 固定为两个命名输入端口，并声明 `accepts_partial_inputs=true`；仅命中一侧时可执行，两侧均 skipped 时 Merge 也 skipped|ERROR|
 |折叠 Loop 后无环|ERROR|
 |Loop Start/End 配对且嵌套合法|ERROR|
@@ -208,17 +207,20 @@ Trigger 节点 `variable` 端口输出 `{source, ts, session_id?, payload}`，�
   "nodes": {
     "n_0000a1b2": {
       "status": "executed | failed | ...", "started_at": "...", "finished_at": "...",
-      "from_cache": false, "error": {"type": "...", "message": "...", "traceback": "..."},
+      "from_cache": false, "error": {"code": "EXCEL_UNAVAILABLE", "type": "...", "message": "...", "traceback": "..."},
       "outputs": {
         "out": {"kind": "table", "path": ".runs/r_20250101_093000_a1b2/outputs/n_0000a1b2/out.arrow", "hash": "sha256:..."},
         "variables": {"kind": "json", "inline": {"row_count": 1000}, "hash": "sha256:..."}
-      }
+      },
+      "activated_ports": null                   // If/Switch 为实际命中端口列表
     }
   }
 }
 ```
 
-`run_id` 格式：`r_<yyyymmdd>_<hhmmss>_<4hex>`，可排序。`workflow_revision` 与冻结文件共同确定本 Run 输入；历史端口读取 `outputs` 中的内联值或文件引用，默认保留最近 50 次 Run。节点状态与错误只存于 `meta.json`，Run 日志只存于 `log.jsonl`，agent 轨迹存于 `nodes/<node_id>.trace.jsonl`，不另存 `nodes/<node_id>.json`。
+节点执行记录另含可选 `"activated_ports": ["true"]`，If/Switch 必须与 outputs 一同写入缓存和 Run 记录，缓存命中时重放同一决策。节点执行状态使用 `unconfigured | configured | running | executed | failed | cancelled | out_of_scope | skipped_branch | skipped_upstream`；`out_of_scope` 与失败后的 `skipped_upstream` 在 UI 显示 configured，`skipped_branch` 显示灰色 skipped。
+
+缓存命中产生的 Table 与大 JSON 也复制到本 Run `outputs/` 并复用已有哈希，缓存重置或 LRU 删除不得影响历史快照。`run_id` 格式：`r_<yyyymmdd>_<hhmmss>_<4hex>`，可排序。`workflow_revision` 与冻结文件共同确定本 Run 输入；历史端口读取 `outputs` 中的内联值或文件引用，默认保留最近 50 次 Run。节点状态与错误只存于 `meta.json`，Run 日志只存于 `log.jsonl`，agent 轨迹存于 `nodes/<node_id>.trace.jsonl`，不另存 `nodes/<node_id>.json`。
 
 ## 7. 审计记录（audit.jsonl，每行一条）
 
@@ -276,12 +278,13 @@ timeout  = 120
 [excel]
 backend = "xlwings"          # xlwings | fake
 call_timeout = 60
+restart_after_timeouts = 3   # 连续超时达到阈值后重建独立 ExcelWorker
 
 [sandbox]
 default = "sandboxie"        # sandboxie | none；none 仅用于影子目录审批流模拟
 allow_none_sandbox = false   # 显式允许 none；不允许任意 bash/pi 在 none 下执行
 network = "deny"             # deny | allowlist；默认仅放行指定环回 LLMProxy
-audit_roots = []             # Root 之外的显式授权目录
+authorized_roots = []        # Root 之外的授权目录；v1 写入授权与审计范围恒等
 
 [sandbox.sandboxie]
 start_exe = 'C:\Program Files\Sandboxie-Plus\Start.exe'
@@ -306,6 +309,8 @@ run_retention = 50
 chat_retention_days = 30     # 0 = 不自动清理
 memory_retention_days = 30   # 0 = 不自动清理
 ```
+
+Excel 最近实例选择另存于 `%APPDATA%/weft/excel-targets.toml`，按 `(workflow_id, node_id)` 关联，PID/窗口信息仅作本机运行时提示；`workflow.json` 只保存工作簿名、路径和 attach 模式等稳定目标。该文件不进入工作流目录或打包产物，跨机运行按稳定身份重新唯一解析。
 
 ## 11. 版本与迁移
 

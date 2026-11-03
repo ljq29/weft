@@ -42,7 +42,7 @@
 | **`[int]`** |`uv run pytest -m integration`|Service + Engine + **真实 Worker 子进程** + FastAPI/WS + 触发器 + 打包/解包|`FakeExcelBackend` + `NoneSandbox`（影子目录）+ `MockLLMServer` + 临时文件系统|每 PR；Linux + Windows CI|< 90 s|
 | **`[e2e]`** |`pnpm -C e2e test`（Playwright）|浏览器画布交互、连线校验提示、参数表单、WS 实时状态灯、Arrow 端口表格预览、聊天面板、变更审批 diff|后端以 `[int]` 相同替身模式启动真实 `weft serve`|每 PR；Linux CI（Chromium headless）|< 3 min|
 | **`[int-win]`** |`uv run pytest -m win_real`<br />（封装于 `scripts/weft-test-win.ps1`）|`XlwingsBackend`（STA 线程、可见/隐藏实例、整块读写性能、弹窗繁忙重试）、`SandboxieSandbox`（`Start.exe`、写入重定向、COM 阻断）、`PiRunner`|**真实 Excel 桌面版 + 真实 Sandboxie-Plus + 真实 pi CLI**（LLM 仍可用 Mock）|M0 Spike、M3/M5 任务卡完成时、发版前；Windows 10/11 登录态桌面会话|< 5 min|
-| **`[manual]`** |人工按检查单执行|真实大模型效果（场景 B/C）、Excel 视觉无闪烁体验、10 分钟从零建流体验、双机交接体验|全部真实环境 + 真实 OpenAI 兼容网关|M2–M7 里程碑出口验收|15–30 min|
+| **`[manual]`** |人工按检查单执行|真实大模型效果（场景 B/C）、Excel 视觉无闪烁体验、10 分钟从零建流体验、双机交接体验|全部真实环境 + 真实 OpenAI 兼容网关|M2–M7 里程碑出口验收|总计 ≤ 20 min|
 
 > **关键约束**：Windows Service 或无交互桌面的 GitHub Hosted Runner 无法稳定运行桌面 Excel COM。因此 `-m win_real` 设计为在**开发者本机登录态会话**或**自托管交互式 Windows Runner** 上一键运行。
 
@@ -114,12 +114,12 @@
 ### 5.1 执行引擎与缓存（`engine/`）
 
 - **拓扑与环检测**：DAG 正常排序；普通环路必拒；成对嵌套 Loop 正确折叠；未闭合或交叉嵌套必拒；Variable 入边按显式 order 合并；动态命名端口仍遵守单入边。
-- **调度终止性**：ready 中节点只出队一次；cache hit、scope skip、分支未命中都正确释放或传播到下游，最终所有节点进入终态，不死循环、不重复执行。
-- **局部执行作用域**：用计数探针验证 `to_node/from_node/single/reset` 的实际执行次数和缓存状态；历史端口必须读对应 Run 的内联或 outputs 文件快照。
-- **缓存确定性**：参数键顺序无关；实现代码、用户代码、uv.lock、解析变量、迭代号变化均失效。显式文件输入内容变化但 mtime+size 不变仍失效；List Files 目录条目指纹变化失效；未声明参数不触发隐式文件读取；`Write CSV` 等副作用节点每次执行；LLM 与实时 Excel Read 禁止跨 Run 复用。
+- **调度终止性**：ready 中节点只出队一次；cache hit、scope skip、分支未命中都正确释放或传播到下游，最终所有节点进入终态，不死循环、不重复执行。菱形 If→A/B→Merge 分别覆盖 true、false、双侧 skipped 及与 ExecScope 相交；Merge 至少一个成功输入才执行，全部 skipped 才跳过。
+- **局部执行作用域**：用计数探针验证 `to_node/from_node/single/reset` 的实际执行次数和缓存状态；`out_of_scope` 与失败后的 `skipped_upstream` 在 UI 显示 configured，只有 `skipped_branch` 显示灰色 skipped。历史端口必须读对应 Run 的内联或 outputs 文件快照。
+- **缓存确定性**：参数键顺序无关；实现代码、用户代码、uv.lock、解析变量、迭代号变化均失效。显式文件输入内容变化但 mtime+size 不变仍失效；List Files 目录条目指纹变化失效；未声明参数不触发隐式文件读取；`Write CSV` 等副作用节点每次执行；LLM 与实时 Excel Read 禁止跨 Run 复用。If/Switch 缓存命中必须重放 `activated_ports`；缓存命中物化 Run 快照后，重置或 LRU 删除全局缓存不影响历史输出。
 - **冻结与 CAS**：活跃 Run 使用入队时图/变量/manifest，非结构编辑不影响本 Run，NodeTool 固定参数也来自冻结快照；旧 revision 保存返回 409 且不覆盖新文档。
 - **并发与取消**：两个真实 Worker 子进程执行慢节点时时间区间重叠；Run 结束后 pool 无残留，下一 Run 不继承模块全局变量或 run_id；取消只影响当前 Run。NodeTool 与正常节点共享 pool/lane 上限，池满排队，取消与 tool_timeout 能终止排队或执行中的调用。
-- **队列契约**：started/queued=202、策略 drop=200 且无 run_id、队列满=409；手动/聊天/HTTP 触发行为一致。`wait=true` 被 drop 时仍直接返回 200 且无 status/outputs；等待超时返回 202、`wait_timed_out:true` 和当前 queued/running 状态，Run 不被取消。
+- **队列契约**：started/queued=202、策略 drop=200 且无 run_id、队列满=409；手动/聊天/HTTP 触发行为一致。`wait=true` 被 drop 时仍直接返回 200 且无 status/outputs；等待超时返回 202、`wait_timed_out:true` 和当前 queued/running 状态，Run 不被取消。服务运行时 CLI 只走 API；服务与 CLI、两个内嵌 CLI 共用跨进程锁且不能产生两个活跃 Run，stale 锁按 PID+创建时间回收。
 - **Wait 正常路径**：正常等待达到 duration_seconds 后才放行下游；取消时不放行。
 
 ### 5.2 Workflow Worker 与 IPC（`weft-worker/`）
@@ -130,10 +130,10 @@
 
 ### 5.3 Excel 线程安全与异常（`excel/`）
 
-- **STA 与串行**：非 ExcelWorker 线程访问 COM 立即断言；跨工作流 COM 调用时间不重叠。
-- **多实例与实时读取**：win_real 打开多个 Excel 实例，用户按 PID/窗口选择；两次 Run 间修改一个单元格，第二次必须读到新值。无人值守 Run 在已保存目标失效或匹配多个实例时必须失败，不得随机 attach 或自动切换隐藏实例。
-- **超时与并发编辑**：COM 超时后本次请求失败但旧调用仍占 Worker，后续任务排队且 UI 繁忙；用户并发编辑造成的失败须可读，不覆盖未确认内容。
-- **隐藏实例归属**：仅清理 owned PID+创建时间+Run/心跳匹配的实例；fast_mode 结束恢复 ScreenUpdating；未显式选择 save/discard 不得关闭隐藏实例。
+- **STA 与串行**：非 ExcelWorker STA 线程访问 COM 立即断言；跨工作流、服务与内嵌 CLI、多个内嵌 CLI 的 COM 调用时间均不重叠。Windows 使用 `Local\WeftExcelCOM`，POSIX CI 以等价跨进程互斥实现验证同一契约。
+- **多实例与实时读取**：win_real 打开多个 Excel 实例，用户按 PID/窗口选择；稳定目标存工作流，最近 PID/窗口选择只存用户级 `excel-targets.toml` 且不打包。两次 Run 间修改一个单元格，第二次必须读到新值。无人值守 Run 在已保存目标失效或匹配多个实例时必须失败，不得随机 attach 或自动切换隐藏实例。
+- **超时与并发编辑**：COM 超时后本次请求失败但旧调用仍占 Worker，后续任务排队且 UI 繁忙；达到阈值或心跳失效后重建独立 ExcelWorker，排队请求以 `EXCEL_WORKER_RESTARTED` 失败，新请求恢复，写请求不自动重放，服务保持运行。用户并发编辑造成的失败须可读，不覆盖未确认内容。
+- **隐藏实例归属**：仅清理 owned PID+创建时间+Run/心跳匹配的实例；fast_mode 结束恢复 ScreenUpdating；未显式选择 save/discard 不得关闭隐藏实例；Worker 恢复不得 kill 用户可见 Excel。
 
 ### 5.4 安全与边界测试（必测红线）
 
@@ -143,7 +143,7 @@
 |SEC-02|If/Polars Expression 传入 `__import__`、`__class__` 等|simpleeval 白名单/AST 白名单分别拦截，命令未执行|US-EXE-12/AC-5, US-TBL-05/AC-5|
 |SEC-03|Jinja 模板遍历 `__class__.__mro__`|SandboxedEnvironment 拦截|US-AGT-09/AC-4|
 |SEC-04|工作流文件含真实 api_key|打包中止并指出泄漏文件|US-SBX-08/AC-2|
-|SEC-05|运行中改图，或缺少 UI 会话令牌/`X-Weft-Client: ui` 调用 PUT|运行中改图返回 409；令牌缺失/无效返回 401，缺少 header 返回 403，图结构不变|US-AGT-11/AC-2|
+|SEC-05|运行中改图，或缺少 UI 会话令牌/`X-Weft-Client: ui` 调用 PUT|运行中改图返回 409；令牌缺失/无效返回 401，缺少 header 返回 403，图结构不变；header 仅是操作标记，agent 防线依赖令牌隔离、工具白名单与 protected 文件|US-AGT-11/AC-2|
 |SEC-06|apply 含 workflow.json 等 protected 路径|整体 400，无任何变更应用|US-SBX-05/AC-4|
 |SEC-07|错误 Bearer token 连续 15 次|前 10 次 401，第 11 次起 429|US-SBX-09/AC-2|
 |SEC-08|NodeTool 指向 Python/Shell/未声明节点或暴露非白名单参数|保存和直接调用均拒绝，无法借可信 lane 绕过沙箱|US-AGT-04/AC-1,2,7|
@@ -163,6 +163,7 @@
 | -------------------| -----------------------------------------------------------------| ------------------------------| --------------|
 |引擎纯调度|50 个 No-op 线性节点，扣除固定开销|< 5 ms / 节点|固定 Linux/Win 基准机|
 |Arrow 跨 Worker|100,000 行 × 20 列 IPC 往返，分别报告序列化、写盘、哈希、映射、转换|< 100 ms|固定 Linux/Win 基准机|
+|缓存命中物化 Run 快照|复用 100,000 行 × 20 列 pure 缓存，复制到本 Run outputs 并复用已有哈希；分别报告复制耗时与磁盘增量|M0/M1 建基线，同机回归|固定 Linux/Win 基准机|
 |Excel 整块读取|1000 × 100 整块读取为 Arrow 表|< 3.0 s|固定 win_real 基准机|
 |Excel 整块写入|1000 × 100 整块写入；另比较逐格与批量合并调用|< 3.0 s|固定 win_real 基准机|
 |WS 状态推送|状态变更到 WS 客户端收到帧，p95|< 200 ms|固定 CI 基准环境|

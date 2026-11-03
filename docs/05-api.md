@@ -28,7 +28,7 @@
 
 鉴权与浏览器边界：服务启动时生成随机 UI 会话令牌，自动打开的启动 URL 携带该令牌；前端仅将其保存在 `sessionStorage`，REST 使用 `Authorization: Bearer <ui_session_token>`，WS 连接后先发送 `{"op":"authenticate","token":"..."}`，认证成功才能订阅。CLI 从仅当前用户可读的会话文件取得令牌。监听 `127.0.0.1` 时，除使用工作流 Bearer token 的 `/trigger` 外，其余 `/api/*` 均要求 UI 会话令牌；监听非本机时改用 `Authorization: Bearer <global_token>`（US-SBX-09）。
 
-所有请求校验 Host 是否属于配置的本机监听地址；浏览器请求还须校验 Origin 为当前 UI 同源地址，失败返回 403。无 Origin 的非浏览器请求必须持有对应 Bearer token。图结构修改接口还要求头 `X-Weft-Client: ui`；该头只用于区分 UI 改图操作，不替代鉴权（US-AGT-11 AC-2）。
+所有请求校验 Host 是否属于配置的本机监听地址；浏览器请求还须校验 Origin 为当前 UI 同源地址，失败返回 403。无 Origin 的非浏览器请求必须持有对应 Bearer token。图结构修改接口还要求头 `X-Weft-Client: ui`；该头只用于区分 UI 改图操作、减少误调用，不替代鉴权，也不构成 agent 不得改图的安全边界（US-AGT-11 AC-2）。
 
 ---
 
@@ -43,6 +43,7 @@
 |PUT|`/api/workflows/{id}`|整文档保存（前端自动保存用），携带读取时的 `revision`；成功递增 revision，CAS 冲突或 Run 活跃时改图结构 → 409；校验失败 422|
 |PATCH|`/api/workflows/{id}`|局部更新（JSON Merge Patch + 读取时 `revision`）：位置、注释等非结构字段在 Run 活跃时允许，仅影响下一 Run；CAS 冲突 → 409|
 |DELETE|`/api/workflows/{id}`|从服务关闭（不删目录）；`?purge_cache=true` 顺带清缓存|
+|POST|`/api/workflows/{id}/duplicate`|本机复制：生成新目录、workflow id 与 revision 历史，不复制 `.runs/`、`.venv/` → 201 `{id, path, revision}`；目标目录冲突 → 409|
 |GET|`/api/workflows/{id}/validate`|返回校验结果 `{errors: [...], warnings: [...]}`（规则见 `04-data-model.md` §2）|
 |GET|`/api/workflows/{id}/env`|环境状态：`{status, python, uv_output}`|
 |POST|`/api/workflows/{id}/env/sync`|手动触发 `uv sync`；进度经 WS `env.progress`|
@@ -51,7 +52,7 @@
 
 |方法|路径|说明|
 | ------| ------| --------------------------------------------------------------------------|
-|GET|`/api/nodes/types`|全部可用节点类型（内置 + 当前工作流 `user.*`）：`[{type, node_version, category, name, description, lane, inputs, outputs, params_schema, ui_hints}]`（US-DES-04 AC-4）|
+|GET|`/api/nodes/types`|全部可用节点类型（内置 + 当前工作流 `user.*`）：`[{type, node_version, category, name, description, lane, cache_policy, tool_capability, tool_exposed_params, inputs, outputs, params_schema, ui_hints, portable_params, external_resources}]`（US-DES-04 AC-4、US-AGT-04 AC-1）|
 |GET|`/api/nodes/types/{type}`|单个类型详情|
 |POST|`/api/workflows/{id}/nodes/{node_id}/column-hints`|返回该节点各输入端口上游缓存的列名（表单下拉用）：`{port: [col, ...]}`；上游未执行 → 空|
 
@@ -151,9 +152,9 @@
 |`run.started`|`{run_id, scope}`|US-EXE-05|
 |`run.finished`|`{run_id, status, usage}`||
 |`run.queued` / `run.dequeued`|`{run_id, position}`|US-EXE-13|
-|`node.status`|`{node_id, status}`（unconfigured/configured/running/executed/failed/skipped/cancelled）|US-DES-05|
+|`node.status`|`{node_id, status}`（unconfigured/configured/running/executed/failed/cancelled/out_of_scope/skipped_branch/skipped_upstream）；out_of_scope 与失败后的 skipped_upstream 在 UI 显示 configured，skipped_branch 显示灰色 skipped|US-DES-05|
 |`node.started` / `node.finished`|`{node_id, duration_ms?, from_cache?}`||
-|`node.failed`|`{node_id, error: {type, message}}`（完整 traceback 走 REST）|US-EXE-07|
+|`node.failed`|`{node_id, error: {code, type, message}}`（完整 traceback 走 REST，code 见 §12）|US-EXE-07|
 |`node.progress`|`{node_id, fraction, message?}`||
 |`node.log`|`{node_id, level, message}`||
 |`node.stream`|`{run_id, node_id, session_id?, source_node_id, delta}`|US-EXE-05 AC-2|
@@ -169,7 +170,32 @@
 
 聊天 UI 以 `(run_id, source_node_id, message_id)` 关联 `node.stream` 与 `chat.message`；最终 Chat Output 消息与增量共用同一 message_id，前端替换而非重复追加。WS 无事件回放，重连后用 REST 补齐（US-EXE-05 AC-3）。
 
-## 12. 兼容性承诺
+## 12. 错误码目录
+
+所有非 2xx 响应必须返回稳定的机器可读 `error.code`；Run 内节点失败在 `meta.json` 的 `error.code` 使用同一目录，API 层不把它伪装成同步 HTTP 异常。前端和测试不得匹配自然语言消息来代替 code。目录至少包含：
+
+|code|HTTP / 记录位置|含义 / 是否可重试|
+| ------| ------| ----------------|
+|`WORKFLOW_NOT_FOUND`|404|工作流不存在；否|
+|`VALIDATION_ERROR`|400 / 422|参数或 schema 校验失败，detail 含逐条错误；修改后重试|
+|`REVISION_CONFLICT`|409|revision/CAS 不一致；重新读取后决定|
+|`RUN_ACTIVE`|409|活跃 Run 禁止结构修改；当前 Run 结束后重试|
+|`RUN_QUEUE_FULL`|409|触发队列已满；稍后重试|
+|`PORT_NOT_EXECUTED`|404|端口没有可读取的有效输出；执行后重试|
+|`CHAT_DISABLED`|400|聊天触发未启用；启用后重试|
+|`CHANGE_CONFLICT`|200 逐项|真实目标已变化；查看新 diff 并显式覆盖|
+|`LLM_CONFIG_NOT_FOUND`|Run 节点错误|命名 LLM 配置不存在；配置后重试|
+|`NONE_SANDBOX_DISABLED`|400 / Run 节点错误|NoneSandbox 未获全局允许；修改设置后重试|
+|`BASH_REQUIRES_SANDBOXIE`|400 / Run 节点错误|none 模式选择 bash；改用 sandboxie|
+|`PI_REQUIRES_SANDBOXIE`|400 / Run 节点错误|none 模式选择 Pi Agent；改用 sandboxie|
+|`EXCEL_WORKER_RESTARTED`|Run 节点错误|ExcelWorker 已重建，排队/在途请求结果未知；写操作不得自动重放|
+|`EXCEL_UNAVAILABLE`|Run 节点错误|Excel 不可用或仍繁忙；排除故障后重试|
+|`UNAUTHORIZED`|401|Bearer/UI/WS 令牌缺失或无效；更新凭据|
+|`FORBIDDEN`|403|Host/Origin 或 UI 操作标记校验失败；修正请求|
+
+新增错误码必须同步对应 AC；消息可改进，code 在 1.0 后按兼容性承诺管理。
+
+## 13. 兼容性承诺
 
 - 0.x 阶段 REST/WS 允许破坏性变更；1.0 起只新增端点、事件和可选字段，删除、重命名或改变语义需升主版本。
 - `schema_version` 只描述工作流数据格式与迁移，不是 API 兼容性的替代品；`/api/system/version` 同时返回服务版本与 schema_version。
