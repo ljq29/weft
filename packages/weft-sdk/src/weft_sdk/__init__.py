@@ -13,7 +13,7 @@ from weft_sdk.nodes import (
     node,
 )
 
-__version__ = "0.0.0"
+__version__ = "0.1.0"
 
 __all__ = [
     "CachePolicy",

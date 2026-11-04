@@ -245,6 +245,8 @@ jobs:
   build-wheels:         # windows-latest: 构建并上传三个 wheel 产物
 ```
 
+版本发布由 `.github/workflows/release.yml` 单独执行：推送与包版本匹配的 `v*.*.*` 标签后，依次通过完整检查、集成测试、E2E 和 wheel 构建，才创建 GitHub Release。标签不匹配或任一自动化失败时不得发布；该流程不替代本机 `win_real` 与人工里程碑门禁。
+
 ### 9.2 Windows 真机一键回归脚本（`scripts/weft-test-win.ps1`）
 
 供你在本地 Windows 终端在里程碑节点运行：

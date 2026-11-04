@@ -1,6 +1,6 @@
 [project]
 name = "weft-sdk"
-version = "0.0.0"
+version = "0.1.0"
 description = "Public SDK for Weft workflow nodes"
 license = "MIT"
 requires-python = ">=3.12"

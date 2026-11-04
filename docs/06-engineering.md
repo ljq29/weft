@@ -138,5 +138,5 @@ uv run poe check                          # = ruff + mypy + pytest + 前端 lint
 
 - 版本：SemVer。0.x 阶段 REST/WS 可破坏；1.0 起只新增。P0 表示完整 v1 必须，不等于首个公开版全交付：M0–M3 发布首个公开 MVP，M4–M6 为后续预览，M7 才形成完整 v1。具体版本号在对应里程碑发布前确定，不预写 M7=`0.1.0`。
 - 主服务、`weft-worker` 与工作流锁定的 Worker 版本必须一致；`weft --version` 与 `/api/system/version` 一致。
-- 打包：`uv build`；发布产物为 wheel + `pipx install weft` / `uv tool install weft` 指引。
+- 打包：`uv build`；发布产物为三个 wheel。提交版本变更后推送匹配的 `v<version>` 标签，`.github/workflows/release.yml` 会在完整自动化通过后创建 GitHub Release 并上传 wheel；标签必须与三包版本一致。
 - 发布前 checklist：`weft doctor` 真机全绿、`-m win_real` 测试通过、`e2e` 通过、docs 与 CHANGELOG 更新。Fake 绿灯不能替代 win_real。
