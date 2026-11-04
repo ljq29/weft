@@ -5,13 +5,16 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+env:
+  UV_INDEX_URL: https://pypi.tuna.tsinghua.edu.cn/simple
+  NPM_CONFIG_REGISTRY: https://registry.npmmirror.com
+
 jobs:
   lint-and-type:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -29,11 +32,7 @@ jobs:
       - run: pnpm -C frontend typecheck
 
   unit-and-integration:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -45,7 +44,7 @@ jobs:
       - run: uv run poe coverage
 
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -58,7 +57,7 @@ jobs:
       - run: pnpm -C frontend build
 
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -72,11 +71,11 @@ jobs:
       - run: uv sync --frozen
       - run: pnpm install --frozen-lockfile
       - run: pnpm -C frontend build
-      - run: pnpm -C e2e exec playwright install --with-deps chromium
+      - run: pnpm -C e2e exec playwright install chromium
       - run: pnpm -C e2e test
 
   build-wheels:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -89,3 +88,7 @@ jobs:
       - run: uv build --wheel --out-dir dist packages/weft-sdk
       - run: uv build --wheel --out-dir dist packages/weft-worker
       - run: uv build --wheel --out-dir dist packages/weft
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weft-wheels
+          path: dist/*.whl

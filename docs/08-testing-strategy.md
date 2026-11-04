@@ -18,14 +18,14 @@
 给 Coding Agent 交办开发任务时，最大的工程风险不是“写不出代码”，而是 **“写出表面能跑、测试全绿，但实际上绕过了核心约束或靠 Mock 自欺欺人的代码”** 。本文档定义：
 
 1. 每一类功能必须在哪个层级测、用真依赖还是替身（Fake/Mock）；
-2. 如何让 **Linux 无头 CI** 覆盖 85% 以上的逻辑，同时保证 **Windows 真机（Excel COM + Sandboxie + pi）**  不脱节；
+2. 如何让 **Windows CI** 覆盖主要逻辑，同时保证 **Windows 真机（Excel COM + Sandboxie + pi）** 不脱节；
 3. Coding Agent 判定“我做完了”的客观门槛，以及**严禁触碰的测试作弊红线**。
 
 ### 1.2 Weft 的四大测试难点与对策
 
 |难点|风险表现|核心对策|
 | --------------------------------| ----------------------------------------------------------------| --------------------------------------------------------------------------------------|
-|**Windows 独占依赖**（Excel COM、Sandboxie）|Linux CI 跑不了；真机测试慢、易受弹窗挂死|抽象 `ExcelBackend` / `Sandbox` 接口，用**同一套契约测试（Contract Tests）** 同时跑 Fake 实现与 Windows 真机实现|
+|**桌面独占依赖**（Excel COM、Sandboxie）|Hosted CI 无法运行交互式桌面 Excel；真机测试慢、易受弹窗挂死|抽象 `ExcelBackend` / `Sandbox` 接口，用**同一套契约测试（Contract Tests）** 同时跑 Fake 实现与 Windows 真机实现|
 |**多进程边界**（Service ↔ Workflow Worker）|Mock 掉进程通信后单元全绿，真跑时 stdio 死锁、Arrow 文件锁冲突|集成测试必须启动**真实子进程**（`.venv` + stdio JSON-RPC + Arrow IPC 文件），禁止在集成层 Mock Worker|
 |**LLM 与 Agent 的非确定性**|模型输出波动导致测试偶发失败（Flaky）或 token 消耗失控|自动化测试统一打本地**剧本式 Mock LLM 服务器**（支持 SSE 流与 `tool_calls`）；真实模型仅用于录制回放与手动里程碑验收|
 |**并发与状态残留**|Excel 孤儿进程、沙箱残留文件、端口占用污染下一个用例|Fixture 强隔离（每用例独立临时工作流目录 + 退出时进程/句柄泄漏断言）|
@@ -38,9 +38,9 @@
 
 |层级标签|pytest / 工具命令|覆盖对象|外部依赖策略|运行时机与环境|单次预算|
 | ----------| -----------------------| -------------------------------------------------------------------------------------------------------| ----------------------------------------------| --------------------------------------------------------------------| ------------|
-| **`[unit]`** |`uv run pytest -m "not integration and not win_real"`<br />`pnpm -C frontend test`|纯函数与领域模型：DAG/Loop 折叠、端口兼容表、缓存哈希、表达式沙箱、Schema 校验与迁移、Zustand store|**零外部依赖**、零网络、零子进程|每次保存 / 每次提交；Linux + Windows CI|< 15 s|
-| **`[int]`** |`uv run pytest -m integration`|Service + Engine + **真实 Worker 子进程** + FastAPI/WS + 触发器 + 打包/解包|`FakeExcelBackend` + `NoneSandbox`（影子目录）+ `MockLLMServer` + 临时文件系统|每 PR；Linux + Windows CI|< 90 s|
-| **`[e2e]`** |`pnpm -C e2e test`（Playwright）|浏览器画布交互、连线校验提示、参数表单、WS 实时状态灯、Arrow 端口表格预览、聊天面板、变更审批 diff|后端以 `[int]` 相同替身模式启动真实 `weft serve`|每 PR；Linux CI（Chromium headless）|< 3 min|
+| **`[unit]`** |`uv run pytest -m "not integration and not win_real"`<br />`pnpm -C frontend test`|纯函数与领域模型：DAG/Loop 折叠、端口兼容表、缓存哈希、表达式沙箱、Schema 校验与迁移、Zustand store|**零外部依赖**、零网络、零子进程|每次保存 / 每次提交；Windows CI|< 15 s|
+| **`[int]`** |`uv run pytest -m integration`|Service + Engine + **真实 Worker 子进程** + FastAPI/WS + 触发器 + 打包/解包|`FakeExcelBackend` + `NoneSandbox`（影子目录）+ `MockLLMServer` + 临时文件系统|每 PR；Windows CI|< 90 s|
+| **`[e2e]`** |`pnpm -C e2e test`（Playwright）|浏览器画布交互、连线校验提示、参数表单、WS 实时状态灯、Arrow 端口表格预览、聊天面板、变更审批 diff|后端以 `[int]` 相同替身模式启动真实 `weft serve`|每 PR；Windows CI（Chromium headless）|< 3 min|
 | **`[int-win]`** |`uv run pytest -m win_real`<br />（封装于 `scripts/weft-test-win.ps1`）|`XlwingsBackend`（STA 线程、可见/隐藏实例、整块读写性能、弹窗繁忙重试）、`SandboxieSandbox`（`Start.exe`、写入重定向、COM 阻断）、`PiRunner`|**真实 Excel 桌面版 + 真实 Sandboxie-Plus + 真实 pi CLI**（LLM 仍可用 Mock）|M0 Spike、M3/M5 任务卡完成时、发版前；Windows 10/11 登录态桌面会话|< 5 min|
 | **`[manual]`** |人工按检查单执行|真实大模型效果（场景 B/C）、Excel 视觉无闪烁体验、10 分钟从零建流体验、双机交接体验|全部真实环境 + 真实 OpenAI 兼容网关|M2–M7 里程碑出口验收|总计 ≤ 20 min|
 
@@ -130,7 +130,7 @@
 
 ### 5.3 Excel 线程安全与异常（`excel/`）
 
-- **STA 与串行**：非 ExcelWorker STA 线程访问 COM 立即断言；跨工作流、服务与内嵌 CLI、多个内嵌 CLI 的 COM 调用时间均不重叠。Windows 使用 `Local\WeftExcelCOM`，POSIX CI 以等价跨进程互斥实现验证同一契约。
+- **STA 与串行**：非 ExcelWorker STA 线程访问 COM 立即断言；跨工作流、服务与内嵌 CLI、多个内嵌 CLI 的 COM 调用时间均不重叠。Windows 使用 `Local\WeftExcelCOM` 验证同一跨进程互斥契约。
 - **多实例与实时读取**：win_real 打开多个 Excel 实例，用户按 PID/窗口选择；稳定目标存工作流，最近 PID/窗口选择只存用户级 `excel-targets.toml` 且不打包。两次 Run 间修改一个单元格，第二次必须读到新值。无人值守 Run 在已保存目标失效或匹配多个实例时必须失败，不得随机 attach 或自动切换隐藏实例。
 - **超时与并发编辑**：COM 超时后本次请求失败但旧调用仍占 Worker，后续任务排队且 UI 繁忙；达到阈值或心跳失效后重建独立 ExcelWorker，排队请求以 `EXCEL_WORKER_RESTARTED` 失败，新请求恢复，写请求不自动重放，服务保持运行。用户并发编辑造成的失败须可读，不覆盖未确认内容。
 - **隐藏实例归属**：仅清理 owned PID+创建时间+Run/心跳匹配的实例；fast_mode 结束恢复 ScreenUpdating；未显式选择 save/discard 不得关闭隐藏实例；Worker 恢复不得 kill 用户可见 Excel。
@@ -161,15 +161,15 @@
 
 |基准项|测量方法|受控目标|运行环境|
 | -------------------| -----------------------------------------------------------------| ------------------------------| --------------|
-|引擎纯调度|50 个 No-op 线性节点，扣除固定开销|< 5 ms / 节点|固定 Linux/Win 基准机|
-|Arrow 跨 Worker|100,000 行 × 20 列 IPC 往返，分别报告序列化、写盘、哈希、映射、转换|< 100 ms|固定 Linux/Win 基准机|
-|缓存命中物化 Run 快照|复用 100,000 行 × 20 列 pure 缓存，复制到本 Run outputs 并复用已有哈希；分别报告复制耗时与磁盘增量|M0/M1 建基线，同机回归|固定 Linux/Win 基准机|
+|引擎纯调度|50 个 No-op 线性节点，扣除固定开销|< 5 ms / 节点|固定 Windows 基准机|
+|Arrow 跨 Worker|100,000 行 × 20 列 IPC 往返，分别报告序列化、写盘、哈希、映射、转换|< 100 ms|固定 Windows 基准机|
+|缓存命中物化 Run 快照|复用 100,000 行 × 20 列 pure 缓存，复制到本 Run outputs 并复用已有哈希；分别报告复制耗时与磁盘增量|M0/M1 建基线，同机回归|固定 Windows 基准机|
 |Excel 整块读取|1000 × 100 整块读取为 Arrow 表|< 3.0 s|固定 win_real 基准机|
 |Excel 整块写入|1000 × 100 整块写入；另比较逐格与批量合并调用|< 3.0 s|固定 win_real 基准机|
 |WS 状态推送|状态变更到 WS 客户端收到帧，p95|< 200 ms|固定 CI 基准环境|
 |服务冷启动|启动到 version 200；首屏可交互单独测量|< 2.0 s / 5.0 s|固定 E2E 基准环境|
 
-基准结果与环境不符时只记录不阻断普通 PR；同一基准机出现显著回归才阻断。Excel 指标只能由 win_real 验证，Fake/Linux 绿灯不能替代。
+基准结果与环境不符时只记录不阻断普通 PR；同一基准机出现显著回归才阻断。Excel 指标只能由 win_real 验证，Fake 绿灯不能替代。
 
 2026-11-04 本机 Arrow 100,000×20 冷缓存基准由 `packages/weft/tests/test_performance.py` 产出，三次总耗时分别为 24.065、24.012、24.194 ms，均低于 100 ms。序列化、写盘、SHA-256、memory-map 和 Polars 转换的分阶段结果及 CPU/RAM/依赖版本保存在 `.test-reports/arrow-worker-benchmark-run1.json` 至 `run3.json`。
 
@@ -207,7 +207,7 @@ test('US-DES-05/AC-1: renders red/yellow/green status bar on canvas nodes', asyn
 2. 解析 `docs/07-roadmap.md` 的任务卡，格式必须为 `- [ ] **T…**` 或 `- [x] **T…**`，只有 `[x]` 是完成；任何不存在的 US/AC 引用都立即报错；
 3. 扫描 `packages/**/tests/`、`frontend/src/**/*.test.*`、`e2e/` 中的 US/AC 标记，未知标记同样报错；
 4. 仅对 `[x]` 已完成卡，检查其声明的所有非 manual AC 至少有一个对应测试；缺失则退出 1。manual AC 必须出现在人工验收单，不能要求自动化函数冒充；
-5. 所有任务默认未完成，文档编写或任务卡文字调整不得自动改为 `[x]`。Fake/Linux 结果只能覆盖其声明环境，涉及 win_real 的完成卡还必须记录真机结果。
+5. 所有任务默认未完成，文档编写或任务卡文字调整不得自动改为 `[x]`。Fake 结果只能覆盖其声明环境，涉及 win_real 的完成卡还必须记录真机结果。
 
 ### 7.3 代码覆盖率指标
 
@@ -238,10 +238,11 @@ test('US-DES-05/AC-1: renders red/yellow/green status bar on canvas nodes', asyn
 
 ```yaml
 jobs:
-  lint-and-type:       # ruff + mypy (linux & win32 target) + import-linter + eslint + tsc
-  unit-and-int-linux:  # ubuntu-latest: uv run pytest (unit + integration) + coverage_matrix.py
-  unit-and-int-win:    # windows-latest: uv run pytest (unit + integration, 验证 Windows 路径/分隔符/CTRL_BREAK 信号)
-  frontend-and-e2e:    # ubuntu-latest: vitest + playwright (启动真实后端 + Fake backends)
+  lint-and-type:        # windows-latest: ruff + mypy win32 + import-linter + eslint + tsc
+  unit-and-integration: # windows-latest: pytest unit/integration + coverage_matrix.py
+  frontend:             # windows-latest: vitest + frontend build
+  e2e:                  # windows-latest: playwright (真实后端 + Fake backends)
+  build-wheels:         # windows-latest: 构建并上传三个 wheel 产物
 ```
 
 ### 9.2 Windows 真机一键回归脚本（`scripts/weft-test-win.ps1`）

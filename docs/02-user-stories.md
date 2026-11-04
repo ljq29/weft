@@ -42,10 +42,10 @@ AC-2  ...
 
 |标签|含义|运行环境|
 | ------| -----------------------------------------------| --------------------------------------------|
-|`[unit]`|纯 Python 单元测试，无外部依赖|任意 OS、CI|
-|`[int]`|集成测试：服务 + 引擎 + 文件系统，可 mock LLM|任意 OS、CI|
+|`[unit]`|纯 Python 单元测试，无外部依赖|Windows CI|
+|`[int]`|集成测试：服务 + 引擎 + 文件系统，可 mock LLM|Windows CI|
 |`[int-win]`|需要真实 Excel / Sandboxie / pi|Windows 本机，手动或自托管 runner|
-|`[e2e]`|浏览器端到端（Playwright）|CI（Linux，Excel 相关节点用 fake backend）|
+|`[e2e]`|浏览器端到端（Playwright）|Windows CI（Excel 相关节点用 fake backend）|
 |`[manual]`|需人工确认的体验类标准（时间、观感）|验收阶段手动|
 
 ### 0.5 通用前置条件（除非故事另有说明）
@@ -331,7 +331,7 @@ AC-2  ...
 - AC-3 不同工作流之间可并行运行，但 Excel 操作全局串行（见 US-XLS-11）。
 - AC-4 `GET /api/workflows/{id}/runs?status=queued` 可查看队列。
 - AC-5 `[int]` 立即执行/入队返回 202 `{run_id, disposition: started|queued}`；策略 drop 返回 200 `{run_id: null, disposition: dropped}`；手动、聊天和 HTTP 触发使用同一规则。
-- AC-6 `[int]` 服务运行时 `weft run` 只调用服务 API；服务未运行时内嵌 CLI 与服务模式共用每工作流跨进程执行锁，锁记录 PID、进程创建时间与 Run ID，缓存访问受同锁保护。服务与 CLI、两个内嵌 CLI 同时触发时不得产生两个活跃 Run；不同进程中的 Excel 调用仍经 Windows `Local\WeftExcelCOM`（POSIX CI 使用等价跨进程互斥实现）互斥串行，异常退出按进程身份回收 stale 锁。
+- AC-6 `[int]` 服务运行时 `weft run` 只调用服务 API；服务未运行时内嵌 CLI 与服务模式共用每工作流跨进程执行锁，锁记录 PID、进程创建时间与 Run ID，缓存访问受同锁保护。服务与 CLI、两个内嵌 CLI 同时触发时不得产生两个活跃 Run；不同进程中的 Excel 调用仍经 Windows `Local\WeftExcelCOM` 互斥串行，异常退出按进程身份回收 stale 锁。
 
 ### US-EXE-14 工作流独立执行环境 [P0] [int]
 
@@ -340,7 +340,7 @@ AC-2  ...
 
 - AC-1 Given 工作流 `pyproject.toml` 声明依赖 `requests` When 打开工作流 Then 系统在 `<root>/.venv/` 执行 `uv sync`，UI 显示进度；完成前运行按钮禁用。
 - AC-2 `[int]` Python Script 节点中 `import requests` 成功；Weft 本体环境中无 `requests`。
-- AC-3 `[int]` Windows 下 Worker 由 `<root>/.venv/Scripts/python.exe` 启动，POSIX 测试环境由 `<root>/.venv/bin/python` 启动，均执行已安装的 `weft-worker` 入口且不依赖主机 `PYTHONPATH`；每 Run 懒启动独立 Worker pool（默认并行度 4），每个 Worker 同时只处理一个 `execute`。测试用两个真实子进程的重叠执行证明并行，Run 结束后 pool 全部退出且下一 Run 不继承全局变量。
+- AC-3 `[int]` Worker 由 `<root>/.venv/Scripts/python.exe` 启动，执行已安装的 `weft-worker` 入口且不依赖主机 `PYTHONPATH`；每 Run 懒启动独立 Worker pool（默认并行度 4），每个 Worker 同时只处理一个 `execute`。测试用两个真实子进程的重叠执行证明并行，Run 结束后 pool 全部退出且下一 Run 不继承全局变量。
 - AC-4 `uv sync` 失败（依赖冲突、网络）时，UI 显示 uv 的完整输出，工作流处于"环境异常"状态，可重试。
 - AC-5 创建工作流时，生成器将 `weft-worker==<service_version>` 及用户依赖写入标准 `pyproject.toml` 的 `dependencies` 并锁入 `uv.lock`；主服务与 Worker 版本不一致时拒绝运行。`[tool.weft]` 仅存 Weft 元数据，不声明 uv 会自动合并的自定义依赖段。
 - AC-6 `[unit]` monorepo 中 `weft-worker` 包含 Worker 入口、RPC 与可信 Worker 内置节点实现并依赖 `weft-sdk`；Excel COM 的 xlwings/pywin32 只由主服务环境安装，不要求每个 Worker 安装。
@@ -455,7 +455,7 @@ AC-2  ...
 关联：F-XLS-11
 
 - AC-1 `[unit]` 服务或内嵌 CLI 通过监督器管理独立 `ExcelWorker` 子进程；COM 只在子进程的单 STA 线程执行并在该线程调用 `CoInitialize`，所有 `ExcelBackend` 方法通过 `worker.submit(fn)` 投递并 await 结果；在其他线程直接调用 COM 对象的代码路径在 debug 模式下触发断言。
-- AC-2 `[int]` 两个工作流同时运行且都含 Excel 节点时，COM 调用严格串行，无 `CoInitialize`/`RPC_E_WRONG_THREAD` 错误；服务与内嵌 CLI、多个内嵌 CLI 之间通过 Windows `Local\WeftExcelCOM`（POSIX CI 使用等价跨进程互斥实现）互斥锁保持同样的全局串行。
+- AC-2 `[int]` 两个工作流同时运行且都含 Excel 节点时，COM 调用严格串行，无 `CoInitialize`/`RPC_E_WRONG_THREAD` 错误；服务与内嵌 CLI、多个内嵌 CLI 之间通过 Windows `Local\WeftExcelCOM` 互斥锁保持同样的全局串行。
 - AC-3 同一 Run 内多个 Excel 节点共享同一个 App 连接；Excel 引用通过端口传递描述符，worker 端维护 `描述符 → COM 对象` 映射，Run 结束释放。
 - AC-4 Excel App/Workbook 描述符可在 `resolve()` 成功后复用；工作簿或工作表解析失败则重跑连接上游。实时 Excel Read 是 volatile，每次 Run 都重新读取单元格，不因描述符有效而复用表格内容。
 - AC-5 `[int]` 连续超时达到 `excel.restart_after_timeouts`（默认 3）或监督心跳确认进程失效时，监督器终止并重建 ExcelWorker；后续新请求可恢复，排队请求以 `EXCEL_WORKER_RESTARTED` 明确失败，不自动重放，服务与其他非 Excel 节点保持运行。

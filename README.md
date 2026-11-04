@@ -61,8 +61,11 @@ UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple uv build --wheel --out-dir
 
 ## 当前验收边界
 
-- Fake/Fake/Linux 结果不能替代真实 Excel、Sandboxie 或真实模型验收。
-- Sandboxie 的独立 box、网络拒绝和进程归属仍需按路线图完成 win_real 验证。
-- Excel 宏的真实错误路径可测；成功宏返回值仍需可运行的真实宏工作簿。
+- 项目仅支持 Windows，不支持 WSL/Linux；Fake 结果不能替代真实 Excel、Sandboxie 或真实模型验收。
+- Sandboxie 独立 box、网络拒绝、进程归属和真实 Excel 宏已成功通过 `win_real` 验证。
 - 跨机交接要求兼容 Weft/uv、锁定依赖及声明的外部资源在目标机可用。
 - 当前版本为开发版本 `0.0.0`，正式版本号在发布门禁满足后确定。
+
+## License
+
+Weft 使用 [MIT License](LICENSE)。Excel、Sandboxie-Plus、Node.js 等外部依赖遵循各自许可证。

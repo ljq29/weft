@@ -2,6 +2,7 @@
 name = "weft"
 version = "0.0.0"
 description = "Local-first visual workflow tool"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
   "weft-sdk==0.0.0",
