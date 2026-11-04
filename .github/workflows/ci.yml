@@ -56,3 +56,36 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -C frontend test
       - run: pnpm -C frontend build
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: uv sync --frozen
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C frontend build
+      - run: pnpm -C e2e exec playwright install --with-deps chromium
+      - run: pnpm -C e2e test
+
+  build-wheels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C frontend build
+      - run: uv build --wheel --out-dir dist packages/weft-sdk
+      - run: uv build --wheel --out-dir dist packages/weft-worker
+      - run: uv build --wheel --out-dir dist packages/weft

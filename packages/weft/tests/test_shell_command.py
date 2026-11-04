@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import shutil
 import time
 from pathlib import Path
 
@@ -11,6 +13,7 @@ from weft_sdk import ToolCapability, weft_ctx
 from weft_worker.shell import cmd_literal, powershell_literal, render_command
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+POWERSHELL_AVAILABLE = os.name == "nt" or shutil.which("pwsh") is not None
 
 
 def execute(root: Path, command: str, shell: str, **params: object) -> tuple[dict, list[str]]:
@@ -30,6 +33,7 @@ def execute(root: Path, command: str, shell: str, **params: object) -> tuple[dic
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(not POWERSHELL_AVAILABLE, reason="PowerShell is not installed")
 def test_powershell_literal_metacharacters_and_newline(tmp_path: Path) -> None:
     """US-TBL-09/AC-1,2: PowerShell interpolation preserves metacharacters literally."""
     value = "space ' \"\n$ ` % & | >"
@@ -43,6 +47,7 @@ def test_powershell_literal_metacharacters_and_newline(tmp_path: Path) -> None:
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(os.name != "nt", reason="cmd is Windows-only")
 def test_cmd_literal_metacharacters_and_unsafe_values(tmp_path: Path) -> None:
     """US-TBL-09/AC-1,2: cmd uses independent quoting and rejects unsafe literals."""
     value = "space ' $ ` & | >"
@@ -57,6 +62,7 @@ def test_cmd_literal_metacharacters_and_unsafe_values(tmp_path: Path) -> None:
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(not POWERSHELL_AVAILABLE, reason="PowerShell is not installed")
 def test_shell_nonzero_and_fail_policy(tmp_path: Path) -> None:
     """US-TBL-09/AC-1: exit codes are returned or fail according to policy."""
     result, _ = execute(tmp_path, "exit 3", "powershell", fail_on_nonzero=False)
@@ -66,6 +72,7 @@ def test_shell_nonzero_and_fail_policy(tmp_path: Path) -> None:
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(not POWERSHELL_AVAILABLE, reason="PowerShell is not installed")
 def test_shell_worker_streams_logs_in_real_time(tmp_path: Path) -> None:
     """US-TBL-09/AC-3: Worker log notifications arrive before process completion."""
     (tmp_path / "nodes").mkdir()

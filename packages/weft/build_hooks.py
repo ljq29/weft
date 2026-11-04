@@ -9,6 +9,8 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict[str, Any]) -> None:
+        if version == "editable":
+            return
         root = Path(self.root)
         frontend = root.parent.parent / "frontend" / "dist"
         if not (frontend / "index.html").is_file():
