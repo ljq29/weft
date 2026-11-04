@@ -178,3 +178,22 @@ def test_worker_crash_fails_request_and_cleans_up(workflow_env: WorkflowEnvironm
         assert not workflow_env.process_alive(process_ids)
 
     asyncio.run(scenario())
+
+
+def test_workflow_uv_ignores_host_project_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """US-EXE-14/AC-1: workflow sync never inherits the host UV_PROJECT_ENVIRONMENT."""
+    from types import SimpleNamespace
+
+    monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", ".venv-host")
+    captured: dict = {}
+
+    def run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr("weft.worker.environment.subprocess.run", run)
+    WorkflowEnvironment(tmp_path).run_uv("sync")
+    environment = captured["env"]
+    assert "UV_PROJECT_ENVIRONMENT" not in environment

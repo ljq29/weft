@@ -64,7 +64,12 @@ module = ["pyarrow", "simpleeval", "apscheduler.*", "watchdog.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["weft.engine.lock"]
+module = [
+  "weft.engine.lock",
+  "weft.excel.lock",
+  "weft.excel.xlwings_backend",
+  "weft.worker.environment",
+]
 disable_error_code = ["attr-defined"]
 
 [tool.importlinter]

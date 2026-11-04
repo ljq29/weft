@@ -244,13 +244,17 @@ class ExcelWorkerSupervisor:
         return len(self._process.pending) if self._process is not None else 0
 
     async def release_run(self, run_id: str, on_finish: str | None = None) -> dict[str, Any]:
+        if on_finish is not None and on_finish not in {"save", "discard"}:
+            raise ValueError("on_finish must be save or discard")
+        if self._process is None:
+            self._run_ids.discard(run_id)
+            return {"references": [], "close_reports": []}
         if on_finish is not None:
-            if on_finish not in {"save", "discard"}:
-                raise ValueError("on_finish must be save or discard")
             await self.submit("set_run_finish", on_finish, run_id=run_id)
         result = await self.submit("release_run", run_id=run_id)
         if not isinstance(result, dict):
             raise TypeError("release_run must return an object")
+        self._run_ids.discard(run_id)
         return result
 
     def close(self) -> None:

@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+pytest.importorskip("pythoncom", reason="Excel recovery tests require Windows COM")
+
 from weft.excel import (
     ExcelWorkerError,
     ExcelWorkerRestartedError,

@@ -107,3 +107,16 @@ def test_fast_mode_restores_state() -> None:
     with backend.fast_mode(app):
         assert app["fast_mode"] is True
     assert app["fast_mode"] == "original"
+
+
+@pytest.mark.anyio
+async def test_release_without_excel_work_does_not_start_worker() -> None:
+    """US-XLS-11/AC-3: unused and repeated releases are no-ops without a Worker process."""
+    worker = ExcelWorkerSupervisor(backend="xlwings")
+    try:
+        expected = {"references": [], "close_reports": []}
+        assert await worker.release_run("r_unused") == expected
+        assert await worker.release_run("r_unused", on_finish="discard") == expected
+        assert worker._process is None
+    finally:
+        worker.close()

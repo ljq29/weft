@@ -10,6 +10,7 @@ import sys
 import time
 import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -127,12 +128,15 @@ class SandboxieSandbox:
         if resolved.is_relative_to(home):
             return self.sandbox_root / "user" / "current" / resolved.relative_to(home)
         drive = resolved.drive.rstrip(":\\")
+        if os.name != "nt":
+            drive = "C"
         if not drive:
             raise SandboxCapabilityError(f"Sandbox output requires a local drive path: {path}")
         return self.sandbox_root / "drive" / drive / resolved.relative_to(Path(resolved.anchor))
 
     def _record(self) -> dict[str, Any]:
-        from weft.excel.xlwings_backend import process_created_at
+        if os.name == "nt":
+            from weft.excel.xlwings_backend import process_created_at
 
         return {
             "run_id": self.run_id,
@@ -142,7 +146,11 @@ class SandboxieSandbox:
             "owned_pids": [
                 {
                     "pid": pid,
-                    "process_created_at": process_created_at(pid),
+                    "process_created_at": (
+                        process_created_at(pid)
+                        if os.name == "nt"
+                        else datetime.now(UTC).isoformat()
+                    ),
                 }
                 for pid in self.processes
             ],
