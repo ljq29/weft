@@ -26,13 +26,13 @@ Nuitka standalone 主程序和内置完整 Python 各自携带 Polars、Arrow �
 
 ## Consequences
 
-收益是发布 ZIP 实测约 22 MiB，构建不再需要 Nuitka，主服务与 helper 共用一份应用依赖，uv 缓存还能供工作流环境复用。代价是首次启动需要下载并等待安装，CMD 父进程需要随应用生命周期存在，进程树清理必须包含其子 Python；离线能力取决于本机缓存，代码签名和 SmartScreen 信誉仍需独立处理。
+收益是发布 ZIP 实测约 15 MB，构建不再需要 Nuitka，主服务与 helper 共用一份应用依赖，uv 缓存还能供工作流环境复用。代价是首次启动需要下载并等待安装，CMD 父进程需要随应用生命周期存在，进程树清理必须包含其子 Python；离线能力取决于本机缓存，代码签名和 SmartScreen 信誉仍需独立处理。
 
 ## Verification
 
 - `packages/weft/tests/test_portable.py` 覆盖应用 Python、托管 base Python、内置 uv、缓存和开发环境路径选择。
-- 构建烟测已确认目录约 60 MiB、ZIP 约 22 MiB，`weft.cmd --version` 与 `--bootstrap-help` 可直接执行。
-- `scripts/verify_portable.py` 使用独立 `%LOCALAPPDATA%` 和仅 System32 的 PATH，校验 manifest、首次托管 Python/依赖下载、真实 CSV、缓存离线重跑与 `--repair`、鉴权服务与前端，并清理 CMD/Python 进程树；最终候选产物已完整通过。
+- 构建烟测已确认目录约 60 MiB、Release ZIP 为 15,259,248 字节，`weft.cmd --version` 与 `--bootstrap-help` 可直接执行。
+- `scripts/verify_portable.py` 使用独立 `%LOCALAPPDATA%` 和仅 System32 的 PATH，校验 manifest、首次托管 Python/依赖下载、真实 CSV、缓存离线重跑与 `--repair`、鉴权服务与前端，并清理 CMD/Python 进程树；最终候选产物已完整通过；ZIP 在含空格路径解压后重复通过。
 - 184 项单元测试、36 项集成测试、23 项前端测试和 11 项 Playwright E2E 通过；12 项真实 Excel/Sandboxie `win_real` 测试通过，托管 Python 下 `doctor --json` 为 `fail_count=0`。
 - CI 与 Release 均执行同一启动器验收，不能只检查版本输出或 wheel import。
 

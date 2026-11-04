@@ -29,6 +29,7 @@ Release 使用标签对应的提交和 `contents: write` 权限。真实 Excel/S
 - 首次实施版本为 `v0.1.0`，GitHub Actions 运行 `41791135262` 成功，Release 位于 `https://github.com/ljq29/weft/releases/tag/v0.1.0`。
 - `v0.1.0` 的三个 wheel 下载资产与本地构建逐字节一致，隔离环境安装及两个 CLI 的 `--version` 均验证为 `0.1.0`。
 - `v0.1.1` 由运行 `41812711363` 发布，包含三个 wheel 与 `weft-windows-x64.zip`；远程绿色版验收通过，下载 ZIP 后在本机再次执行解压验收。
+- `v0.2.0` 由运行 `41867153086` 发布，完整 Release 门禁和 CMD 启动器验收通过；同提交的 main CI 运行 `41867145937` 覆盖单元、集成、前端、E2E 与启动器构建验收。下载的四个 Release 资产通过 API SHA-256 校验，三个 wheel 与本地逐字节一致，下载 ZIP 的完整性、manifest 及含空格路径下的完整启动验收通过。
 
 ## 记录审计
 

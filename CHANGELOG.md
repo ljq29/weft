@@ -8,7 +8,7 @@
 
 - Replace the Nuitka standalone executable and duplicated bundled Python with pure-Python wheels and a CMD bootstrap launcher.
 - Use the bundled uv to download managed CPython and locked production dependencies into versioned environments under `%LOCALAPPDATA%/Weft` on first run.
-- Reduce `weft-windows-x64.zip` from approximately 292 MiB to 22 MiB before bootstrap; Python and locked dependencies are downloaded once and reused.
+- Reduce `weft-windows-x64.zip` from approximately 292 MiB to 15 MB before bootstrap; Python and locked dependencies are downloaded once and reused.
 - Add `--china` with Tsinghua PyPI and gh-proxy Python downloads, custom package/Python mirrors, cached `--offline` execution and `--repair` bootstrap options.
 - Run clean bootstrap, real CSV, cached offline, authenticated service and frontend acceptance in both CI and the tag-driven Release workflow.
 
