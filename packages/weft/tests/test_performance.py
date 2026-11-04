@@ -215,3 +215,58 @@ def test_ws_status_latency_p95_benchmark() -> None:
     output = Path(".test-reports/ws-latency-benchmark.json")
     output.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report))
+
+
+@pytest.mark.benchmark
+def test_real_service_cold_start_benchmark(tmp_path: Path) -> None:
+    """US-SET-02/AC-1; US-SET-04/AC-1: measure real serve until health and version are ready."""
+    import socket
+    import subprocess
+    import sys
+    import urllib.request
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    config = tmp_path / "config"
+    environment = dict(os.environ)
+    environment["WEFT_CONFIG_DIR"] = str(config)
+    started = time.perf_counter()
+    process = subprocess.Popen(
+        [sys.executable, "-m", "weft", "serve", "--no-browser", "--port", str(port)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env=environment,
+    )
+    try:
+        for _ in range(500):
+            try:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/health", timeout=0.1
+                ) as response:
+                    assert response.status == 200
+                    break
+            except OSError:
+                time.sleep(0.02)
+        else:
+            raise AssertionError("service did not start")
+        session = json.loads((config / "session.json").read_text(encoding="utf-8"))
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{port}/api/system/version",
+            headers={"Authorization": f"Bearer {session['token']}"},
+        )
+        with urllib.request.urlopen(request, timeout=1) as response:
+            assert json.loads(response.read())["version"] == "0.0.0"
+        elapsed = time.perf_counter() - started
+    finally:
+        process.terminate()
+        process.wait(timeout=10)
+    report = {
+        "cold_start_seconds": elapsed,
+        "health_status": 200,
+        "version_status": 200,
+        "environment": {"os": platform.platform(), "python": platform.python_version()},
+    }
+    output = Path(".test-reports/service-cold-start-benchmark.json")
+    output.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(json.dumps(report))

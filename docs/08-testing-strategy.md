@@ -175,6 +175,8 @@
 
 同一文件还记录 50 个线性 No-op 节点和 50 次认证 WS 推送。三次引擎调度分别为 1.600、1.646、1.592 ms/节点，均低于 5 ms；WS p95 分别为 0.206、0.249、0.217 ms，均低于 200 ms。对应报告为 `.test-reports/engine-scheduler-benchmark-run*.json` 与 `ws-latency-benchmark-run*.json`。
 
+真实 `weft serve` 冷启动到健康检查和鉴权 version 均可用，三次分别为 0.821、0.785、0.663 秒，均低于 2 秒；报告为 `.test-reports/service-cold-start-benchmark-run*.json`。首屏可交互时间仍由 E2E 单独验收，不与该值混为一谈。
+
 ---
 
 ## 7. AC 追溯矩阵与自动化覆盖门禁
