@@ -43,7 +43,8 @@ jobs:
       - run: uv build --wheel --out-dir dist packages/weft-worker
       - run: uv build --wheel --out-dir dist packages/weft
       - run: uv run python scripts/build_portable.py --skip-frontend-build --skip-wheel-build
-      - run: uv run python scripts/verify_portable.py
+      - name: Verify clean bootstrap and cached offline execution
+        run: uv run python scripts/verify_portable.py
       - uses: actions/upload-artifact@v4
         with:
           name: weft-${{ github.ref_name }}-packages

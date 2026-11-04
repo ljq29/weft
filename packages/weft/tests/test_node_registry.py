@@ -31,10 +31,10 @@ def test_custom_nodes_can_be_registered_and_exported() -> None:
     assert exported["nodes"][0]["params_schema"]["type"] == "object"
 
 
-def test_compiled_node_implementation_hash_has_versioned_fallback(
+def test_node_implementation_hash_has_versioned_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """T7.10: Nuitka nodes retain deterministic cache keys without Python source files."""
+    """T7.10: nodes retain deterministic cache keys when Python source is unavailable."""
     monkeypatch.setattr(
         "weft.nodes.registry.inspect.getsource", lambda _: (_ for _ in ()).throw(OSError())
     )

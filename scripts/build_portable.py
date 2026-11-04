@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
 import shutil
 import subprocess
-import sys
 import zipfile
 from pathlib import Path
 
@@ -13,93 +14,83 @@ from weft import __version__
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 BUNDLE = DIST / "weft-windows-x64"
+PYTHON_VERSION = "3.12"
 
 
 def run(command: list[str], *, cwd: Path = ROOT, env: dict[str, str] | None = None) -> None:
     subprocess.run(command, cwd=cwd, env=env, check=True)
 
 
-def compile_nuitka() -> Path:
-    output = ROOT / "build" / "nuitka"
-    output.mkdir(parents=True, exist_ok=True)
-    run(
-        [
-            sys.executable,
-            "-m",
-            "nuitka",
-            "--standalone",
-            "--assume-yes-for-downloads",
-            "--jobs=4",
-            "--lto=no",
-            f"--output-dir={output}",
-            "--output-filename=weft.exe",
-            "--company-name=Weft",
-            "--product-name=Weft",
-            f"--file-version={__version__}",
-            f"--product-version={__version__}",
-            "--file-description=Local-first visual workflow tool",
-            "--include-package=weft",
-            "--include-package=weft_worker",
-            "--include-package=weft_sdk",
-            "--nofollow-import-to=pytest",
-            "--nofollow-import-to=mypy",
-            "--include-package-data=weft",
-            "--include-package-data=weft_worker",
-            "--include-package-data=weft_sdk",
-            "packages/weft/src/weft/__main__.py",
-        ]
+def wheel_name(distribution: str) -> str:
+    return f"{distribution.replace('-', '_')}-{__version__}-py3-none-any.whl"
+
+
+def write_application_project(app: Path) -> None:
+    app.mkdir(parents=True)
+    (app / "VERSION").write_text(f"{__version__}\n", encoding="utf-8")
+    (app / "pyproject.toml").write_text(
+        f"""[project]
+name = "weft-application"
+version = "{__version__}"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "weft=={__version__}",
+    "weft-worker=={__version__}",
+    "weft-sdk=={__version__}",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+weft = {{ path = "../wheels/{wheel_name("weft")}" }}
+weft-worker = {{ path = "../wheels/{wheel_name("weft-worker")}" }}
+weft-sdk = {{ path = "../wheels/{wheel_name("weft-sdk")}" }}
+
+[tool.uv.workspace]
+""",
+        encoding="utf-8",
     )
-    return output / "__main__.dist"
 
 
-def copy_runtime(destination: Path) -> Path:
-    runtime = destination / "runtime" / "python"
-    shutil.copytree(
-        Path(sys.base_prefix),
-        runtime,
-        ignore=shutil.ignore_patterns("site-packages", "__pycache__", "*.pyc"),
+def write_manifest() -> None:
+    files = {
+        str(path.relative_to(BUNDLE)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(BUNDLE.rglob("*"))
+        if path.is_file() and path.name != "manifest.json"
+    }
+    (BUNDLE / "app" / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "version": __version__,
+                "python": PYTHON_VERSION,
+                "entrypoint": "weft.cmd",
+                "first_run_download": True,
+                "files": files,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
     )
-    python = runtime / "python.exe"
-    environment = os.environ.copy()
-    environment.setdefault("UV_INDEX_URL", "https://pypi.tuna.tsinghua.edu.cn/simple")
-    run(
-        [
-            shutil.which("uv") or "uv",
-            "pip",
-            "install",
-            "--python",
-            str(python),
-            "--find-links",
-            str(DIST),
-            f"weft=={__version__}",
-            f"weft-worker=={__version__}",
-            f"weft-sdk=={__version__}",
-        ],
-        env=environment,
-    )
-    return python
 
 
-def copy_distribution(compiled: Path) -> None:
+def copy_distribution() -> None:
     if BUNDLE.exists():
         shutil.rmtree(BUNDLE)
-    shutil.copytree(compiled, BUNDLE)
-    copy_runtime(BUNDLE)
-    tools = BUNDLE / "tools"
-    tools.mkdir()
-    shutil.copy2(shutil.which("uv") or "uv", tools / "uv.exe")
-    wheels = BUNDLE / "wheels"
-    wheels.mkdir()
-    for name in (
-        f"weft-{__version__}-py3-none-any.whl",
-        f"weft_worker-{__version__}-py3-none-any.whl",
-        f"weft_sdk-{__version__}-py3-none-any.whl",
-    ):
-        shutil.copy2(DIST / name, wheels / name)
+    (BUNDLE / "tools").mkdir(parents=True)
+    (BUNDLE / "wheels").mkdir()
+    shutil.copy2(ROOT / "packaging" / "weft.cmd", BUNDLE / "weft.cmd")
+    shutil.copy2(shutil.which("uv") or "uv", BUNDLE / "tools" / "uv.exe")
+    for distribution in ("weft", "weft-worker", "weft-sdk"):
+        shutil.copy2(DIST / wheel_name(distribution), BUNDLE / "wheels" / wheel_name(distribution))
+    app = BUNDLE / "app"
+    write_application_project(app)
+    environment = os.environ.copy()
+    environment.setdefault("UV_INDEX_URL", "https://pypi.tuna.tsinghua.edu.cn/simple")
+    run([shutil.which("uv") or "uv", "lock"], cwd=app, env=environment)
     shutil.copy2(ROOT / "LICENSE", BUNDLE / "LICENSE.txt")
-    python_license = Path(sys.base_prefix) / "LICENSE.txt"
-    if python_license.is_file():
-        shutil.copy2(python_license, BUNDLE / "LICENSE-Python.txt")
     (BUNDLE / "LICENSE-uv.txt").write_text(
         "MIT License\n\nCopyright (c) uv developers\n\n"
         "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
@@ -119,6 +110,18 @@ def copy_distribution(compiled: Path) -> None:
         "SOFTWARE.\n",
         encoding="utf-8",
     )
+    (BUNDLE / "README.txt").write_text(
+        f"Weft {__version__} - Windows x64\n\n"
+        "Run weft.cmd. The first application run downloads managed CPython and locked\n"
+        "dependencies with the bundled uv; no host Python or uv is required.\n\n"
+        "Examples:\n"
+        "  weft.cmd serve\n"
+        "  weft.cmd --china serve\n"
+        "  weft.cmd --bootstrap-help\n\n"
+        "Excel, Sandboxie-Plus and optional Node.js/pi remain separate dependencies.\n",
+        encoding="utf-8",
+    )
+    write_manifest()
 
 
 def write_archive() -> Path:
@@ -149,8 +152,7 @@ def main() -> None:
                     f"packages/{package}",
                 ]
             )
-    compiled = compile_nuitka()
-    copy_distribution(compiled)
+    copy_distribution()
     archive = write_archive()
     print(f"Portable bundle: {BUNDLE}")
     print(f"Portable archive: {archive}")

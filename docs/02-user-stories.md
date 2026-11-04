@@ -978,7 +978,7 @@ AC-2  ...
 - AC-1 `weft --help` 列出 `serve run pack unpack doctor`；全部命令支持 `--json` 输出。
 - AC-2 `weft doctor` 检查并逐项报告 OK/WARN/FAIL：Python 版本、uv、Excel 可连接性、Sandboxie、pi、端口占用、`%APPDATA%` 可写；退出码 = FAIL 项数。
 - AC-3 `weft doctor --cleanup` 清理孤儿隐藏 Excel 实例（US-XLS-02 AC-3）与沙箱残留进程。
-- AC-4 `[int]` Nuitka 绿色目录内置主程序、Python、uv 与同版本本地 wheel；在不含宿主 Python/uv 的 PATH 下，`weft.exe --version`、真实 CSV 工作流、鉴权服务 API 与前端均通过，Excel/Sandboxie doctor 使用内置 Python。
+- AC-4 `[int]` Windows 轻量目录内置 CMD 启动器、uv、生产依赖锁与同版本本地 wheel，不内置 Python 或编译主程序；在不含宿主 Python/uv 的 PATH 和独立 `%LOCALAPPDATA%` 下，`weft.cmd --version`、首次托管 Python/依赖下载、真实 CSV 工作流、缓存离线重跑、鉴权服务 API 与前端均通过，Excel/Sandboxie doctor 使用应用环境 Python，工作流 venv 使用 uv 托管 base Python。
 
 ### US-SET-05 托盘（占位） [P2]
 

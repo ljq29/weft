@@ -74,7 +74,7 @@ jobs:
       - run: pnpm -C e2e exec playwright install chromium
       - run: pnpm -C e2e test
 
-  build-wheels:
+  build-packages:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +88,12 @@ jobs:
       - run: uv build --wheel --out-dir dist packages/weft-sdk
       - run: uv build --wheel --out-dir dist packages/weft-worker
       - run: uv build --wheel --out-dir dist packages/weft
+      - run: uv run python scripts/build_portable.py --skip-frontend-build --skip-wheel-build
+      - name: Verify clean bootstrap and cached offline execution
+        run: uv run python scripts/verify_portable.py
       - uses: actions/upload-artifact@v4
         with:
-          name: weft-wheels
-          path: dist/*.whl
+          name: weft-packages
+          path: |
+            dist/*.whl
+            dist/*.zip

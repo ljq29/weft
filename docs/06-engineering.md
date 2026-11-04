@@ -138,5 +138,5 @@ uv run poe check                          # = ruff + mypy + pytest + 前端 lint
 
 - 版本：SemVer。0.x 阶段 REST/WS 可破坏；1.0 起只新增。P0 表示完整 v1 必须，不等于首个公开版全交付：M0–M3 发布首个公开 MVP，M4–M6 为后续预览，M7 才形成完整 v1。具体版本号在对应里程碑发布前确定，不预写 M7=`0.1.0`。
 - 主服务、`weft-worker` 与工作流锁定的 Worker 版本必须一致；`weft --version` 与 `/api/system/version` 一致。
-- 打包：`uv build` 生成三个 wheel，`uv run python scripts/build_portable.py` 使用 Nuitka 生成 `weft-windows-x64.zip`。绿色目录内置 Python、uv 和同版本 wheel，`uv run python scripts/verify_portable.py` 验证无宿主 Python/uv 的真实工作流与服务。提交版本变更后推送匹配的 `v<version>` 标签，`.github/workflows/release.yml` 会在完整自动化和绿色版验收通过后创建 GitHub Release；标签必须与三包版本一致。
+- 打包：`uv build` 生成三个 wheel，`uv run python scripts/build_portable.py` 生成轻量 `weft-windows-x64.zip`。目录内置 CMD 启动器、uv、生产锁和同版本 wheel，不携带 Python；`weft.cmd` 首次运行通过 uv 在 `%LOCALAPPDATA%/Weft` 下载托管 CPython 并创建版本化应用环境，支持 `--china`、自定义镜像、`--offline` 与 `--repair`。`uv run python scripts/verify_portable.py` 验证无宿主 Python/uv 的首次下载、真实工作流、缓存离线重跑与服务。提交版本变更后推送匹配的 `v<version>` 标签，`.github/workflows/release.yml` 会在完整自动化和启动器验收通过后创建 GitHub Release；标签必须与三包版本一致。
 - 发布前 checklist：`weft doctor` 真机全绿、`-m win_real` 测试通过、`e2e` 通过、docs 与 CHANGELOG 更新。Fake 绿灯不能替代 win_real。

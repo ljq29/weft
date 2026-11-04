@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -18,12 +19,51 @@ WORK = ROOT / ".test-reports" / "portable-acceptance"
 
 def isolated_environment() -> dict[str, str]:
     environment = os.environ.copy()
-    environment["PATH"] = str(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32")
+    system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+    environment["PATH"] = str(system_root / "System32")
+    environment["LOCALAPPDATA"] = str(WORK / "local-app-data")
     environment["WEFT_CONFIG_DIR"] = str(WORK / "config")
     environment["UV_INDEX_URL"] = "https://pypi.tuna.tsinghua.edu.cn/simple"
-    for name in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "UV_PYTHON", "UV_PROJECT_ENVIRONMENT"):
+    for name in (
+        "PYTHONPATH",
+        "PYTHONHOME",
+        "VIRTUAL_ENV",
+        "UV_PYTHON",
+        "UV_PROJECT_ENVIRONMENT",
+        "UV_FIND_LINKS",
+        "UV_CACHE_DIR",
+        "UV_PYTHON_INSTALL_DIR",
+        "UV_PYTHON_INSTALL_MIRROR",
+        "UV_PYTHON_PREFERENCE",
+        "UV_PYTHON_DOWNLOADS",
+        "UV_OFFLINE",
+        "WEFT_PORTABLE_ROOT",
+        "WEFT_BASE_PYTHON",
+        "WEFT_UV_EXECUTABLE",
+    ):
         environment.pop(name, None)
     return environment
+
+
+def launcher_command(executable: Path, environment: dict[str, str], *args: str) -> list[str]:
+    system_root = Path(environment.get("SystemRoot", r"C:\Windows"))
+    return [str(system_root / "System32" / "cmd.exe"), "/c", str(executable), *args]
+
+
+def verify_manifest() -> None:
+    manifest = json.loads((BUNDLE / "app" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["version"] == __version__
+    assert manifest["entrypoint"] == "weft.cmd"
+    assert manifest["first_run_download"] is True
+    expected = manifest["files"]
+    actual = {
+        str(path.relative_to(BUNDLE)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(BUNDLE.rglob("*"))
+        if path.is_file() and path.name != "manifest.json"
+    }
+    assert actual == expected
+    assert not (BUNDLE / "runtime").exists()
+    assert not (BUNDLE / "weft.exe").exists()
 
 
 def write_workflow(root: Path) -> None:
@@ -34,7 +74,7 @@ def write_workflow(root: Path) -> None:
         f"""[project]
 name = "portable-acceptance"
 version = "0.0.0"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = ["weft-worker=={__version__}"]
 """,
         encoding="utf-8",
@@ -49,8 +89,8 @@ dependencies = ["weft-worker=={__version__}"]
         {
             "id": f"e_{index:08x}",
             "source": nodes[index - 1][0],
-            "sourcePort": "out",
             "target": nodes[index][0],
+            "sourcePort": "out",
             "targetPort": "in",
             "order": 0,
         }
@@ -80,12 +120,62 @@ dependencies = ["weft-worker=={__version__}"]
     (root / "workflow.json").write_text(json.dumps(document), encoding="utf-8")
 
 
+def run_workflow(
+    executable: Path, environment: dict[str, str], workflow: Path, *options: str
+) -> None:
+    result = subprocess.run(
+        launcher_command(executable, environment, *options, "run", str(workflow), "--wait"),
+        env=environment,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=360,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (workflow / "out" / "result.csv").read_text(encoding="utf-8-sig").splitlines() == [
+        "amount",
+        "3",
+        "2",
+    ]
+
+
+def stop_process_tree(process: subprocess.Popen[bytes], environment: dict[str, str]) -> None:
+    if process.poll() is not None:
+        return
+    system_root = Path(environment.get("SystemRoot", r"C:\Windows"))
+    subprocess.run(
+        [
+            str(system_root / "System32" / "taskkill.exe"),
+            "/PID",
+            str(process.pid),
+            "/T",
+            "/F",
+        ],
+        env=environment,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+        timeout=15,
+    )
+    process.wait(timeout=15)
+
+
 def verify_service(executable: Path, environment: dict[str, str]) -> None:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     process = subprocess.Popen(
-        [str(executable), "serve", "--no-browser", "--no-triggers", "--port", str(port)],
+        launcher_command(
+            executable,
+            environment,
+            "--offline",
+            "serve",
+            "--no-browser",
+            "--no-triggers",
+            "--port",
+            str(port),
+        ),
         env=environment,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -110,18 +200,18 @@ def verify_service(executable: Path, environment: dict[str, str]) -> None:
         else:
             raise AssertionError("Portable service did not become ready")
     finally:
-        process.terminate()
-        process.wait(timeout=15)
+        stop_process_tree(process, environment)
 
 
 def main() -> None:
     if WORK.exists():
         shutil.rmtree(WORK)
     WORK.mkdir(parents=True)
-    executable = BUNDLE / "weft.exe"
+    executable = BUNDLE / "weft.cmd"
     environment = isolated_environment()
+    verify_manifest()
     result = subprocess.run(
-        [str(executable), "--version"],
+        launcher_command(executable, environment, "--version"),
         env=environment,
         check=True,
         capture_output=True,
@@ -129,25 +219,25 @@ def main() -> None:
         timeout=30,
     )
     assert result.stdout.strip() == f"weft {__version__}"
-    workflow = WORK / "csv.weft"
-    write_workflow(workflow)
-    result = subprocess.run(
-        [str(executable), "run", str(workflow), "--wait"],
+    help_result = subprocess.run(
+        launcher_command(executable, environment, "--bootstrap-help"),
         env=environment,
+        check=True,
         capture_output=True,
         text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=240,
+        timeout=30,
     )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert (workflow / "out" / "result.csv").read_text(encoding="utf-8-sig").splitlines() == [
-        "amount",
-        "3",
-        "2",
-    ]
+    assert "--china" in help_result.stdout and "--offline" in help_result.stdout
+    workflow = WORK / "csv.weft"
+    write_workflow(workflow)
+    run_workflow(executable, environment, workflow, "--china")
+    run_workflow(executable, environment, workflow, "--offline")
+    run_workflow(executable, environment, workflow, "--offline", "--repair")
     verify_service(executable, environment)
-    print("Portable CLI, CSV workflow, service API and frontend passed without host Python or uv")
+    print(
+        "Portable bootstrap, cached offline repair/workflow, service API and frontend passed "
+        "without host Python or uv"
+    )
 
 
 if __name__ == "__main__":

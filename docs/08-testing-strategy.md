@@ -242,10 +242,10 @@ jobs:
   unit-and-integration: # windows-latest: pytest unit/integration + coverage_matrix.py
   frontend:             # windows-latest: vitest + frontend build
   e2e:                  # windows-latest: playwright (真实后端 + Fake backends)
-  build-wheels:         # windows-latest: 构建并上传三个 wheel 产物
+  build-packages:       # windows-latest: 构建 wheel/启动器 ZIP，验证首次下载与缓存离线运行
 ```
 
-版本发布由 `.github/workflows/release.yml` 单独执行：推送与包版本匹配的 `v*.*.*` 标签后，依次通过完整检查、集成测试、E2E、wheel 构建、Nuitka 绿色目录构建与 `scripts/verify_portable.py`，才创建 GitHub Release。绿色版验收使用不含 Python/uv 的 PATH 跑真实 CSV 工作流，并验证服务 API 与前端。标签不匹配或任一自动化失败时不得发布；该流程不替代本机 `win_real` 与人工里程碑门禁。
+版本发布由 `.github/workflows/release.yml` 单独执行：推送与包版本匹配的 `v*.*.*` 标签后，依次通过完整检查、集成测试、E2E、wheel 构建、CMD 启动器轻量目录构建与 `scripts/verify_portable.py`，才创建 GitHub Release。启动器验收使用不含 Python/uv 的 PATH 和独立 `%LOCALAPPDATA%`，验证 manifest、首次托管 Python/依赖下载、真实 CSV、缓存离线重跑、服务 API 与前端，并清理完整进程树。标签不匹配或任一自动化失败时不得发布；该流程不替代本机 `win_real` 与人工里程碑门禁。
 
 ### 9.2 Windows 真机一键回归脚本（`scripts/weft-test-win.ps1`）
 
