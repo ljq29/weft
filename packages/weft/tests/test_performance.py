@@ -270,3 +270,57 @@ def test_real_service_cold_start_benchmark(tmp_path: Path) -> None:
     output = Path(".test-reports/service-cold-start-benchmark.json")
     output.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report))
+
+
+@pytest.mark.benchmark
+def test_pure_cache_materialization_100k_by_20_benchmark(tmp_path: Path) -> None:
+    """US-EXE-04/AC-5: measure cached 100,000×20 output copy, hash reuse and disk growth."""
+    from weft.engine.cache import CacheManager
+    from weft.workflow.values import ValueRef
+
+    table = pa.Table.from_arrays(
+        [pa.array([row * 20 + column for row in range(100_000)]) for column in range(20)],
+        names=[f"c{column}" for column in range(20)],
+    )
+    source_path = tmp_path / "source.arrow"
+    with pa.ipc.new_file(source_path, table.schema) as writer:
+        writer.write_table(table)
+    digest = hash_file(source_path)
+    reference = ValueRef(
+        kind="table",
+        path=source_path,
+        hash=digest,
+        rows=100_000,
+        cols=20,
+    )
+    manager = CacheManager(tmp_path)
+    manager.store("n_00000001", "benchmark", {"out": reference}, None)
+    cached = manager.load("n_00000001", "benchmark")
+    assert cached is not None
+
+    run_root = tmp_path / ".runs" / "r_cache_benchmark"
+    started = time.perf_counter()
+    materialized = manager.materialize(run_root, "n_00000001", cached.outputs)
+    copy_seconds = time.perf_counter() - started
+    output_ref = materialized["out"]
+    assert output_ref.path is not None
+    output_path = tmp_path / output_ref.path
+    assert output_path.is_file()
+    assert output_ref.hash == digest
+    with pa.memory_map(str(output_path)) as source:
+        restored = pa.ipc.open_file(source).read_all()
+    assert restored.num_rows == 100_000 and restored.num_columns == 20
+    output_files = [path for path in run_root.rglob("*") if path.is_file()]
+    disk_increment = sum(path.stat().st_size for path in output_files)
+    report = {
+        "rows": 100_000,
+        "cols": 20,
+        "copy_seconds": copy_seconds,
+        "disk_increment_bytes": disk_increment,
+        "source_bytes": source_path.stat().st_size,
+        "hash_reused": output_ref.hash == digest,
+        "environment": {"os": platform.platform(), "python": platform.python_version()},
+    }
+    output = Path(".test-reports/cache-materialize-benchmark.json")
+    output.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(json.dumps(report))

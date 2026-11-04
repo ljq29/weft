@@ -177,6 +177,8 @@
 
 真实 `weft serve` 冷启动到健康检查和鉴权 version 均可用，三次分别为 0.821、0.785、0.663 秒，均低于 2 秒；报告为 `.test-reports/service-cold-start-benchmark-run*.json`。首屏可交互时间仍由 E2E 单独验收，不与该值混为一谈。
 
+100,000×20 pure 缓存命中物化通过 `CacheManager.store → load → materialize` 验证，三次复制分别为 6.483、5.525、6.363 ms；每次磁盘增量均为 16,003,194 字节，与源 Arrow 文件一致，哈希保持复用。报告为 `.test-reports/cache-materialize-benchmark-run*.json`，作为后续同机回归基线。
+
 ---
 
 ## 7. AC 追溯矩阵与自动化覆盖门禁
