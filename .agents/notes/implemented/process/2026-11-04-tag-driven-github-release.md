@@ -26,7 +26,8 @@ Release 使用标签对应的提交和 `contents: write` 权限。真实 Excel/S
 
 - 标签与包版本不一致时，发布在构建前失败。
 - Release 创建依赖全部测试、E2E 和 wheel 构建成功。
-- 首次实施版本为 `v0.1.0`；实际运行编号、Release 地址和产物在发布验收后记录于工程文档。
+- 首次实施版本为 `v0.1.0`，GitHub Actions 运行 `41791135262` 成功，Release 位于 `https://github.com/ljq29/weft/releases/tag/v0.1.0`。
+- Release 包含 `weft`、`weft-worker`、`weft-sdk` 三个 wheel；下载资产与本地构建逐字节一致，隔离环境安装及两个 CLI 的 `--version` 均验证为 `0.1.0`。
 
 ## 记录审计
 
