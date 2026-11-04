@@ -785,7 +785,10 @@ def create_app(
     @app.websocket("/api/ws")
     async def websocket(socket: WebSocket) -> None:
         await socket.accept()
-        message = await socket.receive_json()
+        try:
+            message = await socket.receive_json()
+        except WebSocketDisconnect:
+            return
         if message.get("op") != "authenticate" or not secrets.compare_digest(
             message.get("token", ""), session.token
         ):
@@ -886,16 +889,23 @@ def merge_patch(document: dict[str, Any], patch: dict[str, Any]) -> dict[str, An
 
 
 async def send_events(socket: WebSocket, queue: asyncio.Queue[dict[str, Any]]) -> None:
-    while True:
-        event = await queue.get()
-        await socket.send_json(
-            {
-                "topic": f"run:{event['run_id']}",
-                "event": event["event"],
-                "ts": event["ts"],
-                "data": {**event["data"], "run_id": event["run_id"], "node_id": event["node_id"]},
-            }
-        )
+    try:
+        while True:
+            event = await queue.get()
+            await socket.send_json(
+                {
+                    "topic": f"run:{event['run_id']}",
+                    "event": event["event"],
+                    "ts": event["ts"],
+                    "data": {
+                        **event["data"],
+                        "run_id": event["run_id"],
+                        "node_id": event["node_id"],
+                    },
+                }
+            )
+    except WebSocketDisconnect:
+        return
 
 
 def error(code: str, message: str, status: int) -> JSONResponse:

@@ -42,6 +42,13 @@ def test_websocket_requires_authentication_before_subscribe() -> None:
             assert response["error"]["code"] == "UNAUTHORIZED"
 
 
+def test_websocket_disconnect_before_authentication_is_clean() -> None:
+    """US-EXE-05/AC-5: a client may disconnect before authentication without a server error."""
+    with client() as api:
+        with api.websocket_connect("/api/ws") as socket:
+            assert socket.accepted_subprotocol is None
+
+
 def test_websocket_authenticate_subscribe_and_receive() -> None:
     """US-EXE-05/AC-1,5: authenticated subscribers receive matching run events."""
     app = create_app(token=TOKEN)
