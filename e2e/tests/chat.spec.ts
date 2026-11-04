@@ -10,20 +10,28 @@ const config = resolve(
 const projectRoot = resolve(import.meta.dirname, "../..");
 const token = () => JSON.parse(readFileSync(config, "utf8")).token as string;
 async function request(path: string, method = "GET", body?: unknown) {
-  const response = await fetch(`http://127.0.0.1:7788/api${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token()}`,
-      "Content-Type": "application/json",
-      "X-Weft-Client": "ui",
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!response.ok)
-    throw new Error(
-      `${method} ${path}: ${response.status} ${await response.text()}`,
-    );
-  return response.json();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(`http://127.0.0.1:7788/api${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token()}`,
+          "Content-Type": "application/json",
+          "X-Weft-Client": "ui",
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      if (!response.ok)
+        throw new Error(
+          `${method} ${path}: ${response.status} ${await response.text()}`,
+        );
+      return await response.json();
+    } catch (error) {
+      if (!(error instanceof TypeError) || attempt === 2) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+    }
+  }
+  throw new Error("unreachable");
 }
 async function saveDocument(id: string, document: any) {
   for (let attempt = 0; attempt < 3; attempt += 1) {

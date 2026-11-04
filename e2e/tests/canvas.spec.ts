@@ -24,7 +24,9 @@ test("US-DES-01/AC-1,3, US-DES-02/AC-1,4, US-DES-07/AC-1,2: create and save a wo
   await page.getByLabel("工作流名称").fill("e2e");
   await page.getByLabel("父目录").fill(testInfo.outputPath());
   await page.getByRole("button", { name: "新建工作流" }).click();
-  await expect(page.getByText("Trigger", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Trigger", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("e2e", { exact: true })).toBeVisible();
   await page.getByLabel("搜索节点").fill("read");
   await expect(

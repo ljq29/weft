@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-Weft 的开发、测试、E2E、wheel 构建和 GitHub Actions 统一在 Windows 上运行，不再声明或维护 WSL/Linux 支持。删除 Linux mypy 目标和 Ubuntu CI 矩阵，Playwright 在 Windows 安装 Chromium 时不使用 Linux 专用的 `--with-deps`。Python 依赖仍通过清华镜像获取，pnpm 使用 npmmirror。
+Weft 的开发、测试、E2E、wheel 构建和 GitHub Actions 统一在 Windows 上运行，不再声明或维护 WSL/Linux 支持。删除 Linux mypy 目标和 Ubuntu CI 矩阵，Playwright 在 Windows 安装 Chromium 时不使用 Linux 专用的 `--with-deps`。Python 依赖仍通过清华镜像获取，pnpm 使用 npmmirror。`.gitattributes` 统一文本文件为 LF，避免 Windows runner 的 CRLF 检出与 Prettier 配置冲突。
 
 Fake Excel、NoneSandbox 和 Mock LLM 继续保留：它们用于 Windows CI 隔离不可控外部依赖，不代表 Linux 支持，也不能替代本机登录态的 `win_real` 验收。PRD 中非目标章节继续明确不支持 macOS/Linux。
 
