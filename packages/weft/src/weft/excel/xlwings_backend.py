@@ -632,7 +632,11 @@ class XlwingsBackend:
                 if not book.Saved and book.Path:
                     book.Save()
         application.DisplayAlerts = False
+        for identifier in [key for key in self.workbooks if key.startswith(f"{app['pid']}:")]:
+            self.workbooks.pop(identifier, None)
         application.Quit()
+        self.apps.pop(app["pid"], None)
+        application = None
         for _ in range(20):
             if not process_alive(app["pid"]):
                 break
@@ -650,9 +654,6 @@ class XlwingsBackend:
                     break
                 time.sleep(0.1)
         self.owned.remove(app["pid"])
-        self.apps.pop(app["pid"], None)
-        for identifier in [key for key in self.workbooks if key.startswith(f"{app['pid']}:")]:
-            self.workbooks.pop(identifier, None)
 
     def probe(
         self, app: dict[str, Any] | None = None, delay: float = 0, modal: bool = False

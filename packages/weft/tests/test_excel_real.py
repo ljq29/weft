@@ -180,6 +180,8 @@ def test_real_visible_attach_fast_mode_restore_and_dates() -> None:
     backend = XlwingsBackend()
     backend.active_run_id = "excel-visible"
     app = backend.connect("new_visible")
+    application = None
+    sheet = None
     try:
         workbook = backend.workbook(app, "new")
         attached = backend.connect(
@@ -202,5 +204,7 @@ def test_real_visible_attach_fast_mode_restore_and_dates() -> None:
         result = backend.read_range(workbook, "Sheet1", "A1", False, {})
         assert result.to_pylist() == [{"Column_1": datetime(2026, 1, 2, 3, 4, 5)}]
     finally:
+        application = None
+        sheet = None
         backend.close_app(app, "discard")
         pythoncom.CoUninitialize()
