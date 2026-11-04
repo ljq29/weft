@@ -8,6 +8,7 @@ from typing import Any
 
 from weft_sdk import Node
 
+from weft import __version__
 from weft.workflow.ports import PortType
 from weft.workflow.validation import NodeDeclaration, PortDeclaration
 
@@ -87,9 +88,12 @@ class NodeRegistry:
                     self.register(value)
 
 
-def implementation_hash(node_type: type[Node]) -> str:
-    source = inspect.getsource(node_type).encode("utf-8")
-    return f"sha256:{hashlib.sha256(source).hexdigest()}"
+def implementation_hash(node_type: type[Any]) -> str:
+    try:
+        source = inspect.getsource(node_type)
+    except (OSError, TypeError):
+        source = f"{node_type.__module__}.{node_type.__qualname__}@{__version__}"
+    return f"sha256:{hashlib.sha256(source.encode('utf-8')).hexdigest()}"
 
 
 def builtin_registry() -> NodeRegistry:

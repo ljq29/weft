@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import inspect
 import json
 import shutil
 import traceback
@@ -29,6 +27,7 @@ from weft.engine.cache_key import (
 from weft.engine.errors import UnconfiguredNodesError
 from weft.engine.loops import execute_loop, region
 from weft.engine.models import NodeRecord, NodeStatus, PreparedRun, RunRecord, now
+from weft.nodes.registry import implementation_hash
 from weft.workflow.models import Edge, WorkflowDocument
 from weft.workflow.models import Node as WorkflowNode
 from weft.workflow.validation import validate_workflow
@@ -405,9 +404,7 @@ class Engine:
 
     def _cache_key(self, prepared: PreparedRun, node: WorkflowNode, params: dict[str, Any]) -> str:
         declaration = prepared.registry.get(node.type)
-        implementation = hashlib.sha256(
-            inspect.getsource(declaration.__class__).encode("utf-8")
-        ).hexdigest()
+        implementation = implementation_hash(declaration.__class__).removeprefix("sha256:")
         input_hashes = []
         for raw_edge in prepared.workflow.edges:
             edge = Edge.model_validate(raw_edge)

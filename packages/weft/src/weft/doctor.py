@@ -11,6 +11,7 @@ from typing import Any
 
 from weft.agent.settings import SettingsStore
 from weft.api.security import config_dir
+from weft.portable import python_executable, uv_executable
 
 
 def _check(checks: list[dict[str, str]], name: str, status: str, message: str) -> None:
@@ -45,7 +46,7 @@ def _sandboxie_probe(start: Path) -> str:
         root = Path(directory)
         sandbox = SandboxieSandbox(root, f"r_doctor_{root.name}", start)
         try:
-            process = sandbox.spawn([sys.executable, "-c", "print(1)"], root, {}, 15)
+            process = sandbox.spawn([str(python_executable()), "-c", "print(1)"], root, {}, 15)
             try:
                 returncode = process.wait(timeout=15)
                 stdout, _ = process.output()
@@ -57,7 +58,7 @@ def _sandboxie_probe(start: Path) -> str:
                 )
             network = sandbox.spawn(
                 [
-                    sys.executable,
+                    str(python_executable()),
                     "-c",
                     "import urllib.request; "
                     "urllib.request.urlopen('https://example.com', timeout=5)",
@@ -83,7 +84,7 @@ def run_doctor(cleanup: bool = False, settings: SettingsStore | None = None) -> 
     checks: list[dict[str, str]] = []
     python_ok = sys.version_info >= (3, 12)
     _check(checks, "python", "OK" if python_ok else "FAIL", sys.version.split()[0])
-    uv = shutil.which("uv")
+    uv = uv_executable()
     _check(checks, "uv", "OK" if uv else "FAIL", uv or "未找到 uv")
     if os.name == "nt":
         try:

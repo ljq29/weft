@@ -495,6 +495,7 @@ PRD D-01..D-13 之外，本文新增：
 |A-09|表单由 JSON Schema 生成|节点作者只写 schema；UI 自动获得|每节点手写表单组件（节点数量 × 维护成本）|
 |A-10|Arrow 贯穿 引擎-Worker-前端 三层|一种表格格式走到底，预览不经 JSON 转换|后端 Arrow + 前端 JSON（大表预览慢、类型丢失）|
 |A-11|本机 UI/API/WS 使用随机会话令牌，并校验 Host/Origin|覆盖跨站请求与 DNS rebinding；`X-Weft-Client` 不作为权限控制|本机完全免鉴权、仅检查自定义头|
+|A-12|Nuitka 绿色目录内置独立 Python、uv 和同版本 wheel|编译后的 `sys.executable` 不能充当 Python；内部 helper 和工作流仍需真实解释器与隔离环境|onefile 自解压、只编译主服务并依赖宿主 Python|
 
 ## 12. 风险与缓解
 

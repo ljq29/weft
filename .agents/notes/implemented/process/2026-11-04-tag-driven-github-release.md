@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-`.github/workflows/release.yml` 在推送 `v*.*.*` 标签时运行。标签去掉首字母 `v` 后必须与 `weft.__version__` 完全一致；主服务、Worker 和 SDK 使用同一版本。Release 任务在 Windows 上依次执行 `poe check`、集成测试、前端构建、Playwright E2E 和三个 wheel 构建，全部成功后才使用 GitHub CLI 创建 Release 并上传 wheel。
+`.github/workflows/release.yml` 在推送 `v*.*.*` 标签时运行。标签去掉首字母 `v` 后必须与 `weft.__version__` 完全一致；主服务、Worker 和 SDK 使用同一版本。Release 任务在 Windows 上依次执行 `poe check`、集成测试、前端构建、Playwright E2E、三个 wheel 构建以及 [Nuitka 绿色目录](../architecture/2026-11-04-nuitka-portable-runtime.md) 验收，全部成功后才使用 GitHub CLI 创建 Release 并上传 wheel 与 `weft-windows-x64.zip`。
 
 Release 使用标签对应的提交和 `contents: write` 权限。真实 Excel/Sandboxie 的 `win_real` 仍在本机登录态验收，不伪装成 hosted runner 能力。版本发布不自动勾选 `T7.10`，完整 v1 的人工交接和采用指标独立追踪。
 
@@ -16,7 +16,7 @@ Release 使用标签对应的提交和 `contents: write` 权限。真实 Excel/S
 
 1. **本地手工执行 `gh release create`**：操作直接，但容易跳过测试或上传错误产物，也不具备远程可复查的统一过程，因此改为标签流水线。
 2. **每次推送 `main` 都创建 Release**：能进一步减少手工步骤，但会产生无版本意图的发布，因此保留显式版本标签作为发布动作。
-3. **只构建 wheel，不运行完整 E2E**：发布更快，但会削弱发布产物与已验证行为之间的对应关系，因此不采用。
+3. **只构建 wheel，并跳过完整 E2E 与绿色版验收**：发布更快，但会削弱发布产物与已验证行为之间的对应关系，因此不采用。
 
 ## Consequences
 

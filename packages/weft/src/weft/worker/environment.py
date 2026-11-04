@@ -7,6 +7,7 @@ import tomllib
 from pathlib import Path
 
 from weft import __version__
+from weft.portable import uv_environment, uv_executable
 
 
 class EnvironmentError(RuntimeError):
@@ -74,11 +75,11 @@ class WorkflowEnvironment:
         self.sync()
 
     def run_uv(self, *args: str) -> None:
-        environment = os.environ.copy()
+        environment = uv_environment()
         environment.pop("UV_PROJECT_ENVIRONMENT", None)
         environment.setdefault("UV_INDEX_URL", "https://pypi.tuna.tsinghua.edu.cn/simple")
         result = subprocess.run(
-            ["uv", *args],
+            [uv_executable(), *args],
             cwd=self.root,
             capture_output=True,
             text=True,

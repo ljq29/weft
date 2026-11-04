@@ -5,8 +5,9 @@ from pathlib import Path
 
 import jsonschema
 import pytest
+from weft import __version__
 from weft.nodes.export import main, render_markdown, render_node_index
-from weft.nodes.registry import NodeRegistry, builtin_registry
+from weft.nodes.registry import NodeRegistry, builtin_registry, implementation_hash
 
 
 def test_builtin_schemas_are_draft_2020_12() -> None:
@@ -28,6 +29,21 @@ def test_custom_nodes_can_be_registered_and_exported() -> None:
     exported = json.loads(render_node_index(registry))
     assert exported["nodes"][0]["type"] == "flow.trigger"
     assert exported["nodes"][0]["params_schema"]["type"] == "object"
+
+
+def test_compiled_node_implementation_hash_has_versioned_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T7.10: Nuitka nodes retain deterministic cache keys without Python source files."""
+    monkeypatch.setattr(
+        "weft.nodes.registry.inspect.getsource", lambda _: (_ for _ in ()).throw(OSError())
+    )
+    node_type = builtin_registry().get("flow.trigger").__class__
+    expected = f"weft.nodes.flow.TriggerNode@{__version__}".encode()
+    assert (
+        implementation_hash(node_type)
+        == f"sha256:{__import__('hashlib').sha256(expected).hexdigest()}"
+    )
 
 
 def test_duplicate_node_registration_is_rejected() -> None:

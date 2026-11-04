@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## [0.1.1] - 2026-11-04
+
+### Added
+
+- Nuitka standalone `weft.exe` and `weft-windows-x64.zip` portable distribution.
+- Bundled Python workflow runtime, `uv.exe` and same-version local wheels for machines without a Python development environment.
+- Portable acceptance that executes a real CSV workflow and validates the authenticated service and frontend with no host Python or uv on PATH.
+
+### Changed
+
+- ExcelWorker, Sandboxie helpers, doctor and workflow environment setup now select the bundled Python and uv when running from the portable distribution.
+
 ## [0.1.0] - 2026-11-04
 
 ### Added

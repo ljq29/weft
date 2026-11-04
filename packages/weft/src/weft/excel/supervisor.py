@@ -4,7 +4,6 @@ import asyncio
 import json
 import os
 import subprocess
-import sys
 import threading
 import time
 import uuid
@@ -12,6 +11,7 @@ from collections.abc import Callable
 from typing import Any
 
 from weft.excel.worker import decode, encode
+from weft.portable import python_executable
 
 
 class ExcelWorkerError(RuntimeError):
@@ -35,7 +35,7 @@ class ExcelWorkerProcess:
         environment["PYTHONNOUSERSITE"] = "1"
         environment["PYTHONIOENCODING"] = "utf-8"
         self.process = subprocess.Popen(
-            [sys.executable, "-m", "weft.excel.worker", "--backend", backend],
+            [str(python_executable()), "-m", "weft.excel.worker", "--backend", backend],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

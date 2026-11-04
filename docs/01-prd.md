@@ -288,6 +288,7 @@
 |F-SET-03|结构化日志（服务日志 + 每个 Run 的日志），保留策略可配|P0|
 |F-SET-04|CLI：`weft serve` / `weft run` / `weft pack` / `weft unpack` / `weft doctor`（环境检测：Python、uv、Excel、Sandboxie）|P0|
 |F-SET-05|系统托盘图标（显示状态、打开 UI、退出）|P2|
+|F-SET-06|提供 Nuitka Windows 绿色目录版：内置主程序、Python 工作流运行时、uv 与同版本本地 wheel；解压即可运行，其他工作流依赖可按锁文件联网同步|P1|
 
 ---
 
@@ -301,7 +302,7 @@
 |云同步、工作流市场|不在视野内|
 |agent 修改工作流图|安全与可控性优先，v1 禁止|
 |Excel 侧事件触发 / Ribbon（xlOil）|v2 伴侣插件|
-|非程序员一键安装包、桌面壳|用户是 Python 使用者；浏览器访问足够|
+|桌面壳（Tauri / pywebview）|绿色目录版仍采用浏览器访问，v1 不额外维护桌面壳|
 |本地模型推理|走 OpenAI 兼容网关（NewAPI / Ollama 的兼容端点）即可，不内置推理|
 |超内存数据处理|v1 只支持可放入内存的数据；Polars lazy 不等于超内存执行能力，GB 级流式/分布式另行评估|
 |Rust 实现引擎|见决策 D-01|

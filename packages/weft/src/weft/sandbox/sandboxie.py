@@ -6,7 +6,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import time
 import uuid
 from collections.abc import Callable
@@ -17,6 +16,7 @@ from urllib.parse import urlsplit
 
 from weft.agent.settings import SettingsStore
 from weft.api.security import config_dir
+from weft.portable import python_executable
 from weft.sandbox.base import SandboxCapabilityError, SandboxEntry
 from weft.sandbox.changes import (
     Change,
@@ -267,7 +267,7 @@ class SandboxieSandbox:
             "/wait",
             "/silent",
             f"/env:WEFT_RUN_ID={self.run_id}",
-            sys.executable,
+            str(python_executable()),
             "-m",
             "weft.sandbox.child",
             str(spec_path),
@@ -304,7 +304,14 @@ class SandboxieSandbox:
             raise SandboxCapabilityError("Path is outside Root; grant it explicitly first")
         for attempt in range(3):
             process = self.spawn(
-                [sys.executable, "-m", "weft.sandbox.helper", operation, str(target), *args],
+                [
+                    str(python_executable()),
+                    "-m",
+                    "weft.sandbox.helper",
+                    operation,
+                    str(target),
+                    *args,
+                ],
                 self.root,
                 {},
                 60,

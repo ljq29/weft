@@ -4,6 +4,12 @@ Weft 是本地优先的可视化工作流工具：以 KNIME 式表格数据流�
 
 ## 环境与安装
 
+### 绿色目录版
+
+下载并解压 `weft-windows-x64.zip`，运行其中的 `weft.exe`。目录已内置 Python、uv 和同版本 Worker wheel，无需预装 Python 或 uv；首次创建工作流环境时，其他依赖仍按锁文件从配置的镜像下载。Excel、Sandboxie-Plus 和可选的 Node.js/pi 仍需单独安装。
+
+### 开发与 wheel 安装
+
 - Windows 10/11（v1 的真实 Excel 与 Sandboxie 目标平台）
 - Python >= 3.12、uv、Node.js 22 与 pnpm
 - 可选：Microsoft Excel、Sandboxie-Plus、pi
@@ -64,7 +70,7 @@ UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple uv build --wheel --out-dir
 - 项目仅支持 Windows，不支持 WSL/Linux；Fake 结果不能替代真实 Excel、Sandboxie 或真实模型验收。
 - Sandboxie 独立 box、网络拒绝、进程归属和真实 Excel 宏已成功通过 `win_real` 验证。
 - 跨机交接要求兼容 Weft/uv、锁定依赖及声明的外部资源在目标机可用。
-- 当前发布版本为 `0.1.0`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
+- 当前发布版本为 `0.1.1`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
 
 ## License
 
