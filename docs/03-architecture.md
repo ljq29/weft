@@ -422,7 +422,7 @@ class Sandbox(Protocol):
 - **Run 归属**：每 Run 动态创建独立 `WeftBox-<run_id>`，持久登记 `{run_id, box, root, owned_pids, process_created_at}`。M0 必须实测 box 创建、删除、列举、终止及进程归属；清理只针对登记匹配的本 Run box/进程树，禁止按写入时间或路径猜测，也不终止用户既有 box。
 - `spawn`：`Start.exe /box:<box> /wait /silent /env:WEFT_RUN_ID=<id> <cmd>`；stdout/stderr 经临时文件回传。环境变量只含运行标识、本地 LLM 代理地址与配置名，不含原始 API key。
 - **基线与收集**：Run 前记录 Root 和显式授权目录的真实文件存在性、内容 SHA-256；Run 后遍历本 Run box 的 `drive\` 映射与删除标记并对比基线。重命名优先按删除+创建的内容哈希匹配，无法可靠判断时降级为删除+创建并提示。
-- **审计边界**：v1 只审计 Root 与显式授权目录，其他写入默认拒绝。`user\`（AppData 等）不受支持；若发现未知变化，设置 `audit_complete: false` 并在 UI 明示“审计不完整”，不得静默忽略。
+- **审计边界**：v1 只允许应用 Root 与显式授权目录内的变更。真实测试表明 Sandboxie 的硬拒绝配置会破坏 Python/helper 启动，因此任意命令的越权写入采用遏制降级：真实路径不变，外部变更标记 `protected` 且禁止 apply，同时设置 `audit_complete: false` 并在 UI 明示“审计不完整”。`user\current` 与 `drive\` 均须映射收集；发现未知变化时不得静默忽略。
 - `apply`：逐项重算目标哈希；与基线不同返回 `CHANGE_CONFLICT`，需用户查看新 diff 后显式覆盖。覆盖/删除前备份，创建/修改用临时文件+rename，deleted 用回收站。逐项记录 `pending/applied/conflict/failed/discarded`，重复 apply 幂等；普通路径不保证多文件事务全原子，protected 路径仍整体拒绝。
 - **网络**：默认拒绝沙箱网络，唯一内置例外是本 Run 指定的环回 LLMProxy 地址；该例外只能经代理访问配置的 LLM 端点，不能访问任意主机服务。其他联网必须由用户显式开启并配置、验证有效的网络白名单/防火墙；不得把 Sandboxie 的默认可联网当作安全边界。
 

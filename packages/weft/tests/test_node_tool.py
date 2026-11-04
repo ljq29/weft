@@ -203,3 +203,25 @@ def test_save_api_rejects_unauthorized_node_tool(tmp_path: Path) -> None:
         )
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "NODE_TOOL_NOT_AUTHORIZED"
+
+
+def test_tool_ports_expose_no_graph_mutation_capability() -> None:
+    """US-AGT-11/AC-1: only the two controlled tool providers exist, with no graph mutation API."""
+    from weft.agent.sandbox_tools import SandboxedTool
+
+    producers = {
+        node.type
+        for node in builtin_registry().all()
+        if any(port.kind == "tool" for port in node.outputs)
+    }
+    assert producers == {"agent.node_tool", "agent.sandboxed_tools"}
+    for name in (
+        "add_node",
+        "delete_node",
+        "create_edge",
+        "delete_edge",
+        "update_workflow",
+        "save_workflow",
+    ):
+        assert not hasattr(NodeTool, name)
+        assert not hasattr(SandboxedTool, name)

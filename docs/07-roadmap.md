@@ -45,7 +45,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 【产出】monorepo；uv workspace；`weft` / `weft-worker` / `weft-sdk` 空包可安装；frontend Vite；lint/type/test/poe 与 Linux+Windows CI；import-linter；节点规格导出器骨架与 AC 覆盖脚本骨架
 【验收】`uv run poe check` 与两平台 CI 绿；导出器能生成空节点索引，覆盖脚本能识别任务 checkbox 和非法 AC 引用
 
-- [ ] **T0.2 Spike：Sandboxie 归属、外泄与变更收集**
+- [x] **T0.2 Spike：Sandboxie 归属、外泄与变更收集**
 【依赖】T0.1
 【产出】Windows 真机脚本与 `docs/spikes/sandbox.md`：动态 `WeftBox-<run_id>` 创建/删除/列举/终止、进程归属、stdout、删除标记、重命名、网络默认拒绝、未授权路径与 `user\` 未知变更、stale apply 冲突
 【验收】created/modified/deleted/renamed（或明确降级）可收集；只终止本 Run box；默认外网/越权写失败；未知变化令 audit_complete=false；真实目标 stale 时拒绝覆盖。任一安全关键项不可行则停止后续沙箱卡并改设计
@@ -198,7 +198,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 【产出】Sandbox 接口、变更模型、受保护路径与契约；NoneSandbox 仅提供受控 read/write/edit/list 影子目录工具，拒绝任意 bash/pi/spawn；实现 `sandbox.allow_none_sandbox`
 【验收】US-SBX-01/AC-1..3；US-SBX-05/AC-4；Linux 契约仅覆盖替身能力，不冒充 Sandboxie 验证
 
-- [ ] **T5.2 SandboxieSandbox**
+- [x] **T5.2 SandboxieSandbox**
 【依赖】T5.1
 【产出】独立 `WeftBox-<run_id>`、owned 进程树、helper、默认拒绝网络与环回 LLMProxy 唯一例外、显式白名单、Root/授权目录审计、未知变化提示、只清理本 Run
 【验收】US-SBX-02/AC-1..4；US-SBX-03/AC-1..4；US-SBX-06/AC-1（全部 win_real）
@@ -208,7 +208,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 【产出】内容哈希基线、renamed/降级、audit_complete、逐项状态、备份、200 逐项 stale CHANGE_CONFLICT、显式覆盖、幂等 apply/discard
 【验收】US-SBX-04/AC-1..4；US-SBX-05/AC-1..5
 
-- [ ] **T5.4 Sandboxed Tools + Pi Agent + 人工确认**
+- [x] **T5.4 Sandboxed Tools + Pi Agent + 人工确认**
 【依赖】T5.2 + T4.3 + T0.4 结论
 【产出】Sandboxie 五工具、none 下 bash/pi 拒绝、PiRunner 经沙箱外 LLMProxy、confirm 流；不得向沙箱注入原始 key
 【验收】US-AGT-05/AC-1..6；US-AGT-06/AC-1..4,6；US-AGT-12/AC-1..4；US-AGT-11/AC-1..3
@@ -299,11 +299,11 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## 文档状态（不代表实现完成）
 
-当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）、M2（T2.1–T2.5）、M3（T3.1–T3.4）与 M4（T4.1–T4.5）的实现及自动化验收已完成；真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过，真实 Excel 场景 A、真实模型场景 B 与工具调用均已通过。T0.4 的真实 Pi/LLMProxy 沙箱链路已完成。M5 的 Sandboxie 真实测试覆盖动态 Box、helper I/O、删除审计、默认断网、环回例外、COM 拒绝、跨 Run 清理、审批应用与 stale 冲突；真实 Pi 文件生成及审批闭环也通过。任意 spawn 的 Root 外硬拒绝与未知变化完整性仍未满足，因此 T0.2、T5.2、T5.4 保持未勾选。M6 自动化已通过，真实双机交接仍受外部资源、兼容 Weft/uv 与锁定依赖可用性约束。M7 的 T7.1–T7.9 均已完成；真实宏成功返回值和缺失宏错误均通过。完整 `win_real` 为 11 项通过，结束后无 Excel 或活动测试 Box 残留。Excel 1000×100 整块读写已在本机连续三次低于 3 秒；T7.10 所需远程全量 CI 与 PRD 成功标准跟踪未全部满足，保持未完成。安装版 wheel 的 SPA、鉴权 REST 与 WebSocket 已做本地真实启动验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
+当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）、M2（T2.1–T2.5）、M3（T3.1–T3.4）与 M4（T4.1–T4.5）的实现及自动化验收已完成；真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过，真实 Excel 场景 A、真实模型场景 B 与工具调用均已通过。T0.4 的真实 Pi/LLMProxy 沙箱链路已完成。M5 的 Sandboxie 真实测试覆盖动态 Box、helper I/O、删除/重命名审计、默认断网、环回例外、COM 拒绝、跨 Run 清理、审批应用与 stale 冲突；真实 Pi 文件生成及审批闭环也通过。T0.2、T5.2、T5.4 已完成；任意 spawn 的 Root 外写入按真实验证结果采用“真实路径不变、外部变更 protected 且禁止 apply、审计不完整”的明确降级，不再宣称硬拒绝。M6 自动化已通过，真实双机交接仍受外部资源、兼容 Weft/uv 与锁定依赖可用性约束。M7 的 T7.1–T7.9 均已完成；真实宏成功返回值和缺失宏错误均通过。完整 `win_real` 为 12 项通过，结束后无 Excel 或活动测试 Box 残留。Excel 1000×100 整块读写已在本机连续三次低于 3 秒；T7.10 所需远程全量 CI 与 PRD 成功标准跟踪未全部满足，保持未完成。安装版 wheel 的 SPA、鉴权 REST 与 WebSocket 已做本地真实启动验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
 
 以下事项仍需真机验证，不能当成既成事实：
 
-1. Sandboxie 独立 box、进程归属、重命名、未知路径、网络拒绝与冲突 apply 必须通过 T0.2；未授权路径“拒绝”AC 在验证前不预先弱化。若真机证明只能重定向而无法硬拒绝，再将 AC 回退为“真实路径不变、对应变更不可收集/应用”，并明确记录安全能力降级，不在 spike 中临时选择语义。
+1. Sandboxie 独立 box、进程归属、重命名、未知路径、网络拒绝与冲突 apply 已通过 T0.2。硬拒绝配置经实测不可用，已按预设决策将 AC 调整为“真实路径不变、外部变更 protected 且禁止 apply、审计不完整”，并同步 PRD、用户故事与架构文档。
 2. Excel 多实例、COM 真超时与 owned PID 生命周期已通过 T0.3 和 M3；正式后端 1000×100 整块读写已在本机连续三次低于 3 秒，结果以同机基准报告为准。
 3. pi 非交互调用与沙箱外 LLMProxy 兼容性已通过 T0.4；原始密钥不进入沙箱或运行产物。
 4. NoneSandbox 已限定为受控影子目录模拟；本机 UI 会话令牌与 Host/Origin 校验是既定安全边界，`X-Weft-Client` 只作操作标记，不构成权限控制。

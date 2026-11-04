@@ -215,3 +215,58 @@ def test_loopback_proxy_adds_host_key_without_exposing_it(mock_llm: Any, tmp_pat
         assert "raw-host-key" not in body
     finally:
         proxy.close()
+
+
+@pytest.mark.win_real
+def test_real_pi_uses_sandboxie_cwd_stream_and_host_proxy(tmp_path: Path, mock_llm: Any) -> None:
+    """US-AGT-06/AC-2,4: real Pi runs in Sandboxie with streamed output and no raw key."""
+    import shutil
+
+    from weft.sandbox.base import create_sandbox
+
+    pi_path = shutil.which("pi") or ""
+    assert pi_path and Path(pi_path).is_file()
+    root = tmp_path / "pi-root"
+    root.mkdir()
+    store = SettingsStore(tmp_path / "config.toml")
+    store.update(
+        {
+            "sandbox": {"default": "sandboxie"},
+            "llm": {
+                "default": {
+                    "base_url": mock_llm.base_url,
+                    "api_key": "raw-host-key",
+                    "model": "mock",
+                    "timeout": 3,
+                }
+            },
+        }
+    )
+    run_id = "r_pi_win_real"
+    sandbox = create_sandbox(root, run_id, "sandboxie", store)
+    try:
+        result = PiRunner(root, run_id, store).run(
+            task="Reply with exactly WEFT_MOCK_OK and nothing else.",
+            cwd=root,
+            pi_path=pi_path,
+            llm="default",
+            sandbox=sandbox,
+            timeout=60,
+            extra_args=[],
+        )
+        assert result["exit_code"] == 0
+        assert result["final_text"] == "WEFT_MOCK_OK"
+        assert result["trajectory"]
+        specs = list((root / ".runs" / run_id).glob("process-*.json"))
+        assert specs
+        assert all(
+            json.loads(path.read_text(encoding="utf-8"))["cwd"] == str(root) for path in specs
+        )
+        artifacts = "\n".join(
+            path.read_text(encoding="utf-8", errors="ignore")
+            for path in (root / ".runs" / run_id).rglob("*")
+            if path.is_file()
+        )
+        assert "raw-host-key" not in artifacts
+    finally:
+        sandbox.discard()

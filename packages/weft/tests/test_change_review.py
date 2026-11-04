@@ -73,7 +73,7 @@ def test_ambiguous_hashes_do_not_become_rename(tmp_path: Path) -> None:
 
 
 def test_protected_apply_is_rejected_and_auto_apply_stays_in_root(tmp_path: Path) -> None:
-    """US-SBX-05/AC-3,4: protected paths are rejected; auto-apply excludes external paths."""
+    """US-AGT-11/AC-3; US-SBX-05/AC-3,4: protected graph files and external paths stay blocked."""
     workflow = tmp_path / "workflow.json"
     workflow.write_text("{}", encoding="utf-8")
     external_root = tmp_path.parent / f"{tmp_path.name}-external"

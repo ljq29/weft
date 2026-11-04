@@ -743,10 +743,10 @@ AC-2  ...
 作为 Agent，我可以读取真实文件但写入不会影响真实文件，以便安全探索。
 关联：F-SBX-03
 
-- AC-1 沙箱内 `read("D:\flows\demo.weft\data\sales.csv")` 成功返回真实内容；写入限定 Root 与显式授权目录，其他路径默认拒绝。
+- AC-1 沙箱内 `read("D:\flows\demo.weft\data\sales.csv")` 成功返回真实内容；文件工具的写入限定 Root 与显式授权目录，任意命令的越权写入按 AC-4 的遏制与审计语义处理。
 - AC-2 沙箱内 `write("D:\flows\demo.weft\out\a.txt", ...)` 后，真实路径不存在该文件，`<sandbox root>\drive\D\flows\demo.weft\out\a.txt` 存在。
 - AC-3 沙箱内删除真实文件后，真实文件仍在，`collect_changes()` 报告 `deleted`。
-- AC-4 `[int-win]` 尝试写未授权目录、`%APPDATA%` 或访问外网时被拒绝；发现无法归类的 `user\` 等变化时不得静默忽略，`changes.json` 必须 `audit_complete: false` 并在 UI 显示“审计不完整”。
+- AC-4 `[int-win]` 经真实 Sandboxie 验证后，v1 对任意命令的越权写入采用明确降级：真实路径保持不变，外部变更标记 `protected` 且禁止 apply，`changes.json` 必须 `audit_complete: false` 并在 UI 显示“审计不完整”；访问外网仍必须被拒绝。不得把子进程退出码 0 或单纯重定向宣称为硬拒绝。
 
 ### US-SBX-04 变更列表与 diff [P0] [int][int-win]
 

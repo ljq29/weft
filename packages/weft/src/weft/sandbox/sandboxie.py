@@ -236,6 +236,10 @@ class SandboxieSandbox:
             **allowed_env,
         }
         self._ensure_box(allowed_env)
+        if self.processes and all(
+            process.process.poll() is not None for process in self.processes.values()
+        ):
+            time.sleep(0.5)
         identifier = uuid.uuid4().hex
         spec_path = self.run_dir / f"process-{identifier}.json"
         stdout_path = self.run_dir / f"process-{identifier}.out"
@@ -356,6 +360,11 @@ class SandboxieSandbox:
                 resolved_target = target.resolve()
                 if resolved_target.is_relative_to(self.run_dir):
                     continue
+                outside = not any(
+                    resolved_target.is_relative_to(root) for root in self.authorized_roots
+                )
+                if outside:
+                    warnings.append(f"Unauthorized change outside authorized roots: {target}")
                 baseline_hash = self.baseline.get(resolved_target)
                 source_stat = source.stat()
                 if (
@@ -370,7 +379,7 @@ class SandboxieSandbox:
                             kind="deleted",
                             size=0,
                             is_text=False,
-                            protected=protected_path(target, self.root),
+                            protected=protected_path(target, self.root) or outside,
                             baseline_hash=baseline_hash,
                             source=source,
                         )
@@ -391,7 +400,7 @@ class SandboxieSandbox:
                         kind="created" if baseline_hash is None else "modified",
                         size=len(data),
                         is_text=is_text,
-                        protected=protected_path(target, self.root),
+                        protected=protected_path(target, self.root) or outside,
                         baseline_hash=baseline_hash,
                         source=source,
                     )

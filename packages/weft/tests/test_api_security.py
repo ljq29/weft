@@ -136,3 +136,42 @@ def test_workflow_crud_run_and_error_contract(tmp_path: Path) -> None:
         )
         assert missing_port.status_code == 404
         assert missing_port.json()["error"]["code"] == "PORT_NOT_EXECUTED"
+
+
+def test_workflow_update_requires_ui_auth_and_rejects_active_run(tmp_path: Path) -> None:
+    """US-AGT-11/AC-2: graph updates enforce UI auth and reject active Runs."""
+    from types import SimpleNamespace
+
+    with client() as api:
+        created = api.post(
+            "/api/workflows",
+            json={"name": "graph-security", "parent_dir": str(tmp_path)},
+            headers=auth(),
+        )
+        workflow_id = created.json()["id"]
+        document = api.get(f"/api/workflows/{workflow_id}", headers=auth()).json()
+        assert api.put(f"/api/workflows/{workflow_id}", json=document).status_code == 401
+        assert (
+            api.put(f"/api/workflows/{workflow_id}", json=document, headers=auth()).status_code
+            == 403
+        )
+        api.app.state.coordinator.active[workflow_id] = "r_active"
+        api.app.state.engine.runs["r_active"] = SimpleNamespace(
+            record=SimpleNamespace(status="running")
+        )
+        document["nodes"].append(
+            {
+                "id": "n_00000002",
+                "type": "flow.wait",
+                "node_version": 1,
+                "name": "Wait",
+                "position": {"x": 200, "y": 0},
+                "params": {"duration_seconds": 0},
+            }
+        )
+        active = api.put(
+            f"/api/workflows/{workflow_id}",
+            json=document,
+            headers={**auth(), "X-Weft-Client": "ui"},
+        )
+        assert active.status_code == 409

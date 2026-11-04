@@ -20,8 +20,10 @@
 6. 快速连续启动时可能出现 `0x40010004`。只有包装器未创建输出文件时才重试内部 helper；任意用户命令不自动重放。
 7. `query *` 包含已禁用配置节，不能据此调用 `/terminate`；生命周期检查使用 `queryex /boxes *`。
 
-## 仍未完成的安全验收
+## 越权写入的安全降级与验收
 
-T0.2、T5.2、T5.4 暂不因上述修复自动勾完成。任意 spawn 对 Root 外的硬拒绝与未知变化完整性仍需按任务卡验收。全盘 `ReadFilePath`，以及 `ClosedFilePath` + Root `NormalFilePath` + 运行时目录只读的组合，实测均使 Python/helper 无法正常启动，不能把它们写成已经可用的写保护方案。
+全盘 `ReadFilePath`，以及 `ClosedFilePath` + Root `NormalFilePath` + 运行时目录只读的组合，实测均使 Python/helper 无法正常启动。因此按 T0.2 预设的决策路径正式降级，不再宣称任意命令的 Root 外写入会被硬拒绝。
 
-当前未授权 helper 路径由应用层授权拦截，普通写入由 Sandboxie 重定向；这与“任意沙箱命令对 Root 外写入均被硬拒绝”不是同一结论。不得用 NoneSandbox、Fake 或本次基础测试代替剩余安全 AC。
+真实测试已验证：越权命令执行后真实目标不存在；外部变更标记 `protected`，审批 apply 整体拒绝；`audit_complete=false` 并保留明确警告。真实重命名、stale 冲突和显式覆盖也通过。当前未授权 helper 路径仍由应用层授权直接拒绝，普通写入由 Sandboxie 重定向。
+
+该降级已同步 `docs/01-prd.md`、`docs/02-user-stories.md` 与 `docs/03-architecture.md`。不得把子进程退出码 0 或真实路径不变单独描述成硬拒绝。

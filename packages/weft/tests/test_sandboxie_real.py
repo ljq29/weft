@@ -20,7 +20,7 @@ def real_sandbox(root: Path, name: str) -> SandboxieSandbox:
 
 @pytest.mark.win_real
 def test_real_sandboxie_read_write_delete_and_unauthorized_path(tmp_path: Path) -> None:
-    """US-SBX-03/AC-1..4; US-SBX-04/AC-1: real Sandboxie redirection and deletion audit."""
+    """US-AGT-05/AC-3; US-SBX-03/AC-1..4; US-SBX-04/AC-1: real I/O and containment."""
     root = tmp_path / "workflow"
     root.mkdir()
     source = root / "data.txt"
@@ -43,6 +43,32 @@ def test_real_sandboxie_read_write_delete_and_unauthorized_path(tmp_path: Path) 
         with pytest.raises(SandboxCapabilityError):
             sandbox.write_file(outside, b"must-not-write")
         assert not outside.exists()
+
+        from weft.sandbox.review import ChangeReviewStore, ProtectedChangeError
+
+        arbitrary = tmp_path / "arbitrary-outside.txt"
+        process = sandbox.spawn(
+            [
+                sys.executable,
+                "-c",
+                f"from pathlib import Path; Path({str(arbitrary)!r}).write_text('contained')",
+            ],
+            root,
+            {},
+            15,
+        )
+        try:
+            assert process.wait(timeout=15) == 0
+        finally:
+            process.close()
+        assert not arbitrary.exists()
+        collected = sandbox.collect_changes()
+        external = [item for item in collected.changes if item.path == str(arbitrary)]
+        assert external and external[0].protected
+        assert not collected.audit_complete
+        with pytest.raises(ProtectedChangeError):
+            ChangeReviewStore(root, sandbox.run_id).apply([arbitrary])
+        assert not arbitrary.exists()
     finally:
         sandbox.discard()
 
@@ -143,11 +169,13 @@ def test_real_sandboxie_loopback_proxy_exception(tmp_path: Path) -> None:
 
 @pytest.mark.win_real
 def test_real_sandboxie_review_apply_and_stale_conflict(tmp_path: Path) -> None:
-    """US-SBX-05/AC-1,2,5: real sources apply safely and stale targets are not overwritten."""
+    """US-SBX-04/AC-2; US-SBX-05/AC-1,2,5: real rename, apply and stale conflict."""
     from weft.sandbox.review import ChangeReviewStore
 
     root = tmp_path / "workflow"
     root.mkdir()
+    rename_old = root / "rename-old.txt"
+    rename_old.write_bytes(b"rename")
     sandbox = real_sandbox(root, "review")
     try:
         target = root / "approved.txt"
@@ -170,5 +198,16 @@ def test_real_sandboxie_review_apply_and_stale_conflict(tmp_path: Path) -> None:
         overwritten = review.apply([conflict], overwrite_conflicts=True)
         assert overwritten[0].state == "applied"
         assert conflict.read_bytes() == b"sandbox"
+
+        rename_new = root / "rename-new.txt"
+        sandbox.write_file(rename_new, b"rename")
+        sandbox.delete_file(rename_old)
+        renamed = sandbox.collect_changes()
+        assert any(
+            item.kind == "renamed"
+            and item.old_path == str(rename_old)
+            and item.new_path == str(rename_new)
+            for item in renamed.changes
+        )
     finally:
         sandbox.discard()
