@@ -171,6 +171,8 @@
 
 基准结果与环境不符时只记录不阻断普通 PR；同一基准机出现显著回归才阻断。Excel 指标只能由 win_real 验证，Fake/Linux 绿灯不能替代。
 
+2026-11-04 本机 Arrow 100,000×20 冷缓存基准由 `packages/weft/tests/test_performance.py` 产出，三次总耗时分别为 24.065、24.012、24.194 ms，均低于 100 ms。序列化、写盘、SHA-256、memory-map 和 Polars 转换的分阶段结果及 CPU/RAM/依赖版本保存在 `.test-reports/arrow-worker-benchmark-run1.json` 至 `run3.json`。
+
 ---
 
 ## 7. AC 追溯矩阵与自动化覆盖门禁
