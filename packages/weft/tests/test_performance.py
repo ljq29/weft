@@ -85,3 +85,133 @@ def test_arrow_worker_ipc_100k_by_20_staged_benchmark(tmp_path: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report))
+
+
+@pytest.mark.benchmark
+def test_engine_50_noop_linear_nodes_benchmark(tmp_path: Path) -> None:
+    """US-EXE-01/AC-1: measure engine overhead for 50 linear No-op nodes."""
+    import asyncio
+    from typing import Any
+
+    from weft.engine import Engine
+    from weft.nodes.flow import TriggerNode
+    from weft.nodes.registry import NodeRegistry
+    from weft.workflow import WorkflowDocument
+    from weft_sdk import Node, Port
+
+    class NoOpNode(Node):
+        type = "user.noop_benchmark"
+        category = "user"
+        description = "No-op scheduling benchmark"
+        inputs = (Port("in", "flow", "Ordering"),)
+        outputs = (Port("out", "flow", "Ordering"),)
+        params_schema = {"type": "object", "properties": {}}
+
+        def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict:
+            return {}
+
+    nodes = [
+        {
+            "id": "n_00000000",
+            "type": "flow.trigger",
+            "node_version": 1,
+            "name": "Trigger",
+            "position": {"x": 0, "y": 0},
+            "params": {},
+        }
+    ]
+    nodes.extend(
+        {
+            "id": f"n_{index:08d}",
+            "type": "user.noop_benchmark",
+            "node_version": 1,
+            "name": f"NoOp {index}",
+            "position": {"x": index * 100, "y": 0},
+            "params": {},
+        }
+        for index in range(1, 51)
+    )
+    edges = [
+        {
+            "id": f"e_{index:08d}",
+            "source": f"n_{index:08d}",
+            "sourcePort": "out",
+            "target": f"n_{index + 1:08d}",
+            "targetPort": "in",
+            "order": 0,
+        }
+        for index in range(1, 50)
+    ]
+    document = WorkflowDocument.model_validate(
+        {
+            "schema_version": 1,
+            "revision": 1,
+            "id": "wf_0123456789ab",
+            "name": "performance",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "modified_at": "2026-01-01T00:00:00+00:00",
+            "nodes": nodes,
+            "edges": edges,
+        }
+    )
+    registry = NodeRegistry()
+    registry.register(TriggerNode)
+    registry.register(NoOpNode)
+    engine = Engine()
+    started = time.perf_counter()
+    try:
+        record = asyncio.run(engine.run(engine.prepare(document, tmp_path, registry)))
+    finally:
+        engine.close()
+    elapsed = time.perf_counter() - started
+    assert record.status == "succeeded"
+    assert len(record.nodes) == 51
+    report = {
+        "nodes": 50,
+        "elapsed_seconds": elapsed,
+        "milliseconds_per_node": elapsed * 1000 / 50,
+        "environment": {"os": platform.platform(), "python": platform.python_version()},
+    }
+    output = Path(".test-reports/engine-scheduler-benchmark.json")
+    output.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(json.dumps(report))
+
+
+@pytest.mark.benchmark
+def test_ws_status_latency_p95_benchmark() -> None:
+    """US-EXE-05/AC-1: measure 50 authenticated WS status pushes and report p95."""
+    from fastapi.testclient import TestClient
+    from weft.api.app import create_app
+
+    app = create_app(token="benchmark-token")
+    samples: list[float] = []
+    with TestClient(app, base_url="http://127.0.0.1:7788") as client:
+        with client.websocket_connect("/api/ws") as socket:
+            socket.send_json({"op": "authenticate", "token": "benchmark-token"})
+            socket.send_json({"op": "subscribe", "topics": ["run:r_performance"]})
+            assert socket.receive_json()["event"] == "subscribed"
+            for index in range(50):
+                started = time.perf_counter()
+                app.state.bus.publish(
+                    {
+                        "event": "node.status",
+                        "run_id": "r_performance",
+                        "node_id": "n_performance",
+                        "ts": "benchmark",
+                        "data": {"status": "executed", "index": index},
+                    }
+                )
+                event = socket.receive_json()
+                assert event["event"] == "node.status"
+                assert event["data"]["index"] == index
+                samples.append(time.perf_counter() - started)
+    samples.sort()
+    report = {
+        "samples": len(samples),
+        "p95_ms": samples[47] * 1000,
+        "max_ms": samples[-1] * 1000,
+        "environment": {"os": platform.platform(), "python": platform.python_version()},
+    }
+    output = Path(".test-reports/ws-latency-benchmark.json")
+    output.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(json.dumps(report))
