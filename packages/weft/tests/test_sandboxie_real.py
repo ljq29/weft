@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import sys
+import threading
 import uuid
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -92,3 +94,48 @@ def test_real_sandboxie_network_com_and_owned_box_cleanup(tmp_path: Path) -> Non
             other_process.terminate()
             other_process.close()
         other.discard()
+
+
+@pytest.mark.win_real
+def test_real_sandboxie_loopback_proxy_exception(tmp_path: Path) -> None:
+    """US-SBX-02/AC-2: the configured loopback LLM proxy remains reachable."""
+    root = tmp_path / "workflow"
+    root.mkdir()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Length", "5")
+            self.end_headers()
+            self.wfile.write(b"proxy")
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    url = f"http://127.0.0.1:{server.server_address[1]}"
+    sandbox = real_sandbox(root, "loopback")
+    process = None
+    try:
+        process = sandbox.spawn(
+            [
+                sys.executable,
+                "-c",
+                "import urllib.request; print("
+                f"urllib.request.urlopen('{url}', timeout=5).read().decode())",
+            ],
+            root,
+            {"WEFT_LLM_PROXY_URL": url},
+            15,
+        )
+        assert process.wait(timeout=15) == 0
+        assert process.output()[0].strip() == b"proxy"
+    finally:
+        if process is not None:
+            process.close()
+        sandbox.discard()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

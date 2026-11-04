@@ -239,5 +239,14 @@ def create_sandbox(
         authorized = [Path(path) for path in config.get("authorized_roots", [])]
         return NoneSandbox(root, run_id, authorized)
     if mode == "sandboxie":
-        raise SandboxCapabilityError("Sandboxie backend is not configured")
+        from weft.sandbox.sandboxie import SandboxieSandbox
+
+        sandboxie = config.get("sandboxie", {})
+        return SandboxieSandbox(
+            root,
+            run_id,
+            Path(sandboxie.get("start_exe", r"C:\Program Files\Sandboxie-Plus\Start.exe")),
+            box_prefix=sandboxie.get("box_prefix", "WeftBox"),
+            authorized_roots=[Path(path) for path in config.get("authorized_roots", [])],
+        )
     raise ValueError(f"Unknown sandbox mode: {mode}")
