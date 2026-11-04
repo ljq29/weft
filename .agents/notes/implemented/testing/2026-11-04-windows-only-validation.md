@@ -27,6 +27,7 @@ Fake Excel、NoneSandbox 和 Mock LLM 继续保留：它们用于 Windows CI 隔
 - `.github/workflows/ci.yml` 的所有 job 仅使用 `windows-latest`。
 - `pyproject.toml` 仅保留 `mypy --platform win32`。
 - `uv run poe check`、Windows 集成测试、Playwright E2E、wheel 构建和远程 CI 是统一门禁；真实 Excel/Sandboxie 仍由 `win_real` 单独验收。
+- GitHub Actions 运行 `41788367566` 的 lint/type、181 项后端单元、36 项集成、23 项前端、11 项 E2E 与 wheel 构建全部通过，并产生未过期的 `weft-wheels` 构建产物。
 
 ## 记录审计
 
