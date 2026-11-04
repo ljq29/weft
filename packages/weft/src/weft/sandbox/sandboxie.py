@@ -216,7 +216,15 @@ class SandboxieSandbox:
         allowed_env = {
             key: value
             for key, value in env.items()
-            if key in {"WEFT_LLM_PROXY_URL", "WEFT_LLM_CONFIG"}
+            if key
+            in {
+                "WEFT_LLM_PROXY_URL",
+                "WEFT_LLM_CONFIG",
+                "PI_CODING_AGENT_DIR",
+                "PI_CODING_AGENT_SESSION_DIR",
+                "PI_OFFLINE",
+                "PI_TELEMETRY",
+            }
         }
         process_env = {
             "SystemRoot": os.environ.get("SystemRoot", ""),
@@ -402,6 +410,7 @@ class SandboxieSandbox:
         result = detect_renames(
             ChangeSet(self.run_id, "sandboxie", changes, not warnings, warnings)
         )
+        result.authorized_roots = [str(path) for path in self.authorized_roots[1:]]
         (self.run_dir / "changes.json").write_text(
             json.dumps(result.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
         )

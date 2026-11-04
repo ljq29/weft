@@ -98,3 +98,25 @@ def test_real_excel_missing_macro_reports_com_error(tmp_path: Path) -> None:
     finally:
         asyncio.run(worker.release_run("macro-real", on_finish="discard"))
         worker.close()
+
+
+@pytest.mark.win_real
+def test_real_excel_macro_returns_value() -> None:
+    """US-XLS-09/AC-1: real Application.Run returns a Variable-compatible value."""
+    worker = ExcelWorkerSupervisor(backend="xlwings", call_timeout=20)
+    run_id = "macro-real-return"
+
+    async def scenario() -> None:
+        app = await worker.submit("connect", "new_hidden", run_id=run_id)
+        path = Path(__file__).parent / "fixtures" / "macro-book.xlsm"
+        workbook = await worker.submit("workbook", app, "open_file", str(path), run_id=run_id)
+        result = await worker.submit(
+            "run_macro", workbook, "Module1.Test1", ["Test1a", "Test1b"], run_id=run_id
+        )
+        assert result == 1
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        asyncio.run(worker.release_run(run_id, on_finish="discard"))
+        worker.close()

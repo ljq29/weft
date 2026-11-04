@@ -75,6 +75,7 @@ class PiRunner:
                             "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
                             "contextWindow": 128000,
                             "maxTokens": 1024,
+                            "compat": {"supportsUsageInStreaming": False},
                         }
                     ],
                 }
@@ -84,11 +85,22 @@ class PiRunner:
         process = sandbox.spawn(
             self.command(executable, config["model"], task, extra_args),
             cwd,
-            {"WEFT_LLM_PROXY_URL": proxy.url, "WEFT_LLM_CONFIG": llm},
+            {
+                "WEFT_LLM_PROXY_URL": proxy.url,
+                "WEFT_LLM_CONFIG": llm,
+                "PI_CODING_AGENT_DIR": str(agent_dir),
+                "PI_CODING_AGENT_SESSION_DIR": str(agent_dir / "sessions"),
+                "PI_OFFLINE": "1",
+                "PI_TELEMETRY": "0",
+            },
             timeout,
         )
         trace = TraceWriter(self.root, self.run_id, "pi")
-        output_path = Path(process.stdout.name)
+        output_path = (
+            process.sandbox_output[0]
+            if hasattr(process, "sandbox_output")
+            else Path(process.stdout.name)
+        )
         offset = 0
         trajectory: list[dict[str, Any]] = []
         final_text = ""

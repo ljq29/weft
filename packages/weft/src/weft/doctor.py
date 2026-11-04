@@ -38,6 +38,45 @@ def _cleanup() -> list[str]:
     return results
 
 
+def _sandboxie_probe(start: Path) -> str:
+    from weft.sandbox.sandboxie import SandboxieSandbox
+
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        sandbox = SandboxieSandbox(root, f"r_doctor_{root.name}", start)
+        try:
+            process = sandbox.spawn([sys.executable, "-c", "print(1)"], root, {}, 15)
+            try:
+                returncode = process.wait(timeout=15)
+                stdout, _ = process.output()
+            finally:
+                process.close()
+            if returncode != 0 or stdout.strip() != b"1":
+                raise RuntimeError(
+                    f"沙箱 Python/stdout 探针失败：exit={returncode}, out={stdout!r}"
+                )
+            network = sandbox.spawn(
+                [
+                    sys.executable,
+                    "-c",
+                    "import urllib.request; "
+                    "urllib.request.urlopen('https://example.com', timeout=5)",
+                ],
+                root,
+                {},
+                15,
+            )
+            try:
+                network_code = network.wait(timeout=15)
+            finally:
+                network.close()
+            if network_code == 0:
+                raise RuntimeError("沙箱默认网络策略允许了外网访问")
+            return "动态 Box、Python stdout 与默认断网探针通过"
+        finally:
+            sandbox.discard()
+
+
 def run_doctor(cleanup: bool = False, settings: SettingsStore | None = None) -> dict[str, Any]:
     store = settings or SettingsStore()
     config = store.read()
@@ -71,13 +110,13 @@ def run_doctor(cleanup: bool = False, settings: SettingsStore | None = None) -> 
     start = Path(config["sandbox"]["sandboxie"]["start_exe"])
     if os.name != "nt":
         _check(checks, "sandboxie", "WARN", "Sandboxie 仅支持 Windows")
+    elif not start.is_file():
+        _check(checks, "sandboxie", "WARN", "未安装 Sandboxie；真实沙箱验收不可用")
     else:
-        _check(
-            checks,
-            "sandboxie",
-            "OK" if start.is_file() else "WARN",
-            str(start) if start.is_file() else "未安装 Sandboxie；真实沙箱验收不可用",
-        )
+        try:
+            _check(checks, "sandboxie", "OK", _sandboxie_probe(start))
+        except Exception as exception:
+            _check(checks, "sandboxie", "FAIL", str(exception))
     configured_pi = config["agent"].get("pi_path", "")
     pi = configured_pi or shutil.which("pi") or ""
     _check(checks, "pi", "OK" if pi else "WARN", str(pi) if pi else "未找到 pi")

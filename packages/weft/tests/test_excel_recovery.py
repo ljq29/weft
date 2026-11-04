@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -49,6 +50,42 @@ def test_excel_busy_retries_three_times(monkeypatch: pytest.MonkeyPatch) -> None
     with pytest.raises(ExcelBusyError, match=r"Excel is busy \(modal dialog open\?\)"):
         backend._retry(rejected)
     assert calls == 3
+
+
+def test_owned_visible_excel_is_terminated_after_quit_stalls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """US-XLS-01/AC-4; US-XLS-12/AC-5: close terminates only identity-matched owned Excel."""
+    import os
+    from types import SimpleNamespace
+
+    from weft.excel.xlwings_backend import OwnedProcessRegistry
+
+    backend = XlwingsBackend.__new__(XlwingsBackend)
+    backend.owned = OwnedProcessRegistry(tmp_path / "owned.json")
+    application = SimpleNamespace(Workbooks=[], DisplayAlerts=True, Quit=lambda: None)
+    backend.apps = {123: application}
+    backend.workbooks = {}
+    backend.owned.register(
+        {
+            "pid": 123,
+            "owned": True,
+            "visible": True,
+            "run_id": "r_owned_visible",
+            "process_created_at": "created",
+            "heartbeat_at": "unused",
+        }
+    )
+    kills: list[int] = []
+    monkeypatch.setattr("weft.excel.xlwings_backend.process_created_at", lambda pid: "created")
+    monkeypatch.setattr("weft.excel.xlwings_backend.process_alive", lambda pid: True)
+    monkeypatch.setattr("weft.excel.xlwings_backend.time.sleep", lambda seconds: None)
+    monkeypatch.setattr(os, "kill", lambda pid, signal: kills.append(pid))
+
+    backend.close_app({"pid": 123, "owned": True}, "discard")
+
+    assert kills == [123]
+    assert backend.owned._read() == {}
 
 
 @pytest.mark.win_real

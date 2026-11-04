@@ -638,8 +638,17 @@ class XlwingsBackend:
                 break
             time.sleep(0.1)
         else:
-            if record.get("run_id"):
-                self.owned.cleanup_run(record["run_id"])
+            try:
+                if record.get("owned") and process_created_at(app["pid"]) == record.get(
+                    "process_created_at"
+                ):
+                    os.kill(app["pid"], signal.SIGTERM)
+            except OSError:
+                pass
+            for _ in range(20):
+                if not process_alive(app["pid"]):
+                    break
+                time.sleep(0.1)
         self.owned.remove(app["pid"])
         self.apps.pop(app["pid"], None)
         for identifier in [key for key in self.workbooks if key.startswith(f"{app['pid']}:")]:

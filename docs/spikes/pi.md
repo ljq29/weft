@@ -2,19 +2,23 @@
 
 ## 当前结论
 
-pi 1.4.0 已在本机通过最小主机 LLMProxy 调用 OpenAI Chat Completions 兼容 Mock，并收到预期文本 `WEFT_PROXY_OK`。原始假密钥只存在于主机运行时配置；pi 配置仅含环回代理地址、配置名和本地占位凭据。子进程环境、stdout 与 stderr 均未出现原始假密钥。
+**T0.4 已完成**。pi 的非交互参数、JSONL 输出、沙箱外 LLMProxy、Sandboxie 默认断网及环回例外均已通过真实验证；原始 API key 只存在用户级配置，未进入沙箱环境、stdout 或运行产物。
 
-**T0.4 尚未完成**：Sandboxie 基础真实测试已验证默认外网阻断和环回代理例外，但真实 pi 在沙箱内经 LLMProxy 的完整场景尚未执行，不能用本机代理或网络探针替代该项验收。
+## 主机 Mock 证据
 
-## 环境与证据
+- 日期：2026-11-03；pi：`@earendil-works/pi-coding-agent` 1.4.0。
+- 脚本：`scripts/spikes/pi_llm_proxy.py`；命令：`uv run python scripts/spikes/pi_llm_proxy.py`。
+- 汇总报告：`.test-reports/pi-spike.json`；本次输出：`.test-reports/pi-8138933a/stdout.jsonl`、`stderr.log`。
+- pi 退出码 0，收到 `WEFT_PROXY_OK`；Mock 确认上游 Authorization 由主机代理写入；`raw_key_in_child_env=false`、`raw_key_in_stdout_or_stderr=false`。
 
-- 日期：2026-11-03
-- pi：`@earendil-works/pi-coding-agent` 1.4.0
-- 脚本：`scripts/spikes/pi_llm_proxy.py`
-- 命令：`uv run python scripts/spikes/pi_llm_proxy.py`
-- 汇总报告：`.test-reports/pi-spike.json`
-- 本次输出：`.test-reports/pi-8138933a/stdout.jsonl`、`stderr.log`
-- 结果：pi 退出码 0；收到预期文本；Mock 确认上游 Authorization 由主机代理写入；`raw_key_in_child_env=false`；`raw_key_in_stdout_or_stderr=false`
+## 真实模型与 Sandboxie 证据
+
+- 2026-11-04 使用本机用户级 `default` 配置和真实 `deepseek-v4.1-flash` 模型；API 地址与密钥不写入仓库。
+- 主机 `LLMClient` 最小调用返回 `WEFT_REAL_OK`，token usage 正常。
+- 真实 Agent Loop 完成两轮模型调用和一次参考表工具调用，流式事件、审计与最终分类正确。
+- Pi 在 Sandboxie 内经环回代理返回 `WEFT_PI_OK`，退出码 0，解析到 19 个 JSONL 事件。
+- Pi 启用 `read,write,edit,ls` 后创建 `organized/result.txt`；审批前真实文件不存在，经 `ChangeReviewStore` 应用后内容正确。运行产物未包含原始 API key。
+- 配置发现依赖 `PI_CODING_AGENT_DIR` 和独立 session 目录；沙箱只传递这些非敏感变量以及 `PI_OFFLINE=1`、`PI_TELEMETRY=0`。
 
 ## 固化命令行
 
@@ -24,11 +28,11 @@ pi --provider weft-local --model spike-model --mode json --print \
   "Reply with the configured test text only."
 ```
 
-正式 Pi Agent 节点可按需开放工具，但必须保持非交互 `--print`、JSONL `--mode json`、独立配置/会话目录及显式资源开关。stdout 按 LF 解析 JSONL，stderr 用于诊断。
+正式 Pi Agent 节点可通过 `extra_args` 的 `--tools` 白名单按需开放工具，但必须保持非交互 `--print`、JSONL `--mode json`、独立配置/会话目录及显式资源开关。stdout 按 LF 解析 JSONL，stderr 用于诊断。
 
 ## 实现注意事项
 
-1. 自定义 OpenAI 兼容端点可用 pi 的 `models.json`，provider 使用 `api: "openai-completions"`；本次代理 URL 为 `/v1/default`，由主机代理解析配置名并添加上游真实密钥。
-2. 代理必须保留完整 `chat/completions` 两段路径；pi 流式 SSE 与 `stream_options` 可按实际端点兼容性配置。
-3. pi 在助手响应 `stopReason: "error"` 时进程仍可能退出 0；正式节点必须同时检查 JSONL 终态与错误字段，不能只依赖退出码。
-4. 沙箱默认外网阻断和指定环回 LLMProxy 例外已通过基础真实测试；真实 pi 沙箱场景及其他主机服务阻断仍属 T0.2/T0.4 待验收项。
+1. 自定义 OpenAI 兼容端点使用 pi 的 `models.json`，provider 为 `api: "openai-completions"`；代理 URL 为 `/v1/<配置名>`，由主机代理解析配置名并添加上游真实密钥。
+2. 代理保留完整 `chat/completions` 路径；模型兼容配置包含 `supportsUsageInStreaming: False`。
+3. pi 在助手响应 `stopReason: "error"` 时进程仍可能退出 0；正式节点同时检查 JSONL 终态与错误字段，不能只依赖退出码。
+4. T0.2/T5.2/T5.4 中任意命令的 Root 外硬拒绝及其他安全 AC 不因 T0.4 完成而自动完成。

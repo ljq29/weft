@@ -55,7 +55,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 【产出】`docs/spikes/excel.md`：多实例列表与 PID/窗口选择、GetActiveObject 实测、稳定目标与 `excel-targets.toml` 持久化、默认模式写回可见性、模态对话框、真超时后队列占用、独立 ExcelWorker 终止重建与跨宿主 `Local\WeftExcelCOM` 互斥、用户并发编辑、owned PID+创建时间+Run/心跳清理、10 万单元格与逐格/批量受控基准
 【验收】记录环境版本和原始数据；明确可行边界并回写架构/AC，不能以 GetActiveObject 猜测实例或宣称超时后 Worker 立即可用；重建后新请求恢复且超时写请求不自动重放
 
-- [ ] **T0.4 Spike：pi 非交互模式与沙箱外 LLMProxy**
+- [x] **T0.4 Spike：pi 非交互模式与沙箱外 LLMProxy**
 【依赖】T0.1
 【产出】确认 pi 非交互参数、输出、退出码；实现最小主机 LLMProxy，验证 pi 可配置 OpenAI 兼容本地代理；原始 key 只在主机配置，沙箱仅收到本地地址和配置名
 【验收】pi 经代理完成任务，env/stdout/trace 无原始 key，直连外网默认拒绝；命令行固化到节点声明，T1.3 后由导出器写入只读 `09-nodes-v1.md`
@@ -263,7 +263,7 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 【产出】可信 Worker 命令执行、PowerShell/cmd 独立转义器与元字符测试、无法安全插值时失败、流式日志与退出码
 【验收】US-TBL-09/AC-1..3
 
-- [ ] **T7.7 Excel Run Macro**
+- [x] **T7.7 Excel Run Macro**
 【依赖】T3.4
 【产出】Application.Run、参数与 COM 错误映射
 【验收】US-XLS-09/AC-1,2
@@ -299,11 +299,11 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 
 ## 文档状态（不代表实现完成）
 
-当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）、M2（T2.1–T2.5）、M3（T3.1–T3.4）与 M4（T4.1–T4.5）的实现及自动化验收已完成；真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过，真实 Excel 的场景 A 主链路也已通过。场景 B 的真实模型人工抽查尚未执行，不能视为已验证。M6（T6.1–T6.2）的触发器、打包、导入与浏览器/独立目录交接自动化已通过；真实双机交接仍受外部资源、兼容 Weft/uv 与锁定依赖可用性约束，尚未执行。M5 的 NoneSandbox、审批流、工具与 Pi 边界已实现并通过自动化测试；T5.2/T5.4 的 Sandboxie win_real 验收仍未完成，对应任务卡保持未勾选。T0.2/T5.2/T5.4 的 Sandboxie 基础真实测试已通过，包括动态 Box、helper I/O、删除审计、默认断网、环回代理例外、COM 拒绝与跨 Run 清理；任意 spawn 的 Root 外硬拒绝、未知变化、stale apply 和真实 Pi 场景仍待验收，对应任务卡保持未勾选。T0.4 已验证 pi/LLMProxy，沙箱网络边界已有基础实测但完整 Pi 场景仍待验证。M7 的 T7.1–T7.6、T7.8、T7.9 已完成自动化验收；T7.7 的真实缺失宏错误已通过，但真实成功宏返回值仍待验收。T7.10 所需全量 CI、win_real、性能回归与成功标准跟踪未全部满足，保持未完成。安装版 wheel 的 SPA、鉴权 REST 与 WebSocket 已做本地真实启动验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
+当前 01–09 文档与 `AGENTS.md` 已建立；T0.1 已通过 Linux 与 Windows 本地检查，但远程 Git/CI 尚未配置，因此该卡保持未完成。T0.3、M1（T1.1–T1.8）、M2（T2.1–T2.5）、M3（T3.1–T3.4）与 M4（T4.1–T4.5）的实现及自动化验收已完成；真实 Worker 的 CSV 闭环在内嵌 CLI、服务模式及浏览器画布均通过，真实 Excel 场景 A、真实模型场景 B 与工具调用均已通过。T0.4 的真实 Pi/LLMProxy 沙箱链路已完成。M5 的 Sandboxie 真实测试覆盖动态 Box、helper I/O、删除审计、默认断网、环回例外、COM 拒绝、跨 Run 清理、审批应用与 stale 冲突；真实 Pi 文件生成及审批闭环也通过。任意 spawn 的 Root 外硬拒绝与未知变化完整性仍未满足，因此 T0.2、T5.2、T5.4 保持未勾选。M6 自动化已通过，真实双机交接仍受外部资源、兼容 Weft/uv 与锁定依赖可用性约束。M7 的 T7.1–T7.9 均已完成；真实宏成功返回值和缺失宏错误均通过。完整 `win_real` 为 11 项通过，结束后无 Excel 或活动测试 Box 残留。T7.10 所需远程全量 CI、性能优化目标与 PRD 成功标准跟踪未全部满足，保持未完成。安装版 wheel 的 SPA、鉴权 REST 与 WebSocket 已做本地真实启动验证。`docs/09-nodes-v1.md` 由代码节点声明/JSON Schema 自动生成，并由 `poe check` 检查漂移。
 
 以下事项仍需真机验证，不能当成既成事实：
 
 1. Sandboxie 独立 box、进程归属、重命名、未知路径、网络拒绝与冲突 apply 必须通过 T0.2；未授权路径“拒绝”AC 在验证前不预先弱化。若真机证明只能重定向而无法硬拒绝，再将 AC 回退为“真实路径不变、对应变更不可收集/应用”，并明确记录安全能力降级，不在 spike 中临时选择语义。
 2. Excel 多实例、COM 真超时与 owned PID 生命周期已通过 T0.3 和 M3；性能结果以同机基准为准，正式后端写入优化目标尚未达成。
-3. pi 非交互调用与沙箱外 LLMProxy 兼容性必须通过 T0.4。
+3. pi 非交互调用与沙箱外 LLMProxy 兼容性已通过 T0.4；原始密钥不进入沙箱或运行产物。
 4. NoneSandbox 已限定为受控影子目录模拟；本机 UI 会话令牌与 Host/Origin 校验是既定安全边界，`X-Weft-Client` 只作操作标记，不构成权限控制。

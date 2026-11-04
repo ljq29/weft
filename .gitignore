@@ -17,6 +17,7 @@ e2e/test-results/
 e2e/playwright-report/
 
 # Weft runtime
+.env
 packages/weft/src/weft/static/
 .runs/
 .test-reports/

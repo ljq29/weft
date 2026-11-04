@@ -4,7 +4,9 @@
 
 - Sandboxie-Plus `5.72.5` 位于 `C:\Program Files\Sandboxie-Plus`，`SbieDrv` 与 `SbieSvc` 正在运行。
 - 2026-11-04 已修复最小启动：合法且已创建的 Box 中，`cmd /c exit 0` 和 Python `print(1)` 均正常退出。
-- `uv run pytest packages/weft/tests/test_sandboxie_real.py -q`：3 项真实测试通过，覆盖 helper 读写、创建/删除审计、未授权 helper 路径拒绝、默认外网阻断、环回代理例外、COM 拒绝及跨 Run 清理。
+- `uv run pytest packages/weft/tests/test_sandboxie_real.py -q`：4 项真实测试通过，覆盖 helper 读写、创建/删除审计、未授权 helper 路径拒绝、默认外网阻断、环回代理例外、COM 拒绝、跨 Run 清理、真实审批应用与 stale 冲突。
+- 真实 Pi 已在 Sandboxie 内完成文本任务和文件创建；审批前真实目录不变，审批应用后内容正确，运行产物不含原始 API key。
+- `weft doctor` 已实际执行动态 Box、Python stdout 和默认断网探针，不再只检查 `Start.exe` 是否存在。
 - 通过 `create_sandbox(..., "sandboxie")` 工厂入口实际启动 Python，退出码和 stdout 均正确。
 - 测试后 `SbieIni.exe queryex /boxes *` 仅剩 `DefaultBox`，测试 Box 未残留。
 
@@ -20,6 +22,6 @@
 
 ## 仍未完成的安全验收
 
-T0.2、T5.2、T5.4 暂不因上述修复自动勾完成。任意 spawn 对 Root 外的硬拒绝、未知变化完整性、stale apply 冲突及真实 Pi 场景仍需按任务卡验收。全盘 `ReadFilePath` 实测会使 Python/helper 无法正常启动，不能把它当作已经可用的写保护方案。
+T0.2、T5.2、T5.4 暂不因上述修复自动勾完成。任意 spawn 对 Root 外的硬拒绝与未知变化完整性仍需按任务卡验收。全盘 `ReadFilePath`，以及 `ClosedFilePath` + Root `NormalFilePath` + 运行时目录只读的组合，实测均使 Python/helper 无法正常启动，不能把它们写成已经可用的写保护方案。
 
 当前未授权 helper 路径由应用层授权拦截，普通写入由 Sandboxie 重定向；这与“任意沙箱命令对 Root 外写入均被硬拒绝”不是同一结论。不得用 NoneSandbox、Fake 或本次基础测试代替剩余安全 AC。

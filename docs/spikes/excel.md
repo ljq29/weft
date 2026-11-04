@@ -47,3 +47,9 @@
 `test_excel_real.py` 已验证独立 Worker 中的隐藏实例、工作簿、批量读写、append、原子更新、工作表管理、显式保存与 owned 清理，并验证可见实例 attach、fast_mode 状态恢复和日期序列号转换。新实例统一由 Weft 登记，退出使用实际进程状态检查；可见实例不由 Run 自动关闭。
 
 本次 1000 × 100 整块写入（含 Arrow 转换和 IPC）为 6.999940 秒，整块读取为 0.169030 秒，原始报告为 `.test-reports/excel-backend-benchmark.json`。写入未达到 3 秒受控优化目标，与 spike 的 0.125653 秒存在差异；保留该结果作为后续优化基线，不将其写成达标。
+
+## T7.7 Macro 与 visible owned 清理复测
+
+2026-11-04 使用 xlwings 官方 BSD-3-Clause 测试夹具 `packages/weft/tests/fixtures/macro-book.xlsm`，真实 `Application.Run` 调用 `Module1.Test1("Test1a", "Test1b")` 返回 `1`；缺失宏仍返回可读 COM 错误。两项 `win_real` 测试通过。
+
+另修复显式 `close_app(..., "discard")` 在 visible owned 实例退出卡住时跳过清理的问题：现在仅在 PID 与创建时间匹配时终止该 owned 实例。定向单元测试、真实 visible attach 和场景 A 均通过，测试结束后 EXCEL 进程数为 0。Run 的默认 release 仍不自动关闭 visible 实例。

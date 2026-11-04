@@ -73,19 +73,42 @@ class ChangeReviewStore:
 
     def load(self) -> ChangeSet:
         data = json.loads(self.path.read_text(encoding="utf-8"))
-        sandbox = NoneSandbox(
-            self.root,
-            self.run_id,
-            [Path(path) for path in data.get("authorized_roots", [])],
-        )
+        sandbox_root: Path | None = None
+        none_sandbox: NoneSandbox | None = None
+        if data["sandbox"] == "sandboxie":
+            record = json.loads(
+                (self.root / ".runs" / self.run_id / "sandbox.json").read_text(encoding="utf-8")
+            )
+            if record.get("run_id") != self.run_id:
+                raise ValueError("Sandbox ownership does not match this Run")
+            sandbox_root = Path(record["sandbox_root"])
+        else:
+            none_sandbox = NoneSandbox(
+                self.root,
+                self.run_id,
+                [Path(path) for path in data.get("authorized_roots", [])],
+            )
         changes = []
         for item in data["changes"]:
             path = Path(item["path"])
-            source = (
-                sandbox._tombstone(path)
-                if item["kind"] == "deleted"
-                else sandbox._shadow_path(Path(item.get("new_path") or item["path"]))
-            )
+            logical = Path(item.get("new_path") or item["path"])
+            if sandbox_root is not None:
+                resolved = logical.resolve()
+                home = Path.home().resolve()
+                if resolved.is_relative_to(home):
+                    source = sandbox_root / "user" / "current" / resolved.relative_to(home)
+                else:
+                    drive = resolved.drive.rstrip(":\\")
+                    source = (
+                        sandbox_root / "drive" / drive / resolved.relative_to(Path(resolved.anchor))
+                    )
+            else:
+                assert none_sandbox is not None
+                source = (
+                    none_sandbox._tombstone(path)
+                    if item["kind"] == "deleted"
+                    else none_sandbox._shadow_path(logical)
+                )
             changes.append(Change(**item, source=source))
         return ChangeSet(
             run_id=data["run_id"],

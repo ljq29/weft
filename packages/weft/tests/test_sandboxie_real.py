@@ -139,3 +139,36 @@ def test_real_sandboxie_loopback_proxy_exception(tmp_path: Path) -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+@pytest.mark.win_real
+def test_real_sandboxie_review_apply_and_stale_conflict(tmp_path: Path) -> None:
+    """US-SBX-05/AC-1,2,5: real sources apply safely and stale targets are not overwritten."""
+    from weft.sandbox.review import ChangeReviewStore
+
+    root = tmp_path / "workflow"
+    root.mkdir()
+    sandbox = real_sandbox(root, "review")
+    try:
+        target = root / "approved.txt"
+        sandbox.write_file(target, b"approved")
+        sandbox.collect_changes()
+        assert not target.exists()
+        review = ChangeReviewStore(root, sandbox.run_id)
+        applied = review.apply([target])
+        assert applied[0].state == "applied"
+        assert target.read_bytes() == b"approved"
+
+        conflict = root / "conflict.txt"
+        sandbox.write_file(conflict, b"sandbox")
+        sandbox.collect_changes()
+        conflict.write_text("host", encoding="utf-8")
+        rejected = review.apply([conflict])
+        assert rejected[0].state == "conflict"
+        assert rejected[0].error == "CHANGE_CONFLICT"
+        assert conflict.read_text(encoding="utf-8") == "host"
+        overwritten = review.apply([conflict], overwrite_conflicts=True)
+        assert overwritten[0].state == "applied"
+        assert conflict.read_bytes() == b"sandbox"
+    finally:
+        sandbox.discard()
