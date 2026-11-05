@@ -9,6 +9,12 @@
 - Serve the new SVG logo and favicon as image assets instead of the SPA HTML fallback in packaged installations.
 - Extend portable acceptance to validate both brand assets and their MIME types.
 
+### Verified
+
+- GitHub Release run `41962241669` and main CI run `41962239168` passed all automated gates, including integration tests, Playwright E2E and clean portable acceptance.
+- Seventeen local Windows real/benchmark tests passed with real Excel, Sandboxie and pi.
+- Downloaded Release assets matched their API SHA-256 hashes; the three wheels matched local builds, and the downloaded ZIP passed bootstrap, offline CSV, service and browser UI acceptance with visible SVG branding.
+
 ## [0.2.1] - 2026-11-05
 
 ### Added
