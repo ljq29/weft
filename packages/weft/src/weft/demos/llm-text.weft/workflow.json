@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "id": "wf_000000000003",
+  "name": "llm-text",
+  "description": "演示通过命名 LLM 配置调用 OpenAI 兼容端点。",
+  "created_at": "2026-01-01T00:00:00Z",
+  "modified_at": "2026-01-01T00:00:00Z",
+  "settings": {
+    "concurrency_policy": "queue",
+    "sandbox": { "mode": "inherit", "auto_apply_in_root": false }
+  },
+  "variables": [],
+  "nodes": [
+    {
+      "id": "n_00000001",
+      "type": "flow.trigger",
+      "node_version": 1,
+      "name": "手动运行",
+      "position": { "x": 60, "y": 300 },
+      "params": { "manual": { "enabled": true } },
+      "comment": "完成 LLM 设置后点击运行。"
+    },
+    {
+      "id": "n_00000002",
+      "type": "agent.llm_call",
+      "node_version": 1,
+      "name": "提取文本要点",
+      "position": { "x": 360, "y": 300 },
+      "params": {
+        "llm": "demo",
+        "system_prompt": "你是一名简洁、准确的中文文本分析助手。",
+        "user_prompt": "请把以下说明整理为三个要点，每点不超过 20 字：\n\nWeft 是一个本地优先的可视化工作流工具。它把确定性的表格处理节点与可选的大语言模型节点连接起来，工作流及其数据可以打包迁移，模型密钥只保存在用户级设置中。",
+        "table_max_rows": 50,
+        "temperature": 0.2,
+        "max_tokens": 300,
+        "output": "text",
+        "json_schema": {}
+      },
+      "comment": "运行后点击 variable 端口查看 response。"
+    }
+  ],
+  "edges": [],
+  "notes": [
+    {
+      "id": "note_00000001",
+      "position": { "x": 60, "y": 30 },
+      "size": { "width": 720, "height": 190 },
+      "color": "#fff7ed",
+      "markdown": "### 先配置 LLM，再运行\n打开左下角 **设置 → LLM 配置** 并新增配置。如果配置名不是 `demo`，请把 LLM Call 节点的 `llm` 参数改为实际配置名：\n\n- Base URL：`<YOUR_OPENAI_COMPATIBLE_BASE_URL>`，例如 `https://example.com/v1`\n- API Key：`<YOUR_API_KEY>`\n- Model：`<YOUR_MODEL>`\n\n密钥只写入用户级设置，不会进入此工作流或 zip。保存并测试连接后，回到画布点击 **运行**。"
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}

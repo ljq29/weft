@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "id": "wf_000000000002",
+  "name": "table-transform",
+  "description": "使用内嵌表格演示公式计算、分组聚合和表格预览。",
+  "created_at": "2026-01-01T00:00:00Z",
+  "modified_at": "2026-01-01T00:00:00Z",
+  "settings": {
+    "concurrency_policy": "queue",
+    "sandbox": { "mode": "inherit", "auto_apply_in_root": false }
+  },
+  "variables": [],
+  "nodes": [
+    {
+      "id": "n_00000001",
+      "type": "flow.trigger",
+      "node_version": 1,
+      "name": "手动运行",
+      "position": { "x": 40, "y": 220 },
+      "params": { "manual": { "enabled": true } },
+      "comment": "点击顶栏运行开始。"
+    },
+    {
+      "id": "n_00000002",
+      "type": "table.creator",
+      "node_version": 1,
+      "name": "内嵌订单表",
+      "position": { "x": 280, "y": 220 },
+      "params": {
+        "rows": [
+          { "category": "硬件", "product": "键盘", "price": 129, "quantity": 2 },
+          { "category": "硬件", "product": "鼠标", "price": 59, "quantity": 3 },
+          { "category": "软件", "product": "授权", "price": 399, "quantity": 1 },
+          { "category": "软件", "product": "订阅", "price": 99, "quantity": 4 }
+        ]
+      },
+      "comment": "所有数据都保存在节点参数中。"
+    },
+    {
+      "id": "n_00000003",
+      "type": "table.math_formula",
+      "node_version": 1,
+      "name": "计算销售额",
+      "position": { "x": 520, "y": 220 },
+      "params": { "formula": "$price$ * $quantity$", "alias": "total" },
+      "comment": "新增 total = price × quantity。"
+    },
+    {
+      "id": "n_00000004",
+      "type": "table.groupby",
+      "node_version": 1,
+      "name": "按类别聚合",
+      "position": { "x": 760, "y": 220 },
+      "params": {
+        "group_by": ["category"],
+        "aggregations": [
+          { "column": "total", "agg": "sum", "alias": "sales_total" }
+        ]
+      },
+      "comment": "分别汇总硬件和软件销售额。"
+    },
+    {
+      "id": "n_00000005",
+      "type": "table.view",
+      "node_version": 1,
+      "name": "预览汇总结果",
+      "position": { "x": 1000, "y": 220 },
+      "params": { "rows": 10 },
+      "comment": "运行后点击 out 端口查看完整结果。"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_00000001",
+      "source": "n_00000002",
+      "sourcePort": "out",
+      "target": "n_00000003",
+      "targetPort": "in",
+      "order": 0
+    },
+    {
+      "id": "e_00000002",
+      "source": "n_00000003",
+      "sourcePort": "out",
+      "target": "n_00000004",
+      "targetPort": "in",
+      "order": 0
+    },
+    {
+      "id": "e_00000003",
+      "source": "n_00000004",
+      "sourcePort": "out",
+      "target": "n_00000005",
+      "targetPort": "in",
+      "order": 0
+    }
+  ],
+  "notes": [
+    {
+      "id": "note_00000001",
+      "position": { "x": 280, "y": 30 },
+      "size": { "width": 720, "height": 110 },
+      "color": "#ecfdf5",
+      "markdown": "### 表格计算与预览\n这个示例不需要任何输入文件。点击 **运行**，然后点击“预览汇总结果”的 `out` 端口；也可以选中节点，在右侧修改内嵌数据、公式或聚合方式。"
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 0.9 }
+}

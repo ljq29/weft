@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## [0.3.0] - 2026-11-05
+
+### Added
+
+- Add a built-in demo gallery with independent CSV sales, table transformation and LLM text workflows, including portable data, locked dependencies and local Worker/SDK wheels.
+- Synchronize a demo's isolated environment before opening it so the CSV and table examples can run immediately.
+
+### Fixed
+
+- Use left-button drag for node marquee selection and middle-button drag for canvas panning while retaining Space+drag navigation.
+- Force Worker JSON-RPC standard streams to UTF-8 so Chinese node parameters and table values survive real subprocess execution on Windows.
+
+### Verified
+
+- `poe check` passed with 186 backend unit tests and 23 frontend tests.
+- Four Playwright tests passed for mouse navigation, demo creation, real CSV/table execution and LLM placeholder setup.
+- CSV and table demo ZIPs passed fresh unpack, environment synchronization and real execution; demo resources were also loaded directly from a built wheel.
+- Seventeen local Windows real/benchmark tests passed with real Excel, Sandboxie and pi.
+- The portable ZIP passed clean bootstrap without host Python/uv, cached offline execution, authenticated service and frontend acceptance.
+- Real LLM execution remains subject to user-supplied OpenAI-compatible settings; no API key is bundled.
+
 ## [0.2.2] - 2026-11-05
 
 ### Fixed

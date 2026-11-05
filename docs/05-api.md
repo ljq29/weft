@@ -36,6 +36,8 @@
 
 |方法|路径|说明|
 | --------| ------| -----------------------------------------------------------------------------------|
+|GET|`/api/demos`|内置示例清单：`[{id, title, description, requirements}]`|
+|POST|`/api/demos/{id}/create`|按 `{name, parent_dir}` 创建所选示例的独立副本并同步运行环境 → 201 `{id, path}`；示例不存在 → 404，目标目录冲突 → 409，环境同步失败 → 400|
 |GET|`/api/workflows`|已打开的工作流列表：`[{id, name, path, dirty, env_status}]`|
 |POST|`/api/workflows`|新建：`{name, parent_dir}` → 201 `{id, path}`；同名目录存在 → 409|
 |POST|`/api/workflows/open`|打开已有目录：`{path}` → `{id, env_status: ok\|syncing\|error}`；触发 `uv sync`（US-PKG-02）|

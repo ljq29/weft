@@ -263,6 +263,34 @@ def create_app(
         ]
         return {"path": str(path), "entries": entries}
 
+    @app.get("/api/demos")
+    def demos() -> list[dict[str, Any]]:
+        from weft.workflow.demos import list_demos
+
+        return [demo.as_dict() for demo in list_demos()]
+
+    @app.post("/api/demos/{demo_id}/create", status_code=201)
+    async def instantiate_demo(demo_id: str, request: CreateRequest) -> Any:
+        from weft.worker.environment import EnvironmentError as WorkflowEnvironmentError
+        from weft.workflow.demos import create_demo
+
+        try:
+            root = create_demo(demo_id, request.name, Path(request.parent_dir))
+        except KeyError:
+            return error("DEMO_NOT_FOUND", "示例不存在", 404)
+        except FileExistsError:
+            return error("WORKFLOW_EXISTS", "目录已存在", 409)
+        try:
+            await asyncio.to_thread(WorkflowEnvironment(root).sync)
+        except WorkflowEnvironmentError as exception:
+            shutil.rmtree(root)
+            return error("DEMO_ENVIRONMENT_FAILED", str(exception), 400)
+        document = WorkflowStore(root).load()
+        app.state.roots[document.id] = root
+        if app.state.triggers is not None:
+            app.state.triggers.activate(document, root)
+        return {"id": document.id, "path": str(root)}
+
     @app.get("/api/workflows")
     def workflows() -> list[dict[str, Any]]:
         return [
