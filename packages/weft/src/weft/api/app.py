@@ -818,14 +818,27 @@ def create_app(
             sender.cancel()
             app.state.bus.unsubscribe(queue)
 
+    from fastapi.responses import FileResponse
+
     packaged_static = Path(__file__).resolve().parent.parent / "static"
+    source_root = Path(__file__).resolve().parents[5]
     frontend_dist = (
         packaged_static
         if (packaged_static / "index.html").is_file()
-        else Path(__file__).resolve().parents[5] / "frontend" / "dist"
+        else source_root / "frontend" / "dist"
     )
+    brand_dist = (
+        frontend_dist
+        if (frontend_dist / "index.html").is_file()
+        else source_root / "frontend" / "public"
+    )
+    for asset in ("weft-mark.svg", "weft-logo.svg"):
+
+        @app.get(f"/{asset}", include_in_schema=False)
+        def brand_asset(asset: str = asset) -> Any:
+            return FileResponse(brand_dist / asset)
+
     if (frontend_dist / "index.html").is_file():
-        from fastapi.responses import FileResponse
         from fastapi.staticfiles import StaticFiles
 
         if (frontend_dist / "assets").is_dir():
@@ -835,8 +848,6 @@ def create_app(
         def frontend(path: str) -> Any:
             if path.startswith("api"):
                 return error("NOT_FOUND", "接口不存在", 404)
-            if path in {"weft-mark.svg", "weft-logo.svg"}:
-                return FileResponse(frontend_dist / path)
             return FileResponse(frontend_dist / "index.html")
     else:
 
