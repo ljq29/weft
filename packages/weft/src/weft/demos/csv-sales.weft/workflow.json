@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "id": "wf_000000000001",
+  "name": "csv-sales",
+  "description": "读取内置 CSV，筛选高金额订单，按地区汇总并写出结果。",
+  "created_at": "2026-01-01T00:00:00Z",
+  "modified_at": "2026-01-01T00:00:00Z",
+  "settings": {
+    "concurrency_policy": "queue",
+    "sandbox": { "mode": "inherit", "auto_apply_in_root": false }
+  },
+  "variables": [],
+  "nodes": [
+    {
+      "id": "n_00000001",
+      "type": "flow.trigger",
+      "node_version": 1,
+      "name": "手动运行",
+      "position": { "x": 40, "y": 220 },
+      "params": { "manual": { "enabled": true } },
+      "comment": "点击顶栏运行开始。"
+    },
+    {
+      "id": "n_00000002",
+      "type": "table.read_csv",
+      "node_version": 1,
+      "name": "读取销售数据",
+      "position": { "x": 280, "y": 220 },
+      "params": {
+        "path": "data/sales.csv",
+        "encoding": "auto",
+        "separator": "auto",
+        "header": true,
+        "skip_rows": 0
+      },
+      "comment": "数据已随示例打包，无需准备文件。"
+    },
+    {
+      "id": "n_00000003",
+      "type": "table.row_filter",
+      "node_version": 1,
+      "name": "筛选金额大于 100",
+      "position": { "x": 520, "y": 220 },
+      "params": { "column": "amount", "operator": ">", "value": "100" },
+      "comment": "可修改阈值后重新运行。"
+    },
+    {
+      "id": "n_00000004",
+      "type": "table.groupby",
+      "node_version": 1,
+      "name": "按地区汇总",
+      "position": { "x": 760, "y": 220 },
+      "params": {
+        "group_by": ["region"],
+        "aggregations": [
+          { "column": "amount", "agg": "sum", "alias": "total_amount" }
+        ]
+      },
+      "comment": "运行后可点击 out 端口预览汇总表。"
+    },
+    {
+      "id": "n_00000005",
+      "type": "table.write_csv",
+      "node_version": 1,
+      "name": "写出地区汇总",
+      "position": { "x": 1000, "y": 220 },
+      "params": {
+        "path": "out/regional-sales.csv",
+        "encoding": "utf-8-sig",
+        "separator": ",",
+        "overwrite": true
+      },
+      "comment": "结果写入示例目录的 out/regional-sales.csv。"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_00000001",
+      "source": "n_00000002",
+      "sourcePort": "out",
+      "target": "n_00000003",
+      "targetPort": "in",
+      "order": 0
+    },
+    {
+      "id": "e_00000002",
+      "source": "n_00000003",
+      "sourcePort": "out",
+      "target": "n_00000004",
+      "targetPort": "in",
+      "order": 0
+    },
+    {
+      "id": "e_00000003",
+      "source": "n_00000004",
+      "sourcePort": "out",
+      "target": "n_00000005",
+      "targetPort": "in",
+      "order": 0
+    }
+  ],
+  "notes": [
+    {
+      "id": "note_00000001",
+      "position": { "x": 280, "y": 30 },
+      "size": { "width": 720, "height": 110 },
+      "color": "#eef2ff",
+      "markdown": "### CSV 销售汇总\n直接点击 **运行**。流程会读取 `data/sales.csv`，筛选 `amount > 100`，按地区求和，并写出 `out/regional-sales.csv`。左键框选节点，中键拖动画布。"
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 0.9 }
+}

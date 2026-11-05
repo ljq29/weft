@@ -126,6 +126,7 @@ class WorkerPool:
         self.worker_env = dict(os.environ)
         self.worker_env.pop("PYTHONPATH", None)
         self.worker_env["PYTHONNOUSERSITE"] = "1"
+        self.worker_env["PYTHONIOENCODING"] = "utf-8"
         self._lock = threading.Lock()
         self._next = 0
         self.on_log: Callable[[str, str, str], None] | None = None

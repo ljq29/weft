@@ -5,6 +5,7 @@ import {
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  SelectionMode,
   applyNodeChanges,
   useReactFlow,
 } from "@xyflow/react";
@@ -12,6 +13,7 @@ import type { Connection, Edge, NodeChange } from "@xyflow/react";
 import { api } from "./api/client";
 import { Icon, nodeVisual } from "./components/Icon";
 import { AuditPanel } from "./panels/AuditPanel";
+import { DemoGallery } from "./panels/DemoGallery";
 import { WeftNode } from "./canvas/WeftNode";
 import { CanvasNote } from "./canvas/CanvasNote";
 import { connectRuns } from "./api/ws";
@@ -76,6 +78,7 @@ function Editor() {
   const [serverWarning, setServerWarning] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [demosOpen, setDemosOpen] = useState(false);
   const [name, setName] = useState("weekly");
   const [parent, setParent] = useState("C:/flows");
   const [root, setRoot] = useState("");
@@ -285,6 +288,29 @@ function Editor() {
       WorkflowDocument & { nodes: unknown[]; edges: unknown[] }
     >(`/workflows/${result.id}`);
     load(document);
+  };
+
+  const createDemo = async (
+    demoId: string,
+    demoName: string,
+    parentDir: string,
+  ) => {
+    const result = await api<{ id: string; path: string }>(
+      `/demos/${demoId}/create`,
+      {
+        method: "POST",
+        body: JSON.stringify({ name: demoName, parent_dir: parentDir }),
+      },
+    );
+    setRoot(result.path);
+    setName(demoName);
+    setParent(parentDir);
+    const document = await api<
+      WorkflowDocument & { nodes: unknown[]; edges: unknown[] }
+    >(`/workflows/${result.id}`);
+    load(document);
+    setDemosOpen(false);
+    setError("");
   };
 
   const open = async () => {
@@ -626,6 +652,16 @@ function Editor() {
         <nav className="rail-nav" aria-label="工作流操作">
           <button
             className="rail-button"
+            aria-label="示例工作流"
+            data-tooltip="示例工作流"
+            onClick={() => {
+              setDemosOpen(true);
+            }}
+          >
+            <Icon name="grid" />
+          </button>
+          <button
+            className="rail-button"
             aria-label="打开工作流"
             data-tooltip="打开工作流"
             onClick={() => void open()}
@@ -799,12 +835,15 @@ function Editor() {
                   <Icon name="flow" />
                   设计
                 </span>
-                <span>右键画布添加便签</span>
+                <span>左键框选 · 中键平移 · 右键添加便签</span>
               </div>
               <ReactFlow
                 nodes={displayNodes}
                 edges={store.edges}
                 nodeTypes={{ weft: WeftNode, note: CanvasNote }}
+                panOnDrag={[1]}
+                selectionOnDrag
+                selectionMode={SelectionMode.Partial}
                 onPaneContextMenu={(event) => {
                   event.preventDefault();
                   store.addNote(
@@ -990,6 +1029,15 @@ function Editor() {
         </div>
       )}
       {run.runId && <ConfirmPanel runId={run.runId} />}
+      {demosOpen && (
+        <DemoGallery
+          parent={parent}
+          onClose={() => {
+            setDemosOpen(false);
+          }}
+          onCreate={createDemo}
+        />
+      )}
       {chatOpen && store.document && (
         <ChatPanel
           workflowId={store.document.id}

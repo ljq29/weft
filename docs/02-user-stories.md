@@ -81,6 +81,7 @@ AC-2  ...
 - AC-1 Given UI 首页 When 点击"新建工作流"并输入名称 `weekly` 与父目录 `D:\flows` Then 系统创建 `D:\flows\weekly.weft\`，内含 `workflow.json`（schema 版本为当前版本、节点列表仅含一个 `Trigger`）、`pyproject.toml`、`data/`、`nodes/`、`prompts/`、`.gitignore`（排除 `.runs/`、`.venv/` 与 `__pycache__/`）。
 - AC-2 Given 目标目录已存在同名 `.weft` When 新建 Then 系统拒绝并提示"目录已存在"，不覆盖任何文件。
 - AC-3 Given 新建完成 When 查看画布 Then 画布显示一个 `Trigger` 节点，状态为"已配置"（黄）。
+- AC-4 Given UI 示例库 When 选择内置 CSV、表格或 LLM 示例并指定名称与父目录 Then 系统复制完整 `.weft` 目录、生成新的工作流 ID 并打开独立副本；CSV 与表格示例包含可直接运行的资源，LLM 示例仅引用命名配置并以 `<YOUR_API_KEY>` 等占位符说明设置方法，不保存真实密钥；目标目录冲突时拒绝覆盖。
 
 ### US-DES-02 添加节点 [P0] [e2e]
 

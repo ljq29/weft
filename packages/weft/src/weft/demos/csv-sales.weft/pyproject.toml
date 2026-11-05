@@ -1,0 +1,9 @@
+[project]
+name = "weft-demo-csv-sales"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = ["weft-worker==0.3.0", "weft-sdk==0.3.0"]
+
+[tool.uv.sources]
+weft-worker = { path = "vendor/weft_worker-0.3.0-py3-none-any.whl" }
+weft-sdk = { path = "vendor/weft_sdk-0.3.0-py3-none-any.whl" }
