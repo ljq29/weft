@@ -16,6 +16,7 @@
 
 ### Verified
 
+- GitHub Release run `41982811856` and main CI run `41982726654` passed all automated gates, including full integration tests, 15 Playwright E2E tests and clean portable acceptance.
 - `poe check` passed with 186 backend unit tests and 23 frontend tests.
 - Four Playwright tests passed for mouse navigation, demo creation, real CSV/table execution and LLM placeholder setup.
 - CSV and table demo ZIPs passed fresh unpack, environment synchronization and real execution; demo resources were also loaded directly from a built wheel.
