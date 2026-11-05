@@ -1,10 +1,10 @@
 [project]
 name = "weft-worker"
-version = "0.2.1"
+version = "0.2.2"
 description = "Isolated workflow worker for Weft"
 license = "MIT"
 requires-python = ">=3.12"
-dependencies = ["weft-sdk==0.2.1", "polars>=1.0", "pyarrow>=15", "send2trash>=1.8"]
+dependencies = ["weft-sdk==0.2.2", "polars>=1.0", "pyarrow>=15", "send2trash>=1.8"]
 
 [project.scripts]
 weft-worker = "weft_worker.cli:main"

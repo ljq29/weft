@@ -194,6 +194,12 @@ def verify_service(executable: Path, environment: dict[str, str]) -> None:
                     assert json.loads(response.read())["version"] == __version__
                 with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1) as response:
                     assert b'<div id="root">' in response.read()
+                for asset in ("weft-mark.svg", "weft-logo.svg"):
+                    with urllib.request.urlopen(
+                        f"http://127.0.0.1:{port}/{asset}", timeout=1
+                    ) as response:
+                        assert response.headers.get_content_type() == "image/svg+xml"
+                        assert b"<svg" in response.read()
                 break
             except (OSError, ValueError):
                 time.sleep(0.2)

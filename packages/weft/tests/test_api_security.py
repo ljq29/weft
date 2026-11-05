@@ -90,6 +90,11 @@ def test_workflow_crud_run_and_error_contract(tmp_path: Path) -> None:
         assert duplicate.status_code == 409
         document = api.get(f"/api/workflows/{workflow_id}", headers=auth()).json()
         assert document["nodes"][0]["type"] == "flow.trigger"
+        for asset in ("weft-mark.svg", "weft-logo.svg"):
+            branded = api.get(f"/{asset}")
+            assert branded.status_code == 200
+            assert branded.headers["content-type"].startswith("image/svg+xml")
+            assert b"<svg" in branded.content
         document["description"] = "changed"
         saved = api.put(
             f"/api/workflows/{workflow_id}",

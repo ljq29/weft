@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## [0.2.2] - 2026-11-05
+
+### Fixed
+
+- Serve the new SVG logo and favicon as image assets instead of the SPA HTML fallback in packaged installations.
+- Extend portable acceptance to validate both brand assets and their MIME types.
+
 ## [0.2.1] - 2026-11-05
 
 ### Added

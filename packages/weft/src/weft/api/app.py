@@ -835,6 +835,8 @@ def create_app(
         def frontend(path: str) -> Any:
             if path.startswith("api"):
                 return error("NOT_FOUND", "接口不存在", 404)
+            if path in {"weft-mark.svg", "weft-logo.svg"}:
+                return FileResponse(frontend_dist / path)
             return FileResponse(frontend_dist / "index.html")
     else:
 
