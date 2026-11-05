@@ -14,6 +14,11 @@ async function createDemo(
   name: string,
   parent: string,
 ) {
+  page.on("response", (response) => {
+    if (response.status() >= 400)
+      console.log("HTTP", response.status(), response.url());
+  });
+  page.on("pageerror", (error) => console.error(error));
   await page.goto(`/?token=${token()}`);
   await page.getByRole("button", { name: "示例工作流" }).click();
   const dialog = page.getByRole("dialog", { name: "示例工作流" });
