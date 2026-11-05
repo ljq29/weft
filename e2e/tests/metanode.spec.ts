@@ -5,13 +5,16 @@ import { resolve } from "node:path";
 
 const config = resolve(
   import.meta.dirname,
-  "../../.test-reports/e2e-config/session.json",
+  "../..",
+  process.env.WEFT_E2E_CONFIG_DIR ?? ".test-reports/e2e-config",
+  "session.json",
 );
 const projectRoot = resolve(import.meta.dirname, "../..");
 const token = () => JSON.parse(readFileSync(config, "utf8")).token as string;
+const apiUrl = process.env.WEFT_E2E_API_URL ?? "http://127.0.0.1:7788/api";
 
 async function request(path: string, method = "GET", body?: unknown) {
-  const response = await fetch(`http://127.0.0.1:7788/api${path}`, {
+  const response = await fetch(`${apiUrl}${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${token()}`,
@@ -101,11 +104,13 @@ test("US-DES-09/AC-1..4: collapse, edit child canvas and expand in browser", asy
       UV_INDEX_URL: "https://pypi.tuna.tsinghua.edu.cn/simple",
     },
   });
-  page.once("dialog", (dialog) => void dialog.accept(root));
   const opened = page.waitForResponse(
     (response) => response.url().endsWith("/workflows/open") && response.ok(),
   );
   await page.getByRole("button", { name: "打开工作流" }).click();
+  const dialog = page.getByRole("dialog", { name: "打开工作流" });
+  await dialog.getByLabel("工作流目录").fill(root);
+  await dialog.getByRole("button", { name: "打开", exact: true }).click();
   await opened;
   await expect(page.locator(".weft-node")).toHaveCount(5);
   await page.keyboard.press("Shift+1");

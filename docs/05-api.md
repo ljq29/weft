@@ -37,7 +37,7 @@
 |方法|路径|说明|
 | --------| ------| -----------------------------------------------------------------------------------|
 |GET|`/api/demos`|内置示例清单：`[{id, title, description, requirements}]`|
-|POST|`/api/demos/{id}/create`|按 `{name, parent_dir}` 创建所选示例的独立副本并同步运行环境 → 201 `{id, path}`；示例不存在 → 404，目标目录冲突 → 409，环境同步失败 → 400|
+|POST|`/api/demos/{id}/create`|按 `{name, parent_dir}` 创建所选示例的独立副本并同步运行环境 → 201 `{id, path}`；同名同来源示例经临时目录同步成功后自动替换，其他目标目录冲突 → 409；示例不存在 → 404，环境同步失败 → 400|
 |GET|`/api/workflows`|已打开的工作流列表：`[{id, name, path, dirty, env_status}]`|
 |POST|`/api/workflows`|新建：`{name, parent_dir}` → 201 `{id, path}`；同名目录存在 → 409|
 |POST|`/api/workflows/open`|打开已有目录：`{path}` → `{id, env_status: ok\|syncing\|error}`；触发 `uv sync`（US-PKG-02）|
@@ -54,7 +54,7 @@
 
 |方法|路径|说明|
 | ------| ------| --------------------------------------------------------------------------|
-|GET|`/api/nodes/types`|全部可用节点类型（内置 + 当前工作流 `user.*`）：`[{type, node_version, category, name, description, lane, cache_policy, tool_capability, tool_exposed_params, inputs, outputs, params_schema, ui_hints, portable_params, external_resources}]`（US-DES-04 AC-4、US-AGT-04 AC-1）|
+|GET|`/api/nodes/types`|全部可用节点类型（内置 + 当前工作流 `user.*`）：`[{type, node_version, category, name, display_name, description, lane, cache_policy, tool_capability, tool_exposed_params, inputs, outputs, params_schema, ui_hints, portable_params, external_resources}]`；`name` 保留英文规范名，`display_name` 提供中文补充（US-DES-04 AC-4、US-AGT-04 AC-1）|
 |GET|`/api/nodes/types/{type}`|单个类型详情|
 |POST|`/api/workflows/{id}/nodes/{node_id}/column-hints`|返回该节点各输入端口上游缓存的列名（表单下拉用）：`{port: [col, ...]}`；上游未执行 → 空|
 
@@ -129,7 +129,9 @@
 |方法|路径|说明|
 | -----------| ------| ----------------------------------------------------------|
 |GET / PUT|`/api/settings`|用户级配置（api_key 读取时掩码；PUT 时 `"***"` 表示不变更）|
-|POST|`/api/settings/llm/{name}/test`|测试连接（US-AGT-01 AC-2）|
+|POST|`/api/settings/llm/draft/test`|测试当前未保存草稿；body 为 `name` 加 LLM 配置字段，不写配置文件，成功返回 `{ok, models}`（US-AGT-01 AC-2）|
+|POST|`/api/settings/llm/draft/models`|从当前未保存草稿获取模型列表；复用草稿测试语义，不持久化或返回原始 api_key|
+|POST|`/api/settings/llm/{name}/test`|测试已保存连接（US-AGT-01 AC-2）|
 |GET|`/api/system/doctor`|`weft doctor` 的 JSON 输出|
 |GET|`/api/system/version`|`{version, schema_version}`|
 |POST|`/api/fs/browse`|服务端文件选择器：`{path, dirs_only}` → 目录列表（表单路径选择用）|
@@ -145,8 +147,10 @@
 {"op": "unsubscribe", "topics": [...]}
 
 // 服务端 → 客户端（统一信封）
+{"topic": "system", "event": "authenticated", "data": {}}
+// 认证成功后先返回 authenticated ACK；客户端随后才能 subscribe
 {"topic": "system", "event": "subscribed", "data": {"topics": ["run:r_..."]}}
-// subscribe 生效后先返回 ACK；以下为运行事件
+// subscribe 生效后返回 ACK；以下为运行事件
 {"topic": "run:r_...", "event": "node.started", "ts": "...", "data": {...}}
 ```
 
@@ -173,7 +177,7 @@
 |`workflow.saved`|`{workflow_id, modified_at, revision}`（多标签页同步；revision 不一致时重新读取，不盲写）||
 |`trigger.status`|`{workflow_id, source, health}`|US-TRG-05 AC-4|
 
-聊天 UI 以 `(run_id, source_node_id, message_id)` 关联 `node.stream` 与 `chat.message`；最终 Chat Output 消息与增量共用同一 message_id，前端替换而非重复追加。WS 无事件回放，重连后用 REST 补齐（US-EXE-05 AC-3）。
+聊天 UI 以 `(run_id, source_node_id, message_id)` 关联 `node.stream` 与 `chat.message`；最终 Chat Output 消息与增量共用同一 message_id，前端替换而非重复追加。WS 无事件回放，客户端等待 authenticate ACK 后才 subscribe；断线后以带退避的新连接代际重连，旧代际事件丢弃，并用 REST baseline 补齐（US-EXE-05 AC-3）。界面显示连接状态且支持立即重连。
 
 ## 12. 错误码目录
 

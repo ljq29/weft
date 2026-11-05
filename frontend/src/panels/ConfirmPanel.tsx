@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api/client";
+import { api, formatApiError } from "../api/client";
 import { Icon } from "../components/Icon";
 
 interface ConfirmRequest {
@@ -51,7 +51,7 @@ export function ConfirmPanel({ runId }: { runId: string }) {
       });
       setRequest(null);
     } catch (reason) {
-      setError(String(reason));
+      setError(formatApiError(reason));
     }
   };
   return (

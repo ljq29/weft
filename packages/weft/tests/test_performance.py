@@ -188,6 +188,7 @@ def test_ws_status_latency_p95_benchmark() -> None:
     with TestClient(app, base_url="http://127.0.0.1:7788") as client:
         with client.websocket_connect("/api/ws") as socket:
             socket.send_json({"op": "authenticate", "token": "benchmark-token"})
+            assert socket.receive_json()["event"] == "authenticated"
             socket.send_json({"op": "subscribe", "topics": ["run:r_performance"]})
             assert socket.receive_json()["event"] == "subscribed"
             for index in range(50):
@@ -256,7 +257,7 @@ def test_real_service_cold_start_benchmark(tmp_path: Path) -> None:
             headers={"Authorization": f"Bearer {session['token']}"},
         )
         with urllib.request.urlopen(request, timeout=1) as response:
-            assert json.loads(response.read())["version"] == "0.3.0"
+            assert json.loads(response.read())["version"] == "0.4.0"
         elapsed = time.perf_counter() - started
     finally:
         process.terminate()

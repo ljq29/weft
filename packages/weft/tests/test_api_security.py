@@ -55,6 +55,8 @@ def test_websocket_authenticate_subscribe_and_receive() -> None:
     with TestClient(app, base_url=f"http://{HOST}") as api:
         with api.websocket_connect("/api/ws") as socket:
             socket.send_json({"op": "authenticate", "token": TOKEN})
+            authenticated = socket.receive_json()
+            assert authenticated == {"topic": "system", "event": "authenticated", "data": {}}
             socket.send_json({"op": "subscribe", "topics": ["run:r_1"]})
             acknowledgement = socket.receive_json()
             assert acknowledgement["event"] == "subscribed"
@@ -128,7 +130,9 @@ def test_workflow_crud_run_and_error_contract(tmp_path: Path) -> None:
         assert env.json()["status"] == "missing"
         nodes = api.get("/api/nodes/types", headers=auth())
         assert nodes.status_code == 200
-        assert any(item["type"] == "flow.trigger" for item in nodes.json())
+        trigger = next(item for item in nodes.json() if item["type"] == "flow.trigger")
+        assert trigger["name"] == "Trigger"
+        assert trigger["display_name"] == "触发器"
         running = api.post(f"/api/workflows/{workflow_id}/runs", json={}, headers=auth())
         assert running.status_code == 202
         run_id = running.json()["run_id"]

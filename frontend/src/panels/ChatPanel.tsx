@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api/client";
+import { api, formatApiError } from "../api/client";
 import { useRunStore } from "../stores/runStore";
 import { Icon } from "../components/Icon";
 
@@ -175,14 +175,14 @@ export function ChatPanel({
         useRunStore.getState().started(result.run_id);
         void reconcile(result.run_id, result.session_id).catch(
           (reason: unknown) => {
-            setNotice(String(reason));
+            setNotice(formatApiError(reason));
           },
         );
       }
       setNotice(result.disposition === "dropped" ? "已有运行，消息已丢弃" : "");
       setInput("");
     } catch (reason) {
-      setNotice(String(reason));
+      setNotice(formatApiError(reason));
     }
   };
   return (

@@ -8,10 +8,14 @@ import {
   SelectionMode,
   applyNodeChanges,
   useReactFlow,
+  useUpdateNodeInternals,
 } from "@xyflow/react";
-import type { Connection, Edge, NodeChange } from "@xyflow/react";
-import { api } from "./api/client";
+import type { NodeChange } from "@xyflow/react";
+import { api, formatApiError } from "./api/client";
+import { useEditorShortcuts } from "./editorShortcuts";
 import { Icon, nodeVisual } from "./components/Icon";
+import { ConnectionIndicator } from "./components/ConnectionIndicator";
+import { OverlayHost } from "./components/OverlayHost";
 import { AuditPanel } from "./panels/AuditPanel";
 import { DemoGallery } from "./panels/DemoGallery";
 import { WeftNode } from "./canvas/WeftNode";
@@ -29,35 +33,25 @@ import { ConfirmPanel } from "./panels/ConfirmPanel";
 import { TriggerStatusPanel } from "./panels/TriggerStatusPanel";
 import { HistoryPanel } from "./panels/HistoryPanel";
 import { useRunStore } from "./stores/runStore";
-import {
-  collapseGraph,
-  expandGraph,
-  flowGraph,
-  metanodePorts,
-} from "./stores/metanodes";
-import { toDocument, useWorkflowStore } from "./stores/workflowStore";
+import { useWorkflowStore } from "./stores/workflowStore";
 import type { FlowNode } from "./stores/workflowStore";
-import type { NodeTypeDecl, WorkflowDocument } from "./types/workflow";
+import type { NodeTypeDecl } from "./types/workflow";
+import { useCanvasInteractions } from "./hooks/useCanvasInteractions";
+import { useWorkflowCommands } from "./hooks/useWorkflowCommands";
+import type { PathIssue } from "./hooks/useWorkflowCommands";
+import { useWorkflowDocument } from "./hooks/useWorkflowDocument";
+import { useOverlayHost } from "./hooks/useOverlayHost";
 import "@xyflow/react/dist/style.css";
 import "./styles.css";
 
-let saveQueue: Promise<void> = Promise.resolve();
+type Overlay = "demos" | "chat" | "settings" | "preview";
 
-interface StoredNode {
-  id: string;
-  type: string;
-  name: string;
-  position: { x: number; y: number };
-  params: Record<string, unknown>;
-  comment?: string;
-}
-
-interface StoredEdge {
-  id: string;
-  source: string;
-  sourcePort: string;
-  target: string;
-  targetPort: string;
+function NodeInternalsSync({ nodes }: { nodes: FlowNode[] }) {
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    updateNodeInternals(nodes.map((node) => node.id));
+  }, [nodes, updateNodeInternals]);
+  return null;
 }
 
 function Editor() {
@@ -68,11 +62,6 @@ function Editor() {
     port: string;
     runId?: string;
   } | null>(null);
-  const [menu, setMenu] = useState<{
-    nodeId: string;
-    x: number;
-    y: number;
-  } | null>(null);
   const setNodeTypes = useWorkflowStore((state) => state.setNodeTypes);
   const [error, setError] = useState("");
   const [serverWarning, setServerWarning] = useState("");
@@ -82,42 +71,92 @@ function Editor() {
   const [name, setName] = useState("weekly");
   const [parent, setParent] = useState("C:/flows");
   const [root, setRoot] = useState("");
-  const [columnHints, setColumnHints] = useState<string[]>([]);
-  const [pathIssues, setPathIssues] = useState<
-    { node_id: string; param: string; value: string }[]
-  >([]);
-  const flow = useReactFlow();
-  const viewport = useRef({ x: 0, y: 0, zoom: 1 });
-  const graphStack = useRef<
-    { nodes: FlowNode[]; edges: typeof store.edges; id: string; name: string }[]
-  >([]);
-  const [breadcrumbs, setBreadcrumbs] = useState<
-    { id: string; name: string }[]
-  >([]);
+  const [pathIssues, setPathIssues] = useState<PathIssue[]>([]);
+  const flow = useReactFlow<FlowNode>();
+  const canvasRef = useRef<HTMLElement | null>(null);
+  const overlayFocus = useRef<Partial<Record<Overlay, HTMLElement | null>>>({});
   const nodeTypes = useMemo(
     () => new Map(store.nodeTypes.map((item) => [item.type, item])),
     [store.nodeTypes],
   );
+  const {
+    save,
+    load,
+    reload,
+    revisionConflict,
+    viewport,
+    graphStack,
+    breadcrumbs,
+    setBreadcrumbs,
+  } = useWorkflowDocument({ setError });
+  const { request: overlayRequest, form, confirm, message } = useOverlayHost();
+  const dialogs = useMemo(
+    () => ({ form, confirm, message }),
+    [form, confirm, message],
+  );
+  const {
+    menu,
+    setMenu,
+    columnHints,
+    collapse,
+    expand,
+    enterMetanode,
+    leaveMetanode,
+    addAtCenter,
+    connect,
+    selectNodes,
+  } = useCanvasInteractions({
+    flow,
+    viewport,
+    graphStack,
+    setBreadcrumbs,
+    setError,
+  });
 
-  const save = useCallback(() => {
-    const operation = saveQueue.then(async () => {
-      const state = useWorkflowStore.getState();
-      if (!state.document || graphStack.current.length) return;
-      try {
-        const document = toDocument(state, viewport.current);
-        const saved = await api<WorkflowDocument>(
-          `/workflows/${state.document.id}`,
-          { method: "PUT", body: JSON.stringify(document) },
-        );
-        state.markSaved(saved.revision);
-        setError("");
-      } catch (reason) {
-        setError(String(reason));
-      }
-    });
-    saveQueue = operation;
-    return operation;
+  const openOverlay = useCallback((overlay: Exclude<Overlay, "preview">) => {
+    const active = document.activeElement;
+    overlayFocus.current[overlay] =
+      active instanceof HTMLElement ? active : null;
+    if (overlay === "demos") setDemosOpen(true);
+    if (overlay === "chat") setChatOpen(true);
+    if (overlay === "settings") setSettingsOpen(true);
   }, []);
+
+  const openPreview = useCallback(
+    (next: { nodeId: string; port: string; runId?: string }) => {
+      const active = document.activeElement;
+      overlayFocus.current.preview =
+        active instanceof HTMLElement ? active : null;
+      setPreview(next);
+    },
+    [],
+  );
+
+  const closeOverlay = useCallback((overlay: Overlay) => {
+    if (overlay === "demos") setDemosOpen(false);
+    if (overlay === "chat") setChatOpen(false);
+    if (overlay === "settings") setSettingsOpen(false);
+    if (overlay === "preview") setPreview(null);
+    const target = overlayFocus.current[overlay];
+    overlayFocus.current[overlay] = null;
+    if (target?.isConnected) target.focus();
+  }, []);
+
+  const { create, createDemo, open, importWorkflow, pack } =
+    useWorkflowCommands({
+      name,
+      parent,
+      setName,
+      setParent,
+      setRoot,
+      setError,
+      setPathIssues,
+      load,
+      closeDemos: () => {
+        closeOverlay("demos");
+      },
+      dialogs,
+    });
 
   useEffect(() => {
     void api<NodeTypeDecl[]>("/nodes/types")
@@ -125,7 +164,7 @@ function Editor() {
         setNodeTypes(types);
       })
       .catch((reason: unknown) => {
-        setError(String(reason));
+        setError(formatApiError(reason));
       });
   }, [setNodeTypes]);
 
@@ -148,422 +187,80 @@ function Editor() {
     const listener = (event: Event) => {
       const detail = (event as CustomEvent<{ nodeId: string; port: string }>)
         .detail;
-      setPreview(detail);
+      openPreview(detail);
     };
     window.addEventListener("weft-preview", listener);
     return () => {
       window.removeEventListener("weft-preview", listener);
     };
-  }, []);
+  }, [openPreview]);
 
-  useEffect(() => {
-    if (!store.dirty) return;
-    const timer = window.setTimeout(() => {
+  useEditorShortcuts({
+    save: () => {
       void save();
-    }, 2000);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [store.dirty, store.nodes, store.edges, save]);
-
-  useEffect(() => {
-    const actions = useWorkflowStore.getState();
-    const listener = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase();
-      if (event.shiftKey && key === "1") {
-        event.preventDefault();
-        void flow.fitView();
-        return;
+    },
+    undo: () => {
+      useWorkflowStore.getState().undo();
+    },
+    redo: () => {
+      useWorkflowStore.getState().redo();
+    },
+    copy: () => {
+      useWorkflowStore.getState().copy();
+    },
+    paste: () => {
+      useWorkflowStore.getState().paste();
+    },
+    deleteSelected: () => {
+      useWorkflowStore.getState().deleteSelected();
+    },
+    fitView: () => {
+      void flow.fitView();
+    },
+    fitSelected: () => {
+      const selected = useWorkflowStore
+        .getState()
+        .nodes.filter((node) => node.selected);
+      if (selected.length) void flow.fitView({ nodes: selected });
+    },
+    escape: () => {
+      if (document.querySelector('[role="alertdialog"]')) return true;
+      if (preview && store.document) {
+        closeOverlay("preview");
+        return true;
       }
-      if (event.shiftKey && key === "2") {
-        event.preventDefault();
-        const selected = useWorkflowStore
-          .getState()
-          .nodes.filter((node) => node.selected);
-        if (selected.length) void flow.fitView({ nodes: selected });
-        return;
+      if (settingsOpen) {
+        closeOverlay("settings");
+        return true;
       }
-      if (!event.ctrlKey) return;
-      if (key === "s") {
-        event.preventDefault();
-        void save();
+      if (demosOpen) {
+        closeOverlay("demos");
+        return true;
       }
-      if (key === "z") {
-        event.preventDefault();
-        actions.undo();
+      if (chatOpen && store.document) {
+        closeOverlay("chat");
+        return true;
       }
-      if (key === "y") {
-        event.preventDefault();
-        actions.redo();
+      if (menu) {
+        setMenu(null);
+        const node = document.querySelector(`[data-id="${menu.nodeId}"]`);
+        if (node instanceof HTMLElement) node.focus();
+        else canvasRef.current?.focus();
+        return true;
       }
-      if (key === "c") {
-        actions.copy();
-      }
-      if (key === "v") {
-        actions.paste();
-      }
-    };
-    const deleteListener = (event: KeyboardEvent) => {
-      if (event.key === "Delete") actions.deleteSelected();
-    };
-    window.addEventListener("keydown", listener);
-    window.addEventListener("keyup", deleteListener);
-    return () => {
-      window.removeEventListener("keydown", listener);
-      window.removeEventListener("keyup", deleteListener);
-    };
-  }, [save, flow]);
-
-  const load = (
-    document: WorkflowDocument & { nodes: unknown[]; edges: unknown[] },
-  ) => {
-    graphStack.current = [];
-    setBreadcrumbs([]);
-    const nodes = document.nodes.map((raw) => {
-      const node = raw as StoredNode;
-      const ports =
-        node.type === "flow.metanode"
-          ? metanodePorts(node.params, store.nodeTypes)
-          : {
-              inputs: nodeTypes.get(node.type)?.inputs ?? [],
-              outputs: nodeTypes.get(node.type)?.outputs ?? [],
-            };
-      return {
-        id: node.id,
-        type: "weft",
-        position: node.position,
-        data: {
-          nodeId: node.id,
-          type: node.type,
-          name: node.name,
-          params: node.params,
-          inputs: ports.inputs,
-          outputs: ports.outputs,
-          comment: node.comment ?? "",
-          status: "configured",
-        },
-      };
-    });
-    const notes: FlowNode[] = document.notes.map((note) => ({
-      id: note.id,
-      type: "note",
-      position: note.position,
-      data: {
-        nodeId: note.id,
-        type: "canvas.note",
-        name: "便签",
-        params: {
-          markdown: note.markdown,
-          color: note.color,
-          width: note.size.width,
-          height: note.size.height,
-        },
-        inputs: [],
-        outputs: [],
-        comment: "",
-        status: "configured",
-      },
-    }));
-    const edges = document.edges.map((raw) => {
-      const edge = raw as StoredEdge;
-      return {
-        id: edge.id,
-        source: edge.source,
-        sourceHandle: edge.sourcePort,
-        target: edge.target,
-        targetHandle: edge.targetPort,
-      };
-    });
-    store.setDocument(document, [...nodes, ...notes], edges);
-    viewport.current = document.viewport;
-  };
-
-  const create = async () => {
-    const result = await api<{ id: string; path: string }>("/workflows", {
-      method: "POST",
-      body: JSON.stringify({ name, parent_dir: parent }),
-    });
-    setRoot(result.path);
-    const document = await api<
-      WorkflowDocument & { nodes: unknown[]; edges: unknown[] }
-    >(`/workflows/${result.id}`);
-    load(document);
-  };
-
-  const createDemo = async (
-    demoId: string,
-    demoName: string,
-    parentDir: string,
-  ) => {
-    const result = await api<{ id: string; path: string }>(
-      `/demos/${demoId}/create`,
-      {
-        method: "POST",
-        body: JSON.stringify({ name: demoName, parent_dir: parentDir }),
-      },
-    );
-    setRoot(result.path);
-    setName(demoName);
-    setParent(parentDir);
-    const document = await api<
-      WorkflowDocument & { nodes: unknown[]; edges: unknown[] }
-    >(`/workflows/${result.id}`);
-    load(document);
-    setDemosOpen(false);
-    setError("");
-  };
-
-  const open = async () => {
-    const path = window.prompt("工作流目录");
-    if (!path) return;
-    const result = await api<{ id: string; path: string }>("/workflows/open", {
-      method: "POST",
-      body: JSON.stringify({ path }),
-    });
-    setRoot(result.path);
-    const document = await api<
-      WorkflowDocument & { nodes: unknown[]; edges: unknown[] }
-    >(`/workflows/${result.id}`);
-    load(document);
-  };
-
-  const importWorkflow = async () => {
-    const zipPath = window.prompt("工作流 zip 路径");
-    if (!zipPath) return;
-    const destDir = window.prompt("导入目标父目录", parent);
-    if (!destDir) return;
-    try {
-      const result = await api<{ id: string; path: string }>(
-        "/workflows/unpack",
-        {
-          method: "POST",
-          body: JSON.stringify({ zip_path: zipPath, dest_dir: destDir }),
-        },
+      const state = useWorkflowStore.getState();
+      if (!state.selected.length && !state.nodes.some((node) => node.selected))
+        return false;
+      state.moveNodes(
+        state.nodes.map((node) =>
+          node.selected ? { ...node, selected: false } : node,
+        ),
       );
-      setRoot(result.path);
-      const document = await api<
-        WorkflowDocument & { nodes: unknown[]; edges: unknown[] }
-      >(`/workflows/${result.id}`);
-      load(document);
-      setError("");
-    } catch (reason) {
-      setError(String(reason));
-    }
-  };
-
-  const pack = async () => {
-    const document = store.document;
-    if (!document) return;
-    try {
-      const report = await api<{
-        errors: { message: string }[];
-        warnings: { message: string }[];
-        abs_paths: { node_id: string; param: string; value: string }[];
-        size_estimate: number;
-      }>(`/workflows/${document.id}/pack/preflight`);
-      setPathIssues(report.abs_paths);
-      if (report.errors.length) {
-        setError(report.errors.map((item) => item.message).join("\n"));
-        return;
-      }
-      const summary = report.warnings.map((item) => item.message).join("\n");
-      if (
-        report.warnings.length &&
-        !window.confirm(`发现打包警告：\n${summary}\n是否继续？`)
-      )
-        return;
-      const result = await api<{ path: string }>(
-        `/workflows/${document.id}/pack`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            exclude_data: window.confirm("是否排除 data/ 数据目录？"),
-            confirm_warnings: true,
-          }),
-        },
-      );
-      window.alert(`打包完成：${result.path}`);
-      setError("");
-    } catch (reason) {
-      setError(String(reason));
-    }
-  };
-
-  const collapse = () => {
-    const state = useWorkflowStore.getState();
-    const selected = state.selected.filter(
-      (id) =>
-        state.nodes.find((node) => node.id === id)?.data.type !== "canvas.note",
-    );
-    if (!selected.length) return;
-    const metaId = `n_${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
-    const graph = collapseGraph(
-      store.nodes,
-      store.edges,
-      selected,
-      store.nodeTypes,
-      metaId,
-    );
-    store.setGraph(graph.nodes, graph.edges);
-    store.setSelected([metaId]);
-  };
-
-  const expand = (nodeId: string) => {
-    const graph = expandGraph(
-      store.nodes,
-      store.edges,
-      nodeId,
-      store.nodeTypes,
-    );
-    store.setGraph(graph.nodes, graph.edges);
-    setMenu(null);
-  };
-
-  const enterMetanode = (node: FlowNode) => {
-    if (node.data.type !== "flow.metanode") return;
-    const graph = flowGraph(node.data.params, store.nodeTypes);
-    graphStack.current.push({
-      nodes: store.nodes,
-      edges: store.edges,
-      id: node.id,
-      name: node.data.name,
-    });
-    setBreadcrumbs([
-      ...graphStack.current.map((item) => ({ id: item.id, name: item.name })),
-    ]);
-    useWorkflowStore.setState({
-      nodes: graph.nodes,
-      edges: graph.edges,
-      selected: [],
-      history: [],
-      future: [],
-      dirty: false,
-    });
-  };
-
-  const leaveMetanode = () => {
-    const parent = graphStack.current.pop();
-    if (!parent) return;
-    const meta = parent.nodes.find((node) => node.id === parent.id);
-    if (!meta) throw new Error("Metanode 不存在");
-    const params = {
-      ...meta.data.params,
-      graph: {
-        nodes: store.nodes
-          .filter((node) => node.data.type !== "canvas.note")
-          .map((node) => ({
-            id: node.id,
-            type: node.data.type,
-            name: node.data.name,
-            position: node.position,
-            params: node.data.params,
-            comment: node.data.comment,
-          })),
-        notes: store.nodes
-          .filter((node) => node.data.type === "canvas.note")
-          .map((node) => ({
-            id: node.id,
-            position: node.position,
-            size: {
-              width: Number(node.data.params.width ?? 240),
-              height: Number(node.data.params.height ?? 160),
-            },
-            color:
-              typeof node.data.params.color === "string"
-                ? node.data.params.color
-                : "#fef3c7",
-            markdown:
-              typeof node.data.params.markdown === "string"
-                ? node.data.params.markdown
-                : "",
-          })),
-        edges: store.edges.map((edge, order) => ({
-          id: edge.id,
-          source: edge.source,
-          sourcePort: edge.sourceHandle,
-          target: edge.target,
-          targetPort: edge.targetHandle,
-          order,
-        })),
-      },
-    };
-    useWorkflowStore.setState({
-      nodes: parent.nodes.map((node) =>
-        node.id === parent.id
-          ? { ...node, data: { ...node.data, params } }
-          : node,
-      ),
-      edges: parent.edges,
-      selected: [parent.id],
-      history: [],
-      future: [],
-      dirty: true,
-    });
-    setBreadcrumbs(
-      graphStack.current.map((item) => ({ id: item.id, name: item.name })),
-    );
-  };
-
-  const addAtCenter = (type: string) => {
-    store.addNode(
-      type,
-      flow.screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
-      }),
-    );
-  };
-
-  const connect = async (connection: Connection) => {
-    const edge: Edge = {
-      ...connection,
-      id: `e_${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`,
-    };
-    store.connect(edge);
-    const state = useWorkflowStore.getState();
-    if (!state.document) return;
-    const report = await api<{ errors: { message: string }[] }>(
-      `/workflows/${state.document.id}/validate`,
-      {
-        method: "POST",
-        body: JSON.stringify(toDocument(state, viewport.current)),
-      },
-    );
-    if (report.errors.length) {
-      store.undo();
-      setError(report.errors[0].message);
-    }
-  };
-
-  const selectNodes = (nodes: FlowNode[]) => {
-    const updateHints = (next: string[]) => {
-      setColumnHints((current) => {
-        if (
-          current.length === next.length &&
-          current.every((value, index) => value === next[index])
-        )
-          return current;
-        return next;
-      });
-    };
-    const ids = nodes.map((node) => node.id);
-    store.setSelected(ids);
-    const document = store.document;
-    if (!document || ids.length !== 1) {
-      updateHints([]);
-      return;
-    }
-    void api<Record<string, string[]>>(
-      `/workflows/${document.id}/nodes/${ids[0]}/column-hints`,
-      { method: "POST" },
-    )
-      .then((hints) => {
-        updateHints(Object.values(hints).flat());
-      })
-      .catch(() => {
-        updateHints([]);
-      });
-  };
+      state.setSelected([]);
+      canvasRef.current?.focus();
+      return true;
+    },
+  });
 
   const execute = useCallback(
     async (scope: Record<string, unknown> = { kind: "all", node_id: null }) => {
@@ -575,9 +272,11 @@ function Editor() {
           missing: { message: string }[];
         }>(`/workflows/${document.id}/resources/preflight`);
         const allowMissing = resources.missing.length
-          ? window.confirm(
-              `外部资源缺失：\n${resources.missing.map((item) => item.message).join("\n")}\n仍要运行？`,
-            )
+          ? await confirm({
+              title: "外部资源缺失",
+              message: `外部资源缺失：\n${resources.missing.map((item) => item.message).join("\n")}\n仍要运行？`,
+              confirmLabel: "仍要运行",
+            })
           : false;
         if (resources.missing.length && !allowMissing) return;
         const result = await api<{ run_id: string }>(
@@ -600,10 +299,10 @@ function Editor() {
         useRunStore.getState().snapshot(snapshot);
         setMenu(null);
       } catch (reason) {
-        setError(String(reason));
+        setError(formatApiError(reason));
       }
     },
-    [save],
+    [confirm, save, setMenu],
   );
 
   useEffect(() => {
@@ -655,7 +354,7 @@ function Editor() {
             aria-label="示例工作流"
             data-tooltip="示例工作流"
             onClick={() => {
-              setDemosOpen(true);
+              openOverlay("demos");
             }}
           >
             <Icon name="grid" />
@@ -692,7 +391,7 @@ function Editor() {
               aria-label="聊天"
               data-tooltip="聊天"
               onClick={() => {
-                setChatOpen(true);
+                openOverlay("chat");
               }}
             >
               <Icon name="send" />
@@ -705,7 +404,7 @@ function Editor() {
             aria-label="设置"
             data-tooltip="设置"
             onClick={() => {
-              setSettingsOpen(true);
+              openOverlay("settings");
             }}
           >
             <Icon name="settings" />
@@ -745,6 +444,7 @@ function Editor() {
             </button>
           </div>
           <div className="toolbar-actions">
+            <ConnectionIndicator />
             {store.document && (
               <span className="workflow-identity" title="当前工作流">
                 <Icon name="flow" />
@@ -799,10 +499,18 @@ function Editor() {
             {serverWarning}
           </div>
         )}
-        {error && (
+        {(error || revisionConflict) && (
           <div className="error-banner" role="alert">
             <Icon name="warn" />
-            <span>{error}</span>
+            <span>{error || "工作流保存冲突（REVISION_CONFLICT）"}</span>
+            {revisionConflict && (
+              <button
+                className="button secondary"
+                onClick={() => void reload()}
+              >
+                重新读取
+              </button>
+            )}
           </div>
         )}
         {pathIssues.length > 0 && (
@@ -829,7 +537,12 @@ function Editor() {
         <div className="editor-body">
           <NodePanel types={store.nodeTypes} onAdd={addAtCenter} />
           <div className="canvas-column">
-            <section className="canvas" aria-label="工作流画布">
+            <section
+              className="canvas"
+              aria-label="工作流画布"
+              ref={canvasRef}
+              tabIndex={-1}
+            >
               <div className="canvas-caption">
                 <span className="canvas-mode">
                   <Icon name="flow" />
@@ -841,6 +554,7 @@ function Editor() {
                 nodes={displayNodes}
                 edges={store.edges}
                 nodeTypes={{ weft: WeftNode, note: CanvasNote }}
+                deleteKeyCode={null}
                 panOnDrag={[1]}
                 selectionOnDrag
                 selectionMode={SelectionMode.Partial}
@@ -896,6 +610,7 @@ function Editor() {
                 fitView
                 fitViewOptions={{ maxZoom: 1 }}
               >
+                <NodeInternalsSync nodes={store.nodes} />
                 <Background color="#d4d1dc" gap={18} size={1} />
                 <MiniMap />
                 <Controls />
@@ -906,7 +621,7 @@ function Editor() {
               <HistoryPanel
                 workflowId={store.document.id}
                 onPreview={(runId, nodeId, port) => {
-                  setPreview({ runId, nodeId, port });
+                  openPreview({ runId, nodeId, port });
                 }}
               />
             )}
@@ -1033,7 +748,7 @@ function Editor() {
         <DemoGallery
           parent={parent}
           onClose={() => {
-            setDemosOpen(false);
+            closeOverlay("demos");
           }}
           onCreate={createDemo}
         />
@@ -1048,14 +763,14 @@ function Editor() {
             )?.enabled,
           )}
           onClose={() => {
-            setChatOpen(false);
+            closeOverlay("chat");
           }}
         />
       )}
       {settingsOpen && (
         <SettingsPanel
           onClose={() => {
-            setSettingsOpen(false);
+            closeOverlay("settings");
           }}
         />
       )}
@@ -1066,10 +781,11 @@ function Editor() {
           nodeId={preview.nodeId}
           port={preview.port}
           onClose={() => {
-            setPreview(null);
+            closeOverlay("preview");
           }}
         />
       )}
+      <OverlayHost request={overlayRequest} />
     </main>
   );
 }

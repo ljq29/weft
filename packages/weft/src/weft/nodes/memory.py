@@ -19,6 +19,7 @@ class MemoryLoadNode(Node):
     type = "agent.memory_load"
     category = "agent"
     name = "Memory Load"
+    display_name = "加载会话记忆"
     description = "读取指定会话的最新消息，不跨 Run 缓存"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.VOLATILE
@@ -48,6 +49,7 @@ class MemorySaveNode(Node):
     type = "agent.memory_save"
     category = "agent"
     name = "Memory Save"
+    display_name = "保存会话记忆"
     description = "向指定会话追加 Message 输入"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.SIDE_EFFECT
@@ -69,6 +71,7 @@ class MemoryClearNode(Node):
     type = "agent.memory_clear"
     category = "agent"
     name = "Memory Clear"
+    display_name = "清空会话记忆"
     description = "清空指定会话的 Memory 数据"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.SIDE_EFFECT

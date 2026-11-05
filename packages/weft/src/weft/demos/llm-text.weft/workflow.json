@@ -40,7 +40,16 @@
       "comment": "运行后点击 variable 端口查看 response。"
     }
   ],
-  "edges": [],
+  "edges": [
+    {
+      "id": "e_00000001",
+      "source": "n_00000001",
+      "sourcePort": "variable",
+      "target": "n_00000002",
+      "targetPort": "variables",
+      "order": 0
+    }
+  ],
   "notes": [
     {
       "id": "note_00000001",

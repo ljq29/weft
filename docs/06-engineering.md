@@ -56,7 +56,7 @@ weft/
 |Node|22 LTS + pnpm||
 |TypeScript|5.x，`strict: true`||
 |后端主要依赖|fastapi, uvicorn, pydantic v2, jsonschema, polars, pyarrow, fastexcel, xlsxwriter, xlwings (win), pywin32 (win), apscheduler, watchdog, httpx, loguru, jinja2, simpleeval, send2trash|jsonschema 校验节点 schema；fastexcel 读 Excel 文件、xlsxwriter 写 Excel 文件；新增依赖须在 PR 描述说明理由|
-|前端主要依赖|react 18, @xyflow/react 12, zustand, @tanstack/react-query, @tanstack/react-table, apache-arrow, react-diff-view, react-markdown|diff 用于变更审批，Markdown 用于聊天；新增依赖须在 PR 描述说明理由|
+|前端主要依赖|react 18, @xyflow/react 12, zustand, @tanstack/react-table, apache-arrow, react-diff-view, react-markdown|REST 使用轻量 `api()` 封装；diff 用于变更审批，Markdown 用于聊天；新增依赖须在 PR 描述说明理由|
 
 ## 3. 代码风格
 
@@ -72,12 +72,12 @@ weft/
 
 - `eslint` + `prettier`（默认规则 + `@typescript-eslint/strict`）。
 - 组件函数式 + hooks；禁止 class 组件。
-- 业务规则禁入前端（`03-architecture.md` A-08）：端口兼容性、校验等一律调后端接口。
+- 业务规则禁入前端（`03-architecture.md` A-08）：端口兼容性、完整参数与图校验等一律调后端接口。`workflowStore` 的 `required` 检查仅提供 provisional 即时反馈，`applyValidation` 只应用后端节点级错误且不覆盖运行态；最终状态以后端 `validate`/`run` 为准。
 
 ### 通用
 
 - 注释与文档字符串用英文；用户可见文案（UI、错误消息）v1 用中文。
-- 每个节点类型的 `description` 与参数 `description` 必填（UI 与工具 schema 复用）。
+- 每个内置节点类型的 `display_name`、`description` 与参数 `description` 必填；英文 `name` 保持规范名，中文 `display_name` 仅作 UI 补充（UI 与工具 schema 复用描述）。
 
 ## 4. 测试
 

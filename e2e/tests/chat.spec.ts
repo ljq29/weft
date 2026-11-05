@@ -5,14 +5,17 @@ import { resolve } from "node:path";
 
 const config = resolve(
   import.meta.dirname,
-  "../../.test-reports/e2e-config/session.json",
+  "../..",
+  process.env.WEFT_E2E_CONFIG_DIR ?? ".test-reports/e2e-config",
+  "session.json",
 );
 const projectRoot = resolve(import.meta.dirname, "../..");
 const token = () => JSON.parse(readFileSync(config, "utf8")).token as string;
+const apiUrl = process.env.WEFT_E2E_API_URL ?? "http://127.0.0.1:7788/api";
 async function request(path: string, method = "GET", body?: unknown) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const response = await fetch(`http://127.0.0.1:7788/api${path}`, {
+      const response = await fetch(`${apiUrl}${path}`, {
         method,
         headers: {
           Authorization: `Bearer ${token()}`,
@@ -89,11 +92,13 @@ test("US-AGT-07/AC-1..5; US-TRG-03/AC-1,2: chat run, stable session and empty ou
     },
   });
   await saveDocument(id, document);
-  page.once("dialog", (dialog) => void dialog.accept(root));
   const opened = page.waitForResponse(
     (response) => response.url().endsWith("/workflows/open") && response.ok(),
   );
   await page.getByRole("button", { name: "打开工作流" }).click();
+  const dialog = page.getByRole("dialog", { name: "打开工作流" });
+  await dialog.getByLabel("工作流目录").fill(root);
+  await dialog.getByRole("button", { name: "打开", exact: true }).click();
   await opened;
   await expect(page.locator(".weft-node")).toHaveCount(2);
   await page.getByRole("button", { name: "聊天", exact: true }).click();
@@ -112,11 +117,13 @@ test("US-AGT-07/AC-1..5; US-TRG-03/AC-1,2: chat run, stable session and empty ou
   latest.nodes = latest.nodes.slice(0, 1);
   latest.edges = [];
   await saveDocument(id, latest);
-  page.once("dialog", (dialog) => void dialog.accept(root));
   const reopened = page.waitForResponse(
     (response) => response.url().endsWith("/workflows/open") && response.ok(),
   );
   await page.getByRole("button", { name: "打开工作流" }).click();
+  const reopenDialog = page.getByRole("dialog", { name: "打开工作流" });
+  await reopenDialog.getByLabel("工作流目录").fill(root);
+  await reopenDialog.getByRole("button", { name: "打开", exact: true }).click();
   await reopened;
   await page.getByLabel("聊天内容").fill("无输出");
   await page.getByRole("button", { name: "发送", exact: true }).click();

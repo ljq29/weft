@@ -1,0 +1,113 @@
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes stream {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+@media (max-width: 1350px) {
+  :root {
+    --panel-left-width: 224px;
+    --panel-right-width: 288px;
+  }
+  .brand-lockup > span {
+    display: none;
+  }
+  .brand-lockup img {
+    width: 82px;
+  }
+  .compact-field.parent-field input {
+    width: 120px;
+  }
+  .workflow-identity {
+    max-width: 112px;
+  }
+  .breadcrumbs {
+    max-width: 220px;
+  }
+  .toolbar {
+    gap: var(--space-3);
+  }
+  .settings-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .schema-map-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .settings-body > .settings-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-card > .run-list {
+    max-height: 180px;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-modal {
+    width: calc(100vw - 24px);
+  }
+  .settings-body,
+  .settings-card {
+    padding: var(--space-3);
+  }
+  .settings-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-form-grid .wide,
+  .settings-form-grid > .button {
+    grid-column: 1 / -1;
+  }
+  .settings-modal .modal-footer > .button {
+    flex: 1 1 140px;
+  }
+}
+
+@media (max-height: 780px) {
+  .log-panel {
+    height: 132px;
+    flex-basis: 132px;
+  }
+  .history-panel.open {
+    height: 300px;
+    flex-basis: 300px;
+  }
+  .chat-panel {
+    top: 72px;
+    bottom: var(--space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

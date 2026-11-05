@@ -246,6 +246,20 @@ def create_app(
         except LLMConfigError as exception:
             return error("INVALID_SETTINGS", str(exception), 400)
 
+    @app.post("/api/settings/llm/draft/test")
+    @app.post("/api/settings/llm/draft/models")
+    async def test_llm_draft(request: dict[str, Any]) -> Any:
+        payload = dict(request)
+        name = payload.pop("name", "")
+        try:
+            draft = settings_store.llm_draft(name, payload)
+        except LLMConfigError as exception:
+            return error("INVALID_SETTINGS", str(exception), 400)
+        try:
+            return await llm_proxy.test_draft(name, draft)
+        except Exception as exception:
+            return error("LLM_CONNECTION_FAILED", str(exception), 400)
+
     @app.post("/api/settings/llm/{name}/test")
     async def test_llm(name: str) -> Any:
         try:
@@ -272,23 +286,62 @@ def create_app(
     @app.post("/api/demos/{demo_id}/create", status_code=201)
     async def instantiate_demo(demo_id: str, request: CreateRequest) -> Any:
         from weft.worker.environment import EnvironmentError as WorkflowEnvironmentError
-        from weft.workflow.demos import create_demo
+        from weft.workflow.demos import replace_demo, stage_demo
 
         try:
-            root = create_demo(demo_id, request.name, Path(request.parent_dir))
+            staging, root = stage_demo(demo_id, request.name, Path(request.parent_dir))
         except KeyError:
             return error("DEMO_NOT_FOUND", "示例不存在", 404)
         except FileExistsError:
             return error("WORKFLOW_EXISTS", "目录已存在", 409)
+
+        def target_run_active() -> bool:
+            return any(
+                run.root.resolve() == root.resolve()
+                and run.record.status in {"queued", "running", "waiting"}
+                for run in app.state.engine.runs.values()
+            )
+
+        if target_run_active():
+            shutil.rmtree(staging)
+            return error("WORKFLOW_RUN_ACTIVE", "工作流正在运行，不能替换示例", 409)
         try:
-            await asyncio.to_thread(WorkflowEnvironment(root).sync)
+            await asyncio.to_thread(WorkflowEnvironment(staging).sync)
         except WorkflowEnvironmentError as exception:
-            shutil.rmtree(root)
+            shutil.rmtree(staging)
             return error("DEMO_ENVIRONMENT_FAILED", str(exception), 400)
-        document = WorkflowStore(root).load()
-        app.state.roots[document.id] = root
-        if app.state.triggers is not None:
-            app.state.triggers.activate(document, root)
+        if target_run_active():
+            shutil.rmtree(staging)
+            return error("WORKFLOW_RUN_ACTIVE", "工作流正在运行，不能替换示例", 409)
+
+        document = WorkflowStore(staging).load()
+        previous_roots = {
+            workflow_id: previous_root
+            for workflow_id, previous_root in app.state.roots.items()
+            if previous_root.resolve() == root.resolve()
+        }
+        previous_documents = {
+            workflow_id: WorkflowStore(root).load() for workflow_id in previous_roots
+        }
+        try:
+            if app.state.triggers is not None:
+                for workflow_id in previous_roots:
+                    app.state.triggers.deactivate(workflow_id)
+            with replace_demo(staging, root):
+                for workflow_id in previous_roots:
+                    app.state.roots.pop(workflow_id, None)
+                app.state.roots[document.id] = root
+                if app.state.triggers is not None:
+                    app.state.triggers.activate(document, root)
+        except Exception as exception:
+            app.state.roots.pop(document.id, None)
+            if app.state.triggers is not None:
+                app.state.triggers.deactivate(document.id)
+            app.state.roots.update(previous_roots)
+            if app.state.triggers is not None:
+                for previous_document in previous_documents.values():
+                    app.state.triggers.activate(previous_document, root)
+            return error("DEMO_REPLACE_FAILED", f"示例替换失败，已恢复旧副本：{exception}", 500)
         return {"id": document.id, "path": str(root)}
 
     @app.get("/api/workflows")
@@ -823,6 +876,7 @@ def create_app(
             await socket.send_json({"error": {"code": "UNAUTHORIZED", "message": "认证失败"}})
             await socket.close(code=1008)
             return
+        await socket.send_json({"topic": "system", "event": "authenticated", "data": {}})
         topics: set[str] = set()
         queue, _ = app.state.bus.subscribe(lambda event: f"run:{event['run_id']}" in topics)
         sender = asyncio.create_task(send_events(socket, queue))

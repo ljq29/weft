@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api/client";
+import { api, formatApiError } from "../api/client";
 import { Icon } from "../components/Icon";
 
 export interface DemoInfo {
@@ -33,7 +33,7 @@ export function DemoGallery({
         setName(items[0]?.id ?? "");
       })
       .catch((reason: unknown) => {
-        setError(String(reason));
+        setError(formatApiError(reason));
       });
   }, []);
 
@@ -44,7 +44,7 @@ export function DemoGallery({
     try {
       await onCreate(selected, name, parentDir);
     } catch (reason) {
-      setError(String(reason));
+      setError(formatApiError(reason));
       setCreating(false);
     }
   };
@@ -59,7 +59,9 @@ export function DemoGallery({
             </span>
             <div>
               <h2>从一个示例开始</h2>
-              <p>创建独立副本，对副本的修改不会影响内置示例</p>
+              <p>
+                创建独立副本；同名同来源示例会替换旧副本，其他同名目录不会被覆盖
+              </p>
             </div>
           </div>
           <button className="icon-button" aria-label="关闭" onClick={onClose}>

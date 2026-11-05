@@ -24,6 +24,7 @@ class PromptTemplateNode(Node):
     type = "agent.prompt_template"
     category = "agent"
     name = "Prompt Template"
+    display_name = "提示词模板"
     description = "用受限 Jinja2 模板组合变量与只读表格"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.VOLATILE
@@ -60,6 +61,7 @@ class LLMCallNode(Node):
     type = "agent.llm_call"
     category = "agent"
     name = "LLM Call"
+    display_name = "大模型调用"
     description = "通过主机 LLMProxy 执行流式文本或 JSON 补全"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.VOLATILE
@@ -161,6 +163,7 @@ class NodeToolNode(Node):
     type = "agent.node_tool"
     category = "agent"
     name = "Node as Tool"
+    display_name = "节点作为工具"
     description = "把显式授权的节点包装为受控 Agent 工具"
     lane = Lane.TRUSTED_SERVICE
     outputs = (Port("tools", "tool", "授权工具声明"),)
@@ -173,7 +176,11 @@ class NodeToolNode(Node):
                 "description": "工具名",
             },
             "description": {"type": "string", "description": "工具用途"},
-            "exposed_params": {"type": "array", "description": "允许模型填写的参数白名单"},
+            "exposed_params": {
+                "type": "array",
+                "description": "允许模型填写的参数白名单",
+                "items": {"type": "string", "description": "参数名"},
+            },
             "result_format": {
                 "type": "string",
                 "enum": ["table_markdown", "json", "text"],
@@ -205,12 +212,21 @@ class SandboxedToolsNode(Node):
     type = "agent.sandboxed_tools"
     category = "agent"
     name = "Sandboxed Tools"
+    display_name = "沙箱工具"
     description = "提供沙箱内 read/write/edit/list/bash；沙箱内不支持 COM，Excel 请用 Node as Tool"
     lane = Lane.TRUSTED_SERVICE
     outputs = (Port("tools", "tool", "沙箱工具集合"),)
     params_schema = schema(
         {
-            "tools": {"type": "array", "description": "read/write/edit/list/bash 多选"},
+            "tools": {
+                "type": "array",
+                "description": "read/write/edit/list/bash 多选",
+                "items": {
+                    "type": "string",
+                    "enum": ["read", "write", "edit", "list", "bash"],
+                    "description": "沙箱工具名",
+                },
+            },
             "cwd": {"type": "string", "description": "工作目录，默认 Root"},
             "sandbox": {
                 "type": "string",
@@ -270,6 +286,7 @@ class PiAgentNode(Node):
     type = "agent.pi"
     category = "agent"
     name = "Pi Agent"
+    display_name = "Pi 智能体"
     description = "在 Sandboxie 中运行原版 pi，经环回 LLMProxy 使用命名配置"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.VOLATILE
@@ -290,7 +307,11 @@ class PiAgentNode(Node):
                 "description": "沙箱模式",
             },
             "timeout": {"type": "number", "minimum": 0.001, "description": "运行超时秒数"},
-            "extra_args": {"type": "array", "description": "附加 pi 参数"},
+            "extra_args": {
+                "type": "array",
+                "description": "附加 pi 参数",
+                "items": {"type": "string", "description": "命令行参数"},
+            },
         },
         ["task", "llm"],
     )
@@ -332,6 +353,7 @@ class AgentLoopNode(Node):
     type = "agent.loop"
     category = "agent"
     name = "Agent Loop"
+    display_name = "智能体循环"
     description = "执行可停止、可审计的 ReAct 工具调用循环"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.VOLATILE

@@ -2,6 +2,29 @@ import { useMemo, useState } from "react";
 import type { NodeTypeDecl } from "../types/workflow";
 import { Icon, nodeVisual } from "../components/Icon";
 
+const categoryDisplayNames: Record<string, string> = {
+  agent: "智能体",
+  code: "代码",
+  excel: "Excel",
+  file: "文件",
+  flow: "流程控制",
+  table: "表格",
+  user: "自定义",
+};
+
+export function filterNodeTypes(
+  types: NodeTypeDecl[],
+  query: string,
+): NodeTypeDecl[] {
+  const normalized = query.trim().toLocaleLowerCase();
+  if (!normalized) return types;
+  return types.filter((item) =>
+    [item.name, item.display_name, item.type, item.description].some((value) =>
+      value.toLocaleLowerCase().includes(normalized),
+    ),
+  );
+}
+
 export function NodePanel({
   types,
   onAdd,
@@ -11,11 +34,7 @@ export function NodePanel({
 }) {
   const [query, setQuery] = useState("");
   const groups = useMemo(() => {
-    const filtered = types.filter((item) =>
-      `${item.name} ${item.description}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-    );
+    const filtered = filterNodeTypes(types, query);
     const result = new Map<string, NodeTypeDecl[]>();
     for (const item of filtered) {
       result.set(item.category, [...(result.get(item.category) ?? []), item]);
@@ -46,7 +65,7 @@ export function NodePanel({
         {[...groups.entries()].map(([category, nodes]) => (
           <section className="node-category" key={category}>
             <h3>
-              <span>{category}</span>
+              <span>{categoryDisplayNames[category] ?? category}</span>
               <span>{nodes.length}</span>
             </h3>
             <div className="category-nodes">
@@ -71,7 +90,15 @@ export function NodePanel({
                     <span className={`palette-icon ${visual.tone}`}>
                       <Icon name={visual.icon} />
                     </span>
-                    <span className="palette-node-name">{node.name}</span>
+                    <span className="palette-node-name">
+                      {node.name}
+                      {node.display_name && (
+                        <span className="palette-node-display-name">
+                          {" · "}
+                          {node.display_name}
+                        </span>
+                      )}
+                    </span>
                     <Icon name="plus" className="add-icon" />
                   </button>
                 );

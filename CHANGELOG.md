@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+## [0.4.0] - 2026-11-05
+
+### Added
+
+- Add Chinese supplementary names for all built-in nodes, bilingual search and generated node specifications.
+- Add recursive schema-driven parameter controls for enums, nested objects, record arrays, key-value maps and common built-in nodes.
+- Add OpenAI-compatible provider presets, draft connection testing, model discovery and structured runtime settings.
+- Add a visible WebSocket connection indicator with authenticated reconnection, backoff, immediate retry and REST baseline recovery.
+
+### Changed
+
+- Establish readable typography, spacing, control and panel sizing tokens, and split styles by UI region without changing canvas zoom semantics.
+- Connect every built-in demo from Trigger through all business nodes; safely replace only a matching demo copy after staged environment synchronization.
+- Split editor document, command, canvas and overlay orchestration into focused hooks and replace native browser dialogs with accessible Weft dialogs.
+- Preserve local edits on revision conflicts until the user explicitly reloads, and apply backend validation without overwriting execution state.
+- Remove the unused TanStack Query dependency and retain the lightweight API client with structured errors.
+
+### Fixed
+
+- Synchronize React Flow handle measurements so loaded demo edges render reliably.
+- Format Arrow BigInt values safely in inline tables and write Run metadata atomically for concurrent history readers.
+- Preserve the selected node when reloading the same workflow so the inspector remains synchronized.
+
+### Verified
+
+- `poe check` passed with 240 backend unit/contract tests and 64 frontend tests; 37 backend integration tests also passed.
+- All 26 Playwright E2E tests passed, including demo replacement, structured forms, dialogs, 401/409 recovery and real WebSocket reconnection with baseline restoration.
+- Windows real Excel/Sandboxie/pi tests were not rerun for this UI-focused release; existing `win_real` acceptance remains recorded in earlier releases.
+
 ## [0.3.0] - 2026-11-05
 
 ### Added

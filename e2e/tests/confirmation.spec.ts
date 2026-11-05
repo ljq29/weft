@@ -5,7 +5,9 @@ import { resolve } from "node:path";
 function token() {
   const path = resolve(
     import.meta.dirname,
-    "../../.test-reports/e2e-config/session.json",
+    "../..",
+    process.env.WEFT_E2E_CONFIG_DIR ?? ".test-reports/e2e-config",
+    "session.json",
   );
   return JSON.parse(readFileSync(path, "utf8")).token as string;
 }

@@ -52,6 +52,7 @@ class ShellCommandNode(Node):
     type = "code.shell"
     category = "code"
     name = "Shell Command"
+    display_name = "Shell 命令"
     description = "在可信 Worker 车道执行 PowerShell/cmd，不向 Agent 开放"
     lane = Lane.TRUSTED_WORKER
     cache_policy = CachePolicy.SIDE_EFFECT
@@ -62,7 +63,11 @@ class ShellCommandNode(Node):
             "cwd": prop("string", "工作目录，默认 Root", default="."),
             "shell": prop("string", "命令解释器", enum=["powershell", "cmd"], default="powershell"),
             "timeout": prop("number", "超时秒数", default=60),
-            "env": prop("object", "附加环境变量"),
+            "env": prop(
+                "object",
+                "附加环境变量",
+                additionalProperties={"description": "环境变量值；非字符串会序列化为 JSON"},
+            ),
             "fail_on_nonzero": prop("boolean", "非零退出码时失败", default=True),
         },
         ["command"],

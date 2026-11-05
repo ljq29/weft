@@ -2,6 +2,18 @@ import { useEffect, useState } from "react";
 import { tableFromIPC } from "apache-arrow";
 import { sessionToken } from "../api/client";
 
+function formatValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "bigint" ||
+    typeof value === "boolean"
+  )
+    return value.toString();
+  if (typeof value === "object" && value !== null) return JSON.stringify(value);
+  return "";
+}
+
 export function InlineTable({
   workflowId,
   nodeId,
@@ -26,7 +38,7 @@ export function InlineTable({
         Array.from({ length: data.numRows }, (_, row) =>
           data.schema.fields.map((field) => {
             const value: unknown = data.getChild(field.name)?.get(row);
-            return typeof value === "string" ? value : JSON.stringify(value);
+            return formatValue(value);
           }),
         ),
       );

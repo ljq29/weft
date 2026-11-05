@@ -1,0 +1,202 @@
+.editor-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--panel-left-width) minmax(360px, 1fr) var(
+      --panel-right-width
+    );
+}
+.node-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+}
+.panel-title {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-4);
+  color: var(--muted);
+}
+.panel-title > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.panel-title h2 {
+  color: var(--ink);
+  font-size: var(--font-size-lg);
+}
+.panel-title span {
+  font-size: var(--font-size-xs);
+}
+.panel-title > .app-icon {
+  width: 16px;
+  height: 16px;
+}
+.search-field {
+  min-height: var(--control-height-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.search-field:focus-within {
+  border-color: var(--focus-border);
+  box-shadow: 0 0 0 3px var(--search-focus-ring);
+}
+.search-field .app-icon {
+  width: 16px;
+  height: 16px;
+}
+.search-field input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0 !important;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--font-size-md);
+}
+.search-field input::placeholder,
+textarea::placeholder,
+input::placeholder {
+  color: var(--muted-subtle);
+}
+.node-search {
+  margin: 0 var(--space-3) var(--space-3);
+}
+.node-categories {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 var(--space-2) var(--space-3);
+}
+.node-category {
+  margin-bottom: var(--space-3);
+}
+.node-category > h3 {
+  min-height: var(--control-height-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+.node-category > h3 > span:last-child {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+}
+.category-nodes {
+  display: grid;
+  gap: var(--space-1);
+}
+.palette-node {
+  width: 100%;
+  height: var(--control-height-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: var(--font-size-md);
+  text-align: left;
+}
+.palette-node:hover {
+  border-color: var(--line);
+  background: var(--surface-subtle);
+  color: var(--ink);
+}
+.palette-icon {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 6px;
+}
+.palette-icon .app-icon {
+  width: 14px;
+  height: 14px;
+}
+.palette-icon.excel {
+  background: var(--excel-soft);
+  color: var(--excel);
+}
+.palette-icon.table {
+  background: var(--table-soft);
+  color: var(--table);
+}
+.palette-icon.agent {
+  background: var(--message-soft);
+  color: var(--message);
+}
+.palette-icon.flow {
+  background: var(--flow-soft);
+  color: var(--flow);
+}
+.palette-icon.file {
+  background: var(--variable-soft);
+  color: var(--variable);
+}
+.palette-icon.code {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.palette-node-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette-node .add-icon {
+  width: 12px;
+  height: 12px;
+  margin-left: auto;
+  color: var(--muted);
+  opacity: 0;
+}
+.palette-node:hover .add-icon {
+  opacity: 1;
+}
+.node-panel-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+}
+.node-panel-footer .app-icon {
+  width: 12px;
+  height: 12px;
+}
+.palette-empty {
+  padding: 36px 10px;
+  color: var(--muted);
+  text-align: center;
+}
+.palette-empty > .app-icon {
+  margin-bottom: 8px;
+}
+.palette-empty p {
+  color: var(--ink-soft);
+}
+.palette-empty span {
+  font-size: var(--font-size-xs);
+}

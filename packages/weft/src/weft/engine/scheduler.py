@@ -771,10 +771,12 @@ class Engine:
 
     def _write_meta(self, prepared: PreparedRun) -> None:
         path = prepared.root / ".runs" / prepared.record.run_id / "meta.json"
-        path.write_text(
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(
             json.dumps(prepared.record.to_dict(), ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
+        temporary.replace(path)
 
     @staticmethod
     def new_run_id() -> str:

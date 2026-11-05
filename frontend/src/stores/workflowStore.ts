@@ -9,6 +9,12 @@ import type {
 export type FlowNode = Node<WorkflowNodeData>;
 export type FlowEdge = Edge;
 
+export interface ValidationIssue {
+  code: string;
+  message: string;
+  node_id: string | null;
+}
+
 interface Snapshot {
   nodes: FlowNode[];
   edges: FlowEdge[];
@@ -29,6 +35,7 @@ interface WorkflowState extends Snapshot {
   ) => void;
   setGraph: (nodes: FlowNode[], edges: FlowEdge[]) => void;
   setNodeTypes: (types: NodeTypeDecl[]) => void;
+  applyValidation: (issues: ValidationIssue[]) => void;
   setSelected: (ids: string[]) => void;
   addNode: (type: string, position: { x: number; y: number }) => void;
   addNote: (position: { x: number; y: number }) => void;
@@ -115,6 +122,30 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
     },
     setNodeTypes: (nodeTypes) => {
       set({ nodeTypes });
+    },
+    applyValidation: (issues) => {
+      const state = get();
+      const invalid = new Set(
+        issues.flatMap((issue) => (issue.node_id ? [issue.node_id] : [])),
+      );
+      set({
+        nodes: state.nodes.map((node) => {
+          if (
+            node.data.status !== "configured" &&
+            node.data.status !== "unconfigured"
+          )
+            return node;
+          const status = invalid.has(node.id)
+            ? "unconfigured"
+            : configurationStatus(
+                state.nodeTypes.find((item) => item.type === node.data.type),
+                node.data.params,
+              );
+          return status === node.data.status
+            ? node
+            : { ...node, data: { ...node.data, status } };
+        }),
+      });
     },
     setSelected: (selected) => {
       const current = get().selected;

@@ -24,12 +24,12 @@ def render_markdown(registry: NodeRegistry | None = None) -> str:
         "",
         "<!-- 由代码节点声明自动生成，请勿手工编辑。 -->",
         "",
-        "|类型|名称|分类|执行 lane|缓存策略|说明|",
-        "| --- | --- | --- | --- | --- | --- |",
+        "|类型|名称|中文补充|分类|执行 lane|缓存策略|说明|",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for node in nodes:
         lines.append(
-            f"|`{node.type}`|{node.name}|{node.category}|{node.lane}|"
+            f"|`{node.type}`|{node.name}|{node.display_name}|{node.category}|{node.lane}|"
             f"{node.cache_policy}|{node.description}|"
         )
     for node in nodes:

@@ -215,12 +215,12 @@ def test_pack_unpack_run_in_independent_directory(
     (root / "pyproject.toml").write_text(
         """[project]
 name = "portable"
-version = "0.3.0"
+version = "0.4.0"
 requires-python = ">=3.12"
-dependencies = ["weft-worker==0.3.0", "weft-sdk==0.3.0"]
+dependencies = ["weft-worker==0.4.0", "weft-sdk==0.4.0"]
 [tool.uv.sources]
-weft-worker = { path = "wheels/weft_worker-0.3.0-py3-none-any.whl" }
-weft-sdk = { path = "wheels/weft_sdk-0.3.0-py3-none-any.whl" }
+weft-worker = { path = "wheels/weft_worker-0.4.0-py3-none-any.whl" }
+weft-sdk = { path = "wheels/weft_sdk-0.4.0-py3-none-any.whl" }
 """,
         encoding="utf-8",
     )

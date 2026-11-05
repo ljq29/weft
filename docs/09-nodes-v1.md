@@ -2,72 +2,72 @@
 
 <!-- 由代码节点声明自动生成，请勿手工编辑。 -->
 
-|类型|名称|分类|执行 lane|缓存策略|说明|
-| --- | --- | --- | --- | --- | --- |
-|`agent.llm_call`|LLM Call|agent|trusted_service|volatile|通过主机 LLMProxy 执行流式文本或 JSON 补全|
-|`agent.loop`|Agent Loop|agent|trusted_service|volatile|执行可停止、可审计的 ReAct 工具调用循环|
-|`agent.memory_clear`|Memory Clear|agent|trusted_service|side_effect|清空指定会话的 Memory 数据|
-|`agent.memory_load`|Memory Load|agent|trusted_service|volatile|读取指定会话的最新消息，不跨 Run 缓存|
-|`agent.memory_save`|Memory Save|agent|trusted_service|side_effect|向指定会话追加 Message 输入|
-|`agent.node_tool`|Node as Tool|agent|trusted_service|side_effect|把显式授权的节点包装为受控 Agent 工具|
-|`agent.pi`|Pi Agent|agent|trusted_service|volatile|在 Sandboxie 中运行原版 pi，经环回 LLMProxy 使用命名配置|
-|`agent.prompt_template`|Prompt Template|agent|trusted_service|volatile|用受限 Jinja2 模板组合变量与只读表格|
-|`agent.sandboxed_tools`|Sandboxed Tools|agent|trusted_service|side_effect|提供沙箱内 read/write/edit/list/bash；沙箱内不支持 COM，Excel 请用 Node as Tool|
-|`code.python`|Python Script|code|trusted_worker|side_effect|在可信 Worker 中执行用户 Python 代码|
-|`code.shell`|Shell Command|code|trusted_worker|side_effect|在可信 Worker 车道执行 PowerShell/cmd，不向 Agent 开放|
-|`excel.cell_update`|Excel Cell Update|excel|trusted_service|side_effect|原子更新若干不连续单元格，默认禁止公式|
-|`excel.connect`|Excel Connect|excel|trusted_service|side_effect|连接可见 Excel 或创建独立的可见/隐藏实例|
-|`excel.read_range`|Excel Read Range|excel|trusted_service|volatile|实时读取 Excel 区域、表对象或命名区域为表格|
-|`excel.run_macro`|Excel Run Macro|excel|trusted_service|side_effect|通过 ExcelWorker 的 STA 串行队列调用 Application.Run|
-|`excel.save`|Excel Save|excel|trusted_service|side_effect|显式保存或另存工作簿，不隐式覆盖文件|
-|`excel.sheet`|Excel Sheet|excel|trusted_service|side_effect|创建、删除、重命名或清空工作表|
-|`excel.sheet_names`|Excel Sheet Names|excel|trusted_service|volatile|列出工作表名、索引与可见状态|
-|`excel.workbook`|Excel Workbook|excel|trusted_service|side_effect|引用已打开工作簿、打开文件或新建工作簿|
-|`excel.write_table`|Excel Write Table|excel|trusted_service|side_effect|整块写入、追加或覆盖 Excel 工作表区域|
-|`file.copy`|File Copy|file|trusted_worker|side_effect|复制文件或目录|
-|`file.delete`|File Delete|file|trusted_worker|side_effect|移入回收站或永久删除|
-|`file.list`|List Files|file|trusted_worker|pure|列出目录中的文件与目录|
-|`file.move`|File Move|file|trusted_worker|side_effect|移动文件或目录|
-|`file.path_join`|Path Join|file|trusted_worker|pure|拼接并规范化路径|
-|`file.rename`|File Rename|file|trusted_worker|side_effect|重命名文件或目录|
-|`flow.chat_output`|Chat Output|flow|trusted_service|side_effect|将 Message 或 Variable 作为助手消息推送到聊天会话|
-|`flow.http_response`|HTTP Response|flow|trusted_service|side_effect|为同步 HTTP 触发提供唯一响应；重复执行会失败|
-|`flow.if`|If|flow|trusted_service|pure|按受限 Python 表达式选择分支|
-|`flow.loop_end`|Loop End|flow|trusted_service|side_effect|收集循环体输出|
-|`flow.loop_start`|Loop Start|flow|trusted_service|side_effect|按行、按块或计数启动循环|
-|`flow.merge`|Merge|flow|trusted_service|pure|汇合两个可部分到达的表格分支|
-|`flow.metanode`|Metanode|flow|trusted_service|side_effect|将内嵌子图作为可逆折叠的复合节点|
-|`flow.switch`|Switch|flow|trusted_service|pure|按变量值选择命名分支|
-|`flow.trigger`|Trigger|flow|trusted_service|side_effect|手动、聊天、定时、文件或 HTTP 工作流入口|
-|`flow.variable`|Variable|flow|trusted_worker|pure|定义流变量|
-|`flow.wait`|Wait|flow|trusted_service|side_effect|等待指定秒数并响应取消|
-|`table.column_filter`|Column Filter|table|trusted_worker|pure|按名称或通配符筛选列|
-|`table.column_rename`|Column Rename|table|trusted_worker|pure|重命名表格列|
-|`table.concatenate`|Concatenate|table|trusted_worker|pure|按动态命名输入拼接表格|
-|`table.creator`|Table Creator|table|trusted_worker|pure|从参数中的行创建表格|
-|`table.duplicate_filter`|Duplicate Filter|table|trusted_worker|pure|按列去重|
-|`table.from_variables`|Variables to Table|table|trusted_worker|pure|将选中流变量转换为单行表|
-|`table.groupby`|GroupBy|table|trusted_worker|pure|按分组列聚合表格|
-|`table.joiner`|Joiner|table|trusted_worker|pure|按指定列连接两个表格|
-|`table.math_formula`|Math Formula|table|trusted_worker|pure|用 $列名$ 语法新增计算列|
-|`table.missing_value`|Missing Value|table|trusted_worker|pure|按列处理缺失值|
-|`table.pivot`|Pivot|table|trusted_worker|pure|将行透视成列|
-|`table.polars_expression`|Polars Expression|table|trusted_worker|pure|用 AST 白名单表达式新增列|
-|`table.read_csv`|Read CSV|table|trusted_worker|pure|读取 CSV 文件为表格|
-|`table.read_json`|Read JSON|table|trusted_worker|pure|读取 JSON 数组或 JSON Lines 文件|
-|`table.read_parquet`|Read Parquet|table|trusted_worker|pure|读取 Parquet 文件|
-|`table.row_count`|Table Row Count|table|trusted_worker|pure|输出表格行数变量|
-|`table.row_filter`|Row Filter|table|trusted_worker|pure|按单条件筛选行|
-|`table.rule_engine`|Rule Engine|table|trusted_worker|pure|按有序规则赋值，首个命中生效，其余使用默认值|
-|`table.sorter`|Sorter|table|trusted_worker|pure|按多个列键稳定排序|
-|`table.string_manipulation`|String Manipulation|table|trusted_worker|pure|执行常用字符串函数|
-|`table.to_variables`|Table to Variables|table|trusted_worker|pure|将表格行或列转换为流变量|
-|`table.type_cast`|Type Cast|table|trusted_worker|pure|转换列的数据类型|
-|`table.unpivot`|Unpivot|table|trusted_worker|pure|将列展开成行|
-|`table.view`|Table View|table|trusted_worker|pure|在节点内预览输入表格|
-|`table.write_csv`|Write CSV|table|trusted_worker|side_effect|将表格写入 CSV 文件|
-|`table.write_json`|Write JSON|table|trusted_worker|side_effect|将表格写入 JSON 数组或 JSON Lines|
-|`table.write_parquet`|Write Parquet|table|trusted_worker|side_effect|将表格写入 Parquet 文件|
+|类型|名称|中文补充|分类|执行 lane|缓存策略|说明|
+| --- | --- | --- | --- | --- | --- | --- |
+|`agent.llm_call`|LLM Call|大模型调用|agent|trusted_service|volatile|通过主机 LLMProxy 执行流式文本或 JSON 补全|
+|`agent.loop`|Agent Loop|智能体循环|agent|trusted_service|volatile|执行可停止、可审计的 ReAct 工具调用循环|
+|`agent.memory_clear`|Memory Clear|清空会话记忆|agent|trusted_service|side_effect|清空指定会话的 Memory 数据|
+|`agent.memory_load`|Memory Load|加载会话记忆|agent|trusted_service|volatile|读取指定会话的最新消息，不跨 Run 缓存|
+|`agent.memory_save`|Memory Save|保存会话记忆|agent|trusted_service|side_effect|向指定会话追加 Message 输入|
+|`agent.node_tool`|Node as Tool|节点作为工具|agent|trusted_service|side_effect|把显式授权的节点包装为受控 Agent 工具|
+|`agent.pi`|Pi Agent|Pi 智能体|agent|trusted_service|volatile|在 Sandboxie 中运行原版 pi，经环回 LLMProxy 使用命名配置|
+|`agent.prompt_template`|Prompt Template|提示词模板|agent|trusted_service|volatile|用受限 Jinja2 模板组合变量与只读表格|
+|`agent.sandboxed_tools`|Sandboxed Tools|沙箱工具|agent|trusted_service|side_effect|提供沙箱内 read/write/edit/list/bash；沙箱内不支持 COM，Excel 请用 Node as Tool|
+|`code.python`|Python Script|Python 脚本|code|trusted_worker|side_effect|在可信 Worker 中执行用户 Python 代码|
+|`code.shell`|Shell Command|Shell 命令|code|trusted_worker|side_effect|在可信 Worker 车道执行 PowerShell/cmd，不向 Agent 开放|
+|`excel.cell_update`|Excel Cell Update|更新单元格|excel|trusted_service|side_effect|原子更新若干不连续单元格，默认禁止公式|
+|`excel.connect`|Excel Connect|连接 Excel|excel|trusted_service|side_effect|连接可见 Excel 或创建独立的可见/隐藏实例|
+|`excel.read_range`|Excel Read Range|读取 Excel 区域|excel|trusted_service|volatile|实时读取 Excel 区域、表对象或命名区域为表格|
+|`excel.run_macro`|Excel Run Macro|运行 Excel 宏|excel|trusted_service|side_effect|通过 ExcelWorker 的 STA 串行队列调用 Application.Run|
+|`excel.save`|Excel Save|保存工作簿|excel|trusted_service|side_effect|显式保存或另存工作簿，不隐式覆盖文件|
+|`excel.sheet`|Excel Sheet|工作表操作|excel|trusted_service|side_effect|创建、删除、重命名或清空工作表|
+|`excel.sheet_names`|Excel Sheet Names|列出工作表|excel|trusted_service|volatile|列出工作表名、索引与可见状态|
+|`excel.workbook`|Excel Workbook|Excel 工作簿|excel|trusted_service|side_effect|引用已打开工作簿、打开文件或新建工作簿|
+|`excel.write_table`|Excel Write Table|写入 Excel 表格|excel|trusted_service|side_effect|整块写入、追加或覆盖 Excel 工作表区域|
+|`file.copy`|File Copy|复制文件|file|trusted_worker|side_effect|复制文件或目录|
+|`file.delete`|File Delete|删除文件|file|trusted_worker|side_effect|移入回收站或永久删除|
+|`file.list`|List Files|列出文件|file|trusted_worker|pure|列出目录中的文件与目录|
+|`file.move`|File Move|移动文件|file|trusted_worker|side_effect|移动文件或目录|
+|`file.path_join`|Path Join|路径拼接|file|trusted_worker|pure|拼接并规范化路径|
+|`file.rename`|File Rename|重命名文件|file|trusted_worker|side_effect|重命名文件或目录|
+|`flow.chat_output`|Chat Output|聊天输出|flow|trusted_service|side_effect|将 Message 或 Variable 作为助手消息推送到聊天会话|
+|`flow.http_response`|HTTP Response|HTTP 响应|flow|trusted_service|side_effect|为同步 HTTP 触发提供唯一响应；重复执行会失败|
+|`flow.if`|If|条件分支|flow|trusted_service|pure|按受限 Python 表达式选择分支|
+|`flow.loop_end`|Loop End|循环结束|flow|trusted_service|side_effect|收集循环体输出|
+|`flow.loop_start`|Loop Start|循环开始|flow|trusted_service|side_effect|按行、按块或计数启动循环|
+|`flow.merge`|Merge|分支汇合|flow|trusted_service|pure|汇合两个可部分到达的表格分支|
+|`flow.metanode`|Metanode|复合节点|flow|trusted_service|side_effect|将内嵌子图作为可逆折叠的复合节点|
+|`flow.switch`|Switch|多路分支|flow|trusted_service|pure|按变量值选择命名分支|
+|`flow.trigger`|Trigger|触发器|flow|trusted_service|side_effect|手动、聊天、定时、文件或 HTTP 工作流入口|
+|`flow.variable`|Variable|流变量|flow|trusted_worker|pure|定义流变量|
+|`flow.wait`|Wait|等待|flow|trusted_service|side_effect|等待指定秒数并响应取消|
+|`table.column_filter`|Column Filter|列筛选|table|trusted_worker|pure|按名称或通配符筛选列|
+|`table.column_rename`|Column Rename|列重命名|table|trusted_worker|pure|重命名表格列|
+|`table.concatenate`|Concatenate|表格拼接|table|trusted_worker|pure|按动态命名输入拼接表格|
+|`table.creator`|Table Creator|创建表格|table|trusted_worker|pure|从参数中的行创建表格|
+|`table.duplicate_filter`|Duplicate Filter|重复值筛选|table|trusted_worker|pure|按列去重|
+|`table.from_variables`|Variables to Table|变量转为表格|table|trusted_worker|pure|将选中流变量转换为单行表|
+|`table.groupby`|GroupBy|分组聚合|table|trusted_worker|pure|按分组列聚合表格|
+|`table.joiner`|Joiner|表格连接|table|trusted_worker|pure|按指定列连接两个表格|
+|`table.math_formula`|Math Formula|数学公式|table|trusted_worker|pure|用 $列名$ 语法新增计算列|
+|`table.missing_value`|Missing Value|缺失值处理|table|trusted_worker|pure|按列处理缺失值|
+|`table.pivot`|Pivot|数据透视|table|trusted_worker|pure|将行透视成列|
+|`table.polars_expression`|Polars Expression|Polars 表达式|table|trusted_worker|pure|用 AST 白名单表达式新增列|
+|`table.read_csv`|Read CSV|读取 CSV|table|trusted_worker|pure|读取 CSV 文件为表格|
+|`table.read_json`|Read JSON|读取 JSON|table|trusted_worker|pure|读取 JSON 数组或 JSON Lines 文件|
+|`table.read_parquet`|Read Parquet|读取 Parquet|table|trusted_worker|pure|读取 Parquet 文件|
+|`table.row_count`|Table Row Count|表格行数|table|trusted_worker|pure|输出表格行数变量|
+|`table.row_filter`|Row Filter|行筛选|table|trusted_worker|pure|按单条件筛选行|
+|`table.rule_engine`|Rule Engine|规则引擎|table|trusted_worker|pure|按有序规则赋值，首个命中生效，其余使用默认值|
+|`table.sorter`|Sorter|表格排序|table|trusted_worker|pure|按多个列键稳定排序|
+|`table.string_manipulation`|String Manipulation|字符串处理|table|trusted_worker|pure|执行常用字符串函数|
+|`table.to_variables`|Table to Variables|表格转为变量|table|trusted_worker|pure|将表格行或列转换为流变量|
+|`table.type_cast`|Type Cast|类型转换|table|trusted_worker|pure|转换列的数据类型|
+|`table.unpivot`|Unpivot|逆透视|table|trusted_worker|pure|将列展开成行|
+|`table.view`|Table View|表格预览|table|trusted_worker|pure|在节点内预览输入表格|
+|`table.write_csv`|Write CSV|写入 CSV|table|trusted_worker|side_effect|将表格写入 CSV 文件|
+|`table.write_json`|Write JSON|写入 JSON|table|trusted_worker|side_effect|将表格写入 JSON 数组或 JSON Lines|
+|`table.write_parquet`|Write Parquet|写入 Parquet|table|trusted_worker|side_effect|将表格写入 Parquet 文件|
 
 ## LLM Call (`agent.llm_call`)
 
@@ -273,7 +273,11 @@
     },
     "exposed_params": {
       "type": "array",
-      "description": "允许模型填写的参数白名单"
+      "description": "允许模型填写的参数白名单",
+      "items": {
+        "type": "string",
+        "description": "参数名"
+      }
     },
     "result_format": {
       "type": "string",
@@ -347,7 +351,11 @@
     },
     "extra_args": {
       "type": "array",
-      "description": "附加 pi 参数"
+      "description": "附加 pi 参数",
+      "items": {
+        "type": "string",
+        "description": "命令行参数"
+      }
     }
   },
   "required": [
@@ -413,7 +421,18 @@
   "properties": {
     "tools": {
       "type": "array",
-      "description": "read/write/edit/list/bash 多选"
+      "description": "read/write/edit/list/bash 多选",
+      "items": {
+        "type": "string",
+        "enum": [
+          "read",
+          "write",
+          "edit",
+          "list",
+          "bash"
+        ],
+        "description": "沙箱工具名"
+      }
     },
     "cwd": {
       "type": "string",
@@ -481,12 +500,53 @@
     "inputs": {
       "type": "array",
       "description": "输入端口映射",
-      "default": []
+      "default": [],
+      "items": {
+        "type": "object",
+        "description": "单个输入映射",
+        "properties": {
+          "port": {
+            "type": "string",
+            "description": "输入端口名"
+          },
+          "var": {
+            "type": "string",
+            "description": "脚本变量名"
+          }
+        },
+        "required": [
+          "port",
+          "var"
+        ]
+      }
     },
     "outputs": {
       "type": "array",
       "description": "输出端口声明",
-      "default": []
+      "default": [],
+      "items": {
+        "type": "object",
+        "description": "单个输出声明",
+        "properties": {
+          "var": {
+            "type": "string",
+            "description": "脚本变量名"
+          },
+          "port": {
+            "type": "string",
+            "description": "输出端口名"
+          },
+          "type": {
+            "type": "string",
+            "description": "输出类型，例如 Table 或 Variable"
+          }
+        },
+        "required": [
+          "var",
+          "port",
+          "type"
+        ]
+      }
     }
   },
   "required": []
@@ -527,7 +587,10 @@
     },
     "env": {
       "type": "object",
-      "description": "附加环境变量"
+      "description": "附加环境变量",
+      "additionalProperties": {
+        "description": "环境变量值；非字符串会序列化为 JSON"
+      }
     },
     "fail_on_nonzero": {
       "type": "boolean",
@@ -556,7 +619,25 @@
     },
     "cells": {
       "type": "array",
-      "description": "单元格地址与值列表"
+      "description": "单元格地址与值列表",
+      "default": [],
+      "items": {
+        "type": "object",
+        "description": "单个单元格更新",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "单元格地址，例如 B2"
+          },
+          "value": {
+            "description": "要写入的单元格值"
+          }
+        },
+        "required": [
+          "address",
+          "value"
+        ]
+      }
     },
     "allow_formula": {
       "type": "boolean",
@@ -647,7 +728,11 @@
     },
     "dtype_hints": {
       "type": "object",
-      "description": "按列指定 Arrow 类型"
+      "description": "按列指定 Arrow 类型",
+      "additionalProperties": {
+        "type": "string",
+        "description": "Arrow 类型别名，例如 int64、string"
+      }
     }
   },
   "required": [
@@ -672,7 +757,10 @@
     "args": {
       "type": "array",
       "description": "按顺序传给宏的参数",
-      "default": []
+      "default": [],
+      "items": {
+        "description": "宏参数值"
+      }
     }
   },
   "required": [
@@ -998,7 +1086,11 @@
   "properties": {
     "parts": {
       "type": "array",
-      "description": "路径片段"
+      "description": "路径片段",
+      "items": {
+        "type": "string",
+        "description": "路径片段"
+      }
     }
   },
   "required": [
@@ -1066,7 +1158,11 @@
     },
     "headers": {
       "type": "object",
-      "description": "响应头"
+      "description": "响应头",
+      "additionalProperties": {
+        "type": "string",
+        "description": "响应头值"
+      }
     },
     "body": {
       "description": "文本或 JSON 响应体"
@@ -1232,7 +1328,17 @@
     },
     "cases": {
       "type": "object",
-      "description": "值到输出端口名的映射"
+      "description": "值到输出端口名的映射",
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "case_1",
+          "case_2",
+          "case_3",
+          "default"
+        ],
+        "description": "输出端口名"
+      }
     }
   },
   "required": [
@@ -1281,7 +1387,23 @@
         },
         "schedules": {
           "type": "array",
-          "description": "cron 或固定间隔列表"
+          "description": "cron 或固定间隔列表",
+          "default": [],
+          "items": {
+            "type": "object",
+            "description": "单条定时规则",
+            "properties": {
+              "cron": {
+                "type": "string",
+                "description": "五段 cron 表达式"
+              },
+              "interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "固定间隔秒数"
+              }
+            }
+          }
         }
       }
     },
@@ -1295,7 +1417,56 @@
         },
         "watches": {
           "type": "array",
-          "description": "监听路径与规则"
+          "description": "监听路径与规则",
+          "default": [],
+          "items": {
+            "type": "object",
+            "description": "单条文件监听规则",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "监听目录路径"
+              },
+              "pattern": {
+                "type": "string",
+                "default": "*",
+                "description": "文件名 glob 过滤"
+              },
+              "events": {
+                "type": "array",
+                "description": "监听事件类型",
+                "default": [
+                  "created",
+                  "modified",
+                  "deleted"
+                ],
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "modified",
+                    "deleted",
+                    "moved"
+                  ],
+                  "description": "文件事件类型"
+                }
+              },
+              "recursive": {
+                "type": "boolean",
+                "default": false,
+                "description": "是否递归监听子目录"
+              },
+              "debounce_ms": {
+                "type": "number",
+                "minimum": 0,
+                "default": 2000,
+                "description": "事件防抖毫秒数"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
         }
       }
     },
@@ -1328,7 +1499,36 @@
   "properties": {
     "values": {
       "type": "array",
-      "description": "变量定义列表"
+      "description": "变量定义列表",
+      "items": {
+        "type": "object",
+        "description": "单个变量定义",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "变量名"
+          },
+          "type": {
+            "type": "string",
+            "description": "变量类型",
+            "enum": [
+              "str",
+              "int",
+              "float",
+              "bool",
+              "path",
+              "list"
+            ]
+          },
+          "value": {
+            "description": "变量值；path 类型使用相对 Root 的路径"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ]
+      }
     }
   },
   "required": [
@@ -1377,7 +1577,11 @@
     },
     "columns": {
       "type": "array",
-      "description": "列名或通配符列表"
+      "description": "列名或通配符列表",
+      "items": {
+        "type": "string",
+        "description": "列名或通配符"
+      }
     }
   },
   "required": [
@@ -1398,7 +1602,11 @@
   "properties": {
     "mapping": {
       "type": "object",
-      "description": "旧列名到新列名映射"
+      "description": "旧列名到新列名映射",
+      "additionalProperties": {
+        "type": "string",
+        "description": "新列名"
+      }
     }
   },
   "required": [
@@ -1448,7 +1656,14 @@
   "properties": {
     "rows": {
       "type": "array",
-      "description": "表格行数据"
+      "description": "表格行数据",
+      "items": {
+        "type": "object",
+        "description": "动态表格行",
+        "additionalProperties": {
+          "description": "单元格值"
+        }
+      }
     }
   },
   "required": [
@@ -1469,7 +1684,11 @@
     "columns": {
       "type": "array",
       "description": "去重列，空为全部",
-      "default": []
+      "default": [],
+      "items": {
+        "type": "string",
+        "description": "列名"
+      }
     },
     "keep": {
       "type": "string",
@@ -1496,7 +1715,11 @@
   "properties": {
     "names": {
       "type": "array",
-      "description": "变量名列表"
+      "description": "变量名列表",
+      "items": {
+        "type": "string",
+        "description": "变量名"
+      }
     }
   },
   "required": [
@@ -1516,11 +1739,49 @@
   "properties": {
     "group_by": {
       "type": "array",
-      "description": "分组列"
+      "description": "分组列",
+      "items": {
+        "type": "string",
+        "description": "分组列名"
+      }
     },
     "aggregations": {
       "type": "array",
-      "description": "聚合表达式列表"
+      "description": "聚合表达式列表",
+      "items": {
+        "type": "object",
+        "description": "单项聚合配置",
+        "properties": {
+          "column": {
+            "type": "string",
+            "description": "聚合列名"
+          },
+          "agg": {
+            "type": "string",
+            "description": "聚合方式",
+            "enum": [
+              "sum",
+              "mean",
+              "min",
+              "max",
+              "count",
+              "count_distinct",
+              "first",
+              "last",
+              "list",
+              "concat_str"
+            ]
+          },
+          "alias": {
+            "type": "string",
+            "description": "输出列别名"
+          }
+        },
+        "required": [
+          "column",
+          "agg"
+        ]
+      }
     }
   },
   "required": [
@@ -1605,7 +1866,29 @@
   "properties": {
     "strategies": {
       "type": "object",
-      "description": "每列的缺失值策略"
+      "description": "每列的缺失值策略",
+      "additionalProperties": {
+        "type": "object",
+        "description": "单列缺失值策略",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "处理动作",
+            "enum": [
+              "drop_row",
+              "fill_const",
+              "fill_mean",
+              "fill_prev"
+            ]
+          },
+          "value": {
+            "description": "fill_const 使用的填充值"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
     }
   },
   "required": [
@@ -1625,7 +1908,11 @@
   "properties": {
     "index": {
       "type": "array",
-      "description": "行索引列"
+      "description": "行索引列",
+      "items": {
+        "type": "string",
+        "description": "索引列名"
+      }
     },
     "columns": {
       "type": "string",
@@ -1660,7 +1947,25 @@
   "properties": {
     "expressions": {
       "type": "array",
-      "description": "表达式与别名列表"
+      "description": "表达式与别名列表",
+      "items": {
+        "type": "object",
+        "description": "单个表达式",
+        "properties": {
+          "expr": {
+            "type": "string",
+            "description": "Polars 表达式"
+          },
+          "alias": {
+            "type": "string",
+            "description": "输出列别名"
+          }
+        },
+        "required": [
+          "expr",
+          "alias"
+        ]
+      }
     }
   },
   "required": [
@@ -1814,7 +2119,54 @@
   "properties": {
     "rules": {
       "type": "array",
-      "description": "有序规则 [{condition, value}]"
+      "description": "有序规则 [{condition, value}]",
+      "items": {
+        "type": "object",
+        "description": "单条赋值规则",
+        "properties": {
+          "condition": {
+            "type": "object",
+            "description": "Row Filter 条件",
+            "properties": {
+              "column": {
+                "type": "string",
+                "description": "条件列名"
+              },
+              "operator": {
+                "type": "string",
+                "description": "比较操作",
+                "enum": [
+                  "==",
+                  "!=",
+                  ">",
+                  ">=",
+                  "<",
+                  "<=",
+                  "contains",
+                  "starts_with",
+                  "regex",
+                  "is_null",
+                  "is_not_null",
+                  "in"
+                ]
+              },
+              "value": {
+                "description": "比较值"
+              }
+            },
+            "required": [
+              "column",
+              "operator"
+            ]
+          },
+          "value": {
+            "description": "条件命中时的赋值"
+          }
+        },
+        "required": [
+          "condition"
+        ]
+      }
     },
     "default": {
       "description": "未命中时的默认值"
@@ -1842,7 +2194,25 @@
   "properties": {
     "keys": {
       "type": "array",
-      "description": "排序列与方向列表"
+      "description": "排序列与方向列表",
+      "items": {
+        "type": "object",
+        "description": "单个排序键",
+        "properties": {
+          "column": {
+            "type": "string",
+            "description": "排序列名"
+          },
+          "descending": {
+            "type": "boolean",
+            "description": "是否降序",
+            "default": false
+          }
+        },
+        "required": [
+          "column"
+        ]
+      }
     }
   },
   "required": [
@@ -1866,12 +2236,25 @@
     },
     "operation": {
       "type": "string",
-      "description": "字符串操作"
+      "description": "字符串操作",
+      "enum": [
+        "upper",
+        "lower",
+        "strip",
+        "replace",
+        "regex_replace",
+        "substr",
+        "concat",
+        "pad"
+      ]
     },
     "args": {
       "type": "array",
       "description": "操作参数",
-      "default": []
+      "default": [],
+      "items": {
+        "description": "操作参数值"
+      }
     },
     "alias": {
       "type": "string",
@@ -1925,7 +2308,19 @@
   "properties": {
     "mapping": {
       "type": "object",
-      "description": "列到类型的映射"
+      "description": "列到类型的映射",
+      "additionalProperties": {
+        "type": "string",
+        "description": "目标类型",
+        "enum": [
+          "int",
+          "float",
+          "str",
+          "bool",
+          "date",
+          "datetime"
+        ]
+      }
     },
     "strict": {
       "type": "boolean",
@@ -1950,11 +2345,19 @@
   "properties": {
     "index": {
       "type": "array",
-      "description": "保留索引列"
+      "description": "保留索引列",
+      "items": {
+        "type": "string",
+        "description": "保留列名"
+      }
     },
     "on": {
       "type": "array",
-      "description": "展开列"
+      "description": "展开列",
+      "items": {
+        "type": "string",
+        "description": "展开列名"
+      }
     },
     "variable_name": {
       "type": "string",

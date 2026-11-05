@@ -254,3 +254,23 @@ def test_cancel_previous_starts_new_run_after_cancellation(tmp_path: Path) -> No
         assert engine.runs[second.run_id].record.status == "succeeded"
 
     asyncio.run(scenario())
+
+
+def test_run_meta_is_replaced_atomically(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """US-EXE-04/AC-6: Run metadata readers never observe a partial JSON write."""
+    engine = Engine()
+    prepared = engine.prepare(workflow([node("n_00000001", "flow.trigger")]), tmp_path, registry())
+    original_replace = Path.replace
+    replacements: list[tuple[Path, Path]] = []
+
+    def track_replace(source: Path, target: Path) -> Path:
+        replacements.append((source, target))
+        return original_replace(source, target)
+
+    monkeypatch.setattr(Path, "replace", track_replace)
+    engine._write_meta(prepared)
+
+    path = tmp_path / ".runs" / prepared.record.run_id / "meta.json"
+    assert replacements == [(path.with_suffix(".tmp"), path)]
+    assert not path.with_suffix(".tmp").exists()
+    assert json.loads(path.read_text(encoding="utf-8"))["run_id"] == prepared.record.run_id

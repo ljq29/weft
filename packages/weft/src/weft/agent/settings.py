@@ -85,6 +85,11 @@ class SettingsStore:
             raise LLMConfigError(f"LLM config '{name}' not found")
         return dict(configs[name])
 
+    def llm_draft(self, name: str, config: dict[str, Any]) -> dict[str, Any]:
+        draft = copy.deepcopy(config)
+        self._validate_llm(name, draft, self.read().get("llm", {}), require_model=False)
+        return draft
+
     def masked(self) -> dict[str, Any]:
         result = copy.deepcopy(self.read())
         for config in result.get("llm", {}).values():
@@ -158,12 +163,21 @@ class SettingsStore:
         if settings["logging"]["level"] not in {"DEBUG", "INFO", "WARN", "ERROR"}:
             raise LLMConfigError("配置字段 logging.level 无效")
 
-    def _validate_llm(self, name: str, config: Any, current: dict[str, Any]) -> None:
-        if not re.fullmatch(r"[A-Za-z0-9_.-]+", name) or not isinstance(config, dict):
+    def _validate_llm(
+        self, name: str, config: Any, current: dict[str, Any], require_model: bool = True
+    ) -> None:
+        if (
+            not isinstance(name, str)
+            or not re.fullmatch(r"[A-Za-z0-9_.-]+", name)
+            or not isinstance(config, dict)
+        ):
             raise LLMConfigError("Invalid LLM config name or value")
-        for field in ("base_url", "model"):
+        fields = ("base_url", "model") if require_model else ("base_url",)
+        for field in fields:
             if not isinstance(config.get(field), str) or not config[field]:
                 raise LLMConfigError(f"LLM {name}.{field} is required")
+        if "model" in config and not isinstance(config["model"], str):
+            raise LLMConfigError(f"LLM {name}.model must be a string")
         url = urlsplit(config["base_url"])
         if url.scheme not in {"http", "https"} or not url.hostname or url.username or url.password:
             raise LLMConfigError("LLM base_url must be an HTTP(S) URL without userinfo")

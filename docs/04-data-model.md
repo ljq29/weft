@@ -16,7 +16,7 @@
 ```
 <name>.weft/
 ├── workflow.json          # 图定义（§2），打开/解析时唯一必需
-├── pyproject.toml         # 依赖声明；执行/打包必需；[tool.weft] 段存元数据
+├── pyproject.toml         # 依赖声明；执行/打包必需；[tool.weft] 段存元数据（示例副本含 demo_id）
 ├── uv.lock                # 锁定（uv 生成）；执行/打包必需
 ├── nodes/                 # 用户自定义节点（@weft.node）
 ├── prompts/               # prompt 文件（Prompt Template source: file）

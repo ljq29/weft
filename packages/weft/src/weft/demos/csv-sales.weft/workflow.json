@@ -76,6 +76,14 @@
   ],
   "edges": [
     {
+      "id": "e_00000004",
+      "source": "n_00000001",
+      "sourcePort": "variable",
+      "target": "n_00000002",
+      "targetPort": "variables",
+      "order": 0
+    },
+    {
       "id": "e_00000001",
       "source": "n_00000002",
       "sourcePort": "out",

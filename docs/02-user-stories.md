@@ -81,7 +81,7 @@ AC-2  ...
 - AC-1 Given UI 首页 When 点击"新建工作流"并输入名称 `weekly` 与父目录 `D:\flows` Then 系统创建 `D:\flows\weekly.weft\`，内含 `workflow.json`（schema 版本为当前版本、节点列表仅含一个 `Trigger`）、`pyproject.toml`、`data/`、`nodes/`、`prompts/`、`.gitignore`（排除 `.runs/`、`.venv/` 与 `__pycache__/`）。
 - AC-2 Given 目标目录已存在同名 `.weft` When 新建 Then 系统拒绝并提示"目录已存在"，不覆盖任何文件。
 - AC-3 Given 新建完成 When 查看画布 Then 画布显示一个 `Trigger` 节点，状态为"已配置"（黄）。
-- AC-4 Given UI 示例库 When 选择内置 CSV、表格或 LLM 示例并指定名称与父目录 Then 系统复制完整 `.weft` 目录、生成新的工作流 ID 并打开独立副本；CSV 与表格示例包含可直接运行的资源，LLM 示例仅引用命名配置并以 `<YOUR_API_KEY>` 等占位符说明设置方法，不保存真实密钥；目标目录冲突时拒绝覆盖。
+- AC-4 Given UI 示例库 When 选择内置 CSV、表格或 LLM 示例并指定名称与父目录 Then 系统复制完整 `.weft` 目录、生成新的工作流 ID 并打开独立副本；CSV 与表格示例包含可直接运行的资源，LLM 示例仅引用命名配置并以 `<YOUR_API_KEY>` 等占位符说明设置方法，不保存真实密钥；同名同来源示例再次创建时经临时目录与环境同步后自动替换并打开，其他目标目录冲突仍拒绝覆盖。
 
 ### US-DES-02 添加节点 [P0] [e2e]
 
@@ -243,7 +243,7 @@ AC-2  ...
 
 - AC-1 `[int]` 连接 `WS /api/ws` 并完成 authenticate 与 subscribe 后，运行期间收到事件序列：`run.started` → 若干 `node.started` / `node.progress` / `node.log` / `node.finished` / `node.failed` → `run.finished`；每个事件含 `run_id, node_id, ts`。
 - AC-2 `[int]` agent 节点运行时推送 `node.stream` 事件，`delta` 字段为增量文本，顺序与 LLM 输出一致。
-- AC-3 Given WebSocket 断线重连 Then 客户端重新 authenticate 并通过 `GET /api/runs/{id}` 补齐状态，不丢最终结果。
+- AC-3 Given WebSocket 断线重连 Then 客户端显示连接状态，以带退避的新连接代际重新 authenticate，等待认证 ACK 后 subscribe，并通过 `GET /api/runs/{id}` 等 REST baseline 补齐状态；旧代际事件不得污染状态，不丢最终结果，用户可手工立即重连。
 - AC-4 `[e2e]` 底部日志面板按节点分组显示日志，支持筛选级别（INFO/WARN/ERROR）与按节点过滤。
 - AC-5 `[int]` 未认证或令牌无效的 WS 连接不得订阅或接收事件；认证成功前发送 subscribe 返回认证错误并关闭连接。
 

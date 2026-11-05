@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { tableFromIPC } from "apache-arrow";
-import { sessionToken } from "../api/client";
+import { formatApiError, sessionToken } from "../api/client";
 import { Icon } from "../components/Icon";
 
 interface Row {
@@ -77,7 +77,7 @@ export function PortView({
           })),
         );
       } catch (reason) {
-        setError(String(reason));
+        setError(formatApiError(reason));
       }
     };
     void load();

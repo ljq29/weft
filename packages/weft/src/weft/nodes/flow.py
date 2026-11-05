@@ -13,6 +13,7 @@ class MetanodeNode(Node):
     type = "flow.metanode"
     category = "flow"
     name = "Metanode"
+    display_name = "复合节点"
     description = "将内嵌子图作为可逆折叠的复合节点"
     lane = Lane.TRUSTED_SERVICE
     params_schema = {
@@ -33,6 +34,7 @@ class TriggerNode(Node):
     type = "flow.trigger"
     category = "flow"
     name = "Trigger"
+    display_name = "触发器"
     description = "手动、聊天、定时、文件或 HTTP 工作流入口"
     lane = Lane.TRUSTED_SERVICE
     outputs = (
@@ -59,7 +61,23 @@ class TriggerNode(Node):
                 "description": "定时触发配置",
                 "properties": {
                     "enabled": {"type": "boolean", "description": "是否启用定时触发"},
-                    "schedules": {"type": "array", "description": "cron 或固定间隔列表"},
+                    "schedules": {
+                        "type": "array",
+                        "description": "cron 或固定间隔列表",
+                        "default": [],
+                        "items": {
+                            "type": "object",
+                            "description": "单条定时规则",
+                            "properties": {
+                                "cron": {"type": "string", "description": "五段 cron 表达式"},
+                                "interval_seconds": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0,
+                                    "description": "固定间隔秒数",
+                                },
+                            },
+                        },
+                    },
                 },
             },
             "watch": {
@@ -67,7 +85,45 @@ class TriggerNode(Node):
                 "description": "文件监听配置",
                 "properties": {
                     "enabled": {"type": "boolean", "description": "是否启用文件监听"},
-                    "watches": {"type": "array", "description": "监听路径与规则"},
+                    "watches": {
+                        "type": "array",
+                        "description": "监听路径与规则",
+                        "default": [],
+                        "items": {
+                            "type": "object",
+                            "description": "单条文件监听规则",
+                            "properties": {
+                                "path": {"type": "string", "description": "监听目录路径"},
+                                "pattern": {
+                                    "type": "string",
+                                    "default": "*",
+                                    "description": "文件名 glob 过滤",
+                                },
+                                "events": {
+                                    "type": "array",
+                                    "description": "监听事件类型",
+                                    "default": ["created", "modified", "deleted"],
+                                    "items": {
+                                        "type": "string",
+                                        "enum": ["created", "modified", "deleted", "moved"],
+                                        "description": "文件事件类型",
+                                    },
+                                },
+                                "recursive": {
+                                    "type": "boolean",
+                                    "default": False,
+                                    "description": "是否递归监听子目录",
+                                },
+                                "debounce_ms": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "default": 2000,
+                                    "description": "事件防抖毫秒数",
+                                },
+                            },
+                            "required": ["path"],
+                        },
+                    },
                 },
             },
             "http": {
@@ -89,6 +145,7 @@ class ChatOutputNode(Node):
     type = "flow.chat_output"
     category = "flow"
     name = "Chat Output"
+    display_name = "聊天输出"
     description = "将 Message 或 Variable 作为助手消息推送到聊天会话"
     lane = Lane.TRUSTED_SERVICE
     inputs = (Port("message", "message", "消息输入"), Port("variable", "variable", "变量输入"))
@@ -137,6 +194,7 @@ class HttpResponseNode(Node):
     type = "flow.http_response"
     category = "flow"
     name = "HTTP Response"
+    display_name = "HTTP 响应"
     description = "为同步 HTTP 触发提供唯一响应；重复执行会失败"
     lane = Lane.TRUSTED_SERVICE
     inputs = (Port("flow", "flow", "可选执行顺序"),)
@@ -146,7 +204,11 @@ class HttpResponseNode(Node):
         "type": "object",
         "properties": {
             "status_code": {"type": "integer", "description": "HTTP 状态码"},
-            "headers": {"type": "object", "description": "响应头"},
+            "headers": {
+                "type": "object",
+                "description": "响应头",
+                "additionalProperties": {"type": "string", "description": "响应头值"},
+            },
             "body": {"description": "文本或 JSON 响应体"},
         },
     }
@@ -165,6 +227,7 @@ class IfNode(Node):
     type = "flow.if"
     category = "flow"
     name = "If"
+    display_name = "条件分支"
     description = "按受限 Python 表达式选择分支"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.PURE
@@ -187,6 +250,7 @@ class SwitchNode(Node):
     type = "flow.switch"
     category = "flow"
     name = "Switch"
+    display_name = "多路分支"
     description = "按变量值选择命名分支"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.PURE
@@ -201,7 +265,15 @@ class SwitchNode(Node):
         "type": "object",
         "properties": {
             "variable": {"type": "string", "description": "要匹配的变量名"},
-            "cases": {"type": "object", "description": "值到输出端口名的映射"},
+            "cases": {
+                "type": "object",
+                "description": "值到输出端口名的映射",
+                "additionalProperties": {
+                    "type": "string",
+                    "enum": ["case_1", "case_2", "case_3", "default"],
+                    "description": "输出端口名",
+                },
+            },
         },
         "required": ["variable", "cases"],
     }
@@ -218,6 +290,7 @@ class MergeNode(Node):
     type = "flow.merge"
     category = "flow"
     name = "Merge"
+    display_name = "分支汇合"
     description = "汇合两个可部分到达的表格分支"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.PURE
@@ -232,6 +305,7 @@ class WaitNode(Node):
     type = "flow.wait"
     category = "flow"
     name = "Wait"
+    display_name = "等待"
     description = "等待指定秒数并响应取消"
     lane = Lane.TRUSTED_SERVICE
     outputs = (Port("flow", "flow", "等待完成"),)
@@ -260,6 +334,7 @@ class LoopStartNode(Node):
     type = "flow.loop_start"
     category = "flow"
     name = "Loop Start"
+    display_name = "循环开始"
     description = "按行、按块或计数启动循环"
     lane = Lane.TRUSTED_SERVICE
     inputs = (Port("in", "table", "循环输入表"),)
@@ -290,6 +365,7 @@ class LoopEndNode(Node):
     type = "flow.loop_end"
     category = "flow"
     name = "Loop End"
+    display_name = "循环结束"
     description = "收集循环体输出"
     lane = Lane.TRUSTED_SERVICE
     inputs = (Port("in", "table", "循环体表格"), Port("variables", "variable", "循环体变量"))

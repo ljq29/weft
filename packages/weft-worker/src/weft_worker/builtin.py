@@ -45,7 +45,9 @@ class ReadCSV(TableNode):
     type = "table.read_csv"
     category = "table"
     name = "Read CSV"
+    display_name = "读取 CSV"
     description = "读取 CSV 文件为表格"
+    inputs = (Port("variables", "variable", "可选流变量"),)
     params_schema = schema(
         {
             "path": prop("string", "CSV 文件路径"),
@@ -93,6 +95,7 @@ class ReadParquet(TableNode):
     type = "table.read_parquet"
     category = "table"
     name = "Read Parquet"
+    display_name = "读取 Parquet"
     description = "读取 Parquet 文件"
     params_schema = schema({"path": prop("string", "Parquet 文件路径")}, ["path"])
     cache_inputs = [ExternalInput("path", "file")]
@@ -105,6 +108,7 @@ class ReadJSON(TableNode):
     type = "table.read_json"
     category = "table"
     name = "Read JSON"
+    display_name = "读取 JSON"
     description = "读取 JSON 数组或 JSON Lines 文件"
     params_schema = schema({"path": prop("string", "JSON 文件路径")}, ["path"])
     cache_inputs = [ExternalInput("path", "file")]
@@ -142,6 +146,7 @@ class WriteCSV(WriteTable):
     type = "table.write_csv"
     category = "table"
     name = "Write CSV"
+    display_name = "写入 CSV"
     description = "将表格写入 CSV 文件"
     params_schema = schema(
         {
@@ -164,6 +169,7 @@ class WriteParquet(WriteTable):
     type = "table.write_parquet"
     category = "table"
     name = "Write Parquet"
+    display_name = "写入 Parquet"
     description = "将表格写入 Parquet 文件"
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
@@ -175,6 +181,7 @@ class WriteJSON(WriteTable):
     type = "table.write_json"
     category = "table"
     name = "Write JSON"
+    display_name = "写入 JSON"
     description = "将表格写入 JSON 数组或 JSON Lines"
     params_schema = schema(
         {
@@ -198,12 +205,13 @@ class ColumnFilter(TableNode):
     type = "table.column_filter"
     category = "table"
     name = "Column Filter"
+    display_name = "列筛选"
     description = "按名称或通配符筛选列"
     inputs = (Port("in", "table", "输入表格"),)
     params_schema = schema(
         {
             "mode": prop("string", "包含或排除", enum=["include", "exclude"]),
-            "columns": prop("array", "列名或通配符列表"),
+            "columns": prop("array", "列名或通配符列表", items=prop("string", "列名或通配符")),
         },
         ["mode", "columns"],
     )
@@ -254,6 +262,7 @@ class RowFilter(TableNode):
     type = "table.row_filter"
     category = "table"
     name = "Row Filter"
+    display_name = "行筛选"
     description = "按单条件筛选行"
     tool_capability = ToolCapability.READ_ONLY
     tool_exposed_params = ["column", "operator", "value"]
@@ -292,9 +301,27 @@ class Sorter(TableNode):
     type = "table.sorter"
     category = "table"
     name = "Sorter"
+    display_name = "表格排序"
     description = "按多个列键稳定排序"
     inputs = (Port("in", "table", "输入表格"),)
-    params_schema = schema({"keys": prop("array", "排序列与方向列表")}, ["keys"])
+    params_schema = schema(
+        {
+            "keys": prop(
+                "array",
+                "排序列与方向列表",
+                items=prop(
+                    "object",
+                    "单个排序键",
+                    properties={
+                        "column": prop("string", "排序列名"),
+                        "descending": prop("boolean", "是否降序", default=False),
+                    },
+                    required=["column"],
+                ),
+            )
+        },
+        ["keys"],
+    )
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         keys = params["keys"]
@@ -311,9 +338,19 @@ class ColumnRename(TableNode):
     type = "table.column_rename"
     category = "table"
     name = "Column Rename"
+    display_name = "列重命名"
     description = "重命名表格列"
     inputs = (Port("in", "table", "输入表格"),)
-    params_schema = schema({"mapping": prop("object", "旧列名到新列名映射")}, ["mapping"])
+    params_schema = schema(
+        {
+            "mapping": prop(
+                "object",
+                "旧列名到新列名映射",
+                additionalProperties=prop("string", "新列名"),
+            )
+        },
+        ["mapping"],
+    )
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         mapping = params["mapping"]
@@ -327,11 +364,34 @@ class VariableNode(Node):
     type = "flow.variable"
     category = "flow"
     name = "Variable"
+    display_name = "流变量"
     description = "定义流变量"
     cache_policy = CachePolicy.PURE
     inputs = (Port("variables", "variable", "上游流变量"),)
     outputs = (Port("variables", "variable", "流变量"),)
-    params_schema = schema({"values": prop("array", "变量定义列表")}, ["values"])
+    params_schema = schema(
+        {
+            "values": prop(
+                "array",
+                "变量定义列表",
+                items=prop(
+                    "object",
+                    "单个变量定义",
+                    properties={
+                        "name": prop("string", "变量名"),
+                        "type": prop(
+                            "string",
+                            "变量类型",
+                            enum=["str", "int", "float", "bool", "path", "list"],
+                        ),
+                        "value": {"description": "变量值；path 类型使用相对 Root 的路径"},
+                    },
+                    required=["name", "type"],
+                ),
+            )
+        },
+        ["values"],
+    )
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         result = {}
@@ -347,6 +407,7 @@ class TableRowCount(Node):
     type = "table.row_count"
     category = "table"
     name = "Table Row Count"
+    display_name = "表格行数"
     description = "输出表格行数变量"
     cache_policy = CachePolicy.PURE
     inputs = (Port("in", "table", "输入表格"),)
@@ -360,6 +421,7 @@ class ListFiles(TableNode):
     type = "file.list"
     category = "file"
     name = "List Files"
+    display_name = "列出文件"
     description = "列出目录中的文件与目录"
     params_schema = schema(
         {

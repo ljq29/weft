@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 function token() {
-  const configDir = process.env.WEFT_E2E_CONFIG_DIR ?? ".test-reports/e2e-config";
+  const configDir =
+    process.env.WEFT_E2E_CONFIG_DIR ?? ".test-reports/e2e-config";
   const path = resolve(import.meta.dirname, "../..", configDir, "session.json");
   return JSON.parse(readFileSync(path, "utf8")).token as string;
 }
@@ -37,6 +38,7 @@ test("US-DES-01/AC-4: CSV demo runs with bundled data and writes output", async 
   test.setTimeout(120_000);
   await createDemo(page, "CSV 销售汇总", "csv-demo", testInfo.outputPath());
   await expect(page.locator(".weft-node")).toHaveCount(5);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(4);
   await page.getByRole("button", { name: "运行", exact: true }).click();
   await expect(page.locator(".status-executed")).toHaveCount(5, {
     timeout: 90_000,
@@ -54,8 +56,14 @@ test("US-DES-01/AC-4: table demo calculates and previews grouped results", async
   page,
 }, testInfo) => {
   test.setTimeout(120_000);
+  const pageErrors: Error[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
   await createDemo(page, "表格计算与预览", "table-demo", testInfo.outputPath());
   await expect(page.locator(".weft-node")).toHaveCount(5);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(4);
+  await createDemo(page, "表格计算与预览", "table-demo", testInfo.outputPath());
+  await expect(page.locator(".weft-node")).toHaveCount(5);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(4);
   await page.getByRole("button", { name: "运行", exact: true }).click();
   await expect(page.locator(".status-executed")).toHaveCount(5, {
     timeout: 90_000,
@@ -69,6 +77,7 @@ test("US-DES-01/AC-4: table demo calculates and previews grouped results", async
   await expect(preview).toBeVisible();
   await expect(preview).toContainText("共 2 行");
   await expect(preview).toContainText("sales_total");
+  expect(pageErrors).toEqual([]);
 });
 
 test("US-DES-01/AC-4: LLM demo contains setup placeholders and no secret", async ({
@@ -76,6 +85,7 @@ test("US-DES-01/AC-4: LLM demo contains setup placeholders and no secret", async
 }, testInfo) => {
   await createDemo(page, "LLM 文本处理", "llm-demo", testInfo.outputPath());
   await expect(page.locator(".weft-node")).toHaveCount(2);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
   await expect(page.locator(".canvas-note")).toContainText("<YOUR_API_KEY>");
   await expect(page.locator(".canvas-note")).toContainText("demo");
 });

@@ -65,6 +65,7 @@ class Node:
     version: ClassVar[int] = 1
     category: ClassVar[str]
     name: ClassVar[str] = ""
+    display_name: ClassVar[str] = ""
     description: ClassVar[str]
     lane: ClassVar[Lane] = Lane.TRUSTED_WORKER
     cache_policy: ClassVar[CachePolicy] = CachePolicy.SIDE_EFFECT
@@ -100,6 +101,7 @@ class Node:
             "node_version": self.version,
             "category": self.category,
             "name": self.name or self.type,
+            "display_name": self.display_name,
             "description": self.description,
             "lane": self.lane.value,
             "cache_policy": self.cache_policy.value,

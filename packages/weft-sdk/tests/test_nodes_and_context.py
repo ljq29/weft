@@ -12,6 +12,8 @@ class ExampleNode(Node):
     type = "user.example"
     version = 1
     category = "user"
+    name = "Example"
+    display_name = "示例节点"
     description = "Example custom node"
     inputs = (Port("in", "table", "Input table"),)
     outputs = (Port("out", "table", "Output table"),)
@@ -34,6 +36,8 @@ def test_custom_node_decorator_and_dynamic_manifest() -> None:
     node = ExampleNode()
     assert node.__weft_node__ is True
     manifest = node.manifest({"input_count": 3})
+    assert manifest["name"] == "Example"
+    assert manifest["display_name"] == "示例节点"
     assert [port["name"] for port in manifest["inputs"]] == ["in", "extra_1", "extra_2", "extra_3"]
     assert manifest["cache_policy"] == "pure"
     assert manifest["tool_exposed_params"] == ["value"]

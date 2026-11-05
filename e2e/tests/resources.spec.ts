@@ -3,12 +3,15 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const config = resolve(
-  import.meta.dirname,
-  "../../.test-reports/e2e-config/session.json",
-);
+const config = () =>
+  resolve(
+    import.meta.dirname,
+    "../..",
+    process.env.WEFT_E2E_CONFIG_DIR ?? ".test-reports/e2e-config",
+    "session.json",
+  );
 const projectRoot = resolve(import.meta.dirname, "../..");
-const token = () => JSON.parse(readFileSync(config, "utf8")).token as string;
+const token = () => JSON.parse(readFileSync(config(), "utf8")).token as string;
 
 test("US-PKG-06/AC-1; US-PKG-07/AC-1,2: confirm missing resources and locate absolute path", async ({
   page,
@@ -18,7 +21,9 @@ test("US-PKG-06/AC-1; US-PKG-07/AC-1,2: confirm missing resources and locate abs
   await page.getByLabel("父目录").fill(testInfo.outputPath());
   await page.getByRole("button", { name: "新建工作流" }).click();
   await expect(page.locator(".weft-node")).toHaveCount(1);
-  await page.getByRole("button", { name: "Read CSV", exact: true }).dblclick();
+  await page
+    .getByRole("button", { name: "Read CSV · 读取 CSV", exact: true })
+    .dblclick();
   await expect(page.locator(".weft-node")).toHaveCount(2);
   await page
     .locator(".weft-node")
@@ -41,21 +46,31 @@ test("US-PKG-06/AC-1; US-PKG-07/AC-1,2: confirm missing resources and locate abs
   });
   await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.locator(".toolbar")).not.toContainText("resources *");
-  let allowMissing = false;
-  const dialogs = (dialog: import("@playwright/test").Dialog) => {
-    if (allowMissing && dialog.message().includes("仍要运行")) {
-      void dialog.accept();
-    } else {
-      void dialog.dismiss();
-    }
-  };
-  page.on("dialog", dialogs);
   await page.getByRole("button", { name: "运行", exact: true }).click();
+  const missingDialog = page.getByRole("dialog", { name: "外部资源缺失" });
+  await expect(missingDialog).toBeVisible();
+  await missingDialog
+    .getByRole("button", { name: "取消", exact: true })
+    .click();
   await expect(page.locator(".status-failed")).toHaveCount(0);
-  allowMissing = true;
   await page.getByRole("button", { name: "运行", exact: true }).click();
+  await missingDialog
+    .getByRole("button", { name: "仍要运行", exact: true })
+    .click();
   await expect(page.locator(".status-failed")).toHaveCount(1);
   await page.getByRole("button", { name: "打包工作流" }).click();
+  await page
+    .getByRole("dialog", { name: "打包警告" })
+    .getByRole("button", { name: "继续打包", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "打包数据目录" })
+    .getByRole("button", { name: "保留 data", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "打包完成" })
+    .getByRole("button", { name: "确定", exact: true })
+    .click();
   const locator = page.getByRole("button", { name: /定位 n_\w+\.path/ });
   await expect(locator).toBeVisible();
   await locator.click();

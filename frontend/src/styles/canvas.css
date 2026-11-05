@@ -1,0 +1,283 @@
+.canvas-column {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 210px;
+  overflow: hidden;
+  background: var(--canvas);
+}
+.canvas .react-flow {
+  background-color: var(--canvas);
+}
+.canvas-caption {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--canvas-caption);
+  font-size: var(--font-size-xs);
+  pointer-events: none;
+}
+.canvas-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--canvas-floating-surface);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+.canvas-mode .app-icon {
+  width: 12px;
+  height: 12px;
+}
+.react-flow__edge-path {
+  stroke: var(--edge);
+  stroke-width: 1.5;
+}
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--primary);
+}
+.react-flow__connection-path {
+  stroke: var(--primary);
+}
+.react-flow__handle {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--on-primary);
+  box-shadow: 0 0 0 1px currentColor;
+}
+.react-flow__minimap {
+  width: 128px !important;
+  height: 82px !important;
+  margin: 0 var(--space-3) var(--space-3) 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--canvas-floating-surface) !important;
+  box-shadow: var(--shadow-sm);
+}
+.react-flow__minimap-mask {
+  fill: var(--minimap-mask-fill);
+  stroke: var(--minimap-mask-stroke);
+}
+.react-flow__controls {
+  margin: 0 0 var(--space-3) var(--space-3) !important;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  box-shadow: var(--shadow-sm);
+}
+.react-flow__controls-button {
+  width: var(--control-height-sm) !important;
+  height: var(--control-height-sm) !important;
+  border-bottom-color: var(--line) !important;
+  background: var(--controls-surface) !important;
+  color: var(--ink-soft);
+}
+.react-flow__controls-button:hover {
+  background: var(--controls-hover) !important;
+}
+.react-flow__controls-button svg {
+  max-width: 14px;
+  max-height: 14px;
+}
+.react-flow__nodesselection-rect,
+.react-flow__selection {
+  border: 1px solid var(--primary);
+  background: var(--selection-surface);
+}
+
+.weft-node {
+  width: var(--node-width);
+  min-height: 124px;
+  overflow: visible;
+  border: 1px solid var(--node-border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 2px 5px var(--shadow-color-soft);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.weft-node:hover {
+  border-color: var(--node-border-hover);
+  box-shadow: 0 5px 14px var(--shadow-color-hover);
+}
+.weft-node.selected {
+  border-color: var(--primary);
+  box-shadow:
+    0 0 0 2px var(--node-selected-ring),
+    0 6px 16px var(--shadow-color-hover);
+}
+.node-header {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+}
+.node-header .palette-icon {
+  width: 32px;
+  height: 32px;
+}
+.node-heading {
+  min-width: 0;
+}
+.node-heading strong {
+  display: block;
+  overflow: hidden;
+  color: var(--node-title);
+  font-size: var(--font-size-md);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.node-heading small {
+  display: block;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.node-error {
+  margin-left: auto;
+  color: var(--danger);
+}
+.node-error .app-icon {
+  width: 16px;
+  height: 16px;
+}
+.node-content {
+  min-height: 36px;
+  padding: 0 var(--space-3) var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-size-md);
+}
+.node-content > p {
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+  color: var(--ink-soft);
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.node-outputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.port-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 28px;
+  margin: 0;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+}
+.port-preview:hover {
+  border-color: var(--interactive-border-hover);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.port-preview .app-icon {
+  width: 12px;
+  height: 12px;
+}
+.iteration-progress {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--info);
+}
+.node-status {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-3);
+  border-radius: 0 0 8px 8px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+}
+.node-status .app-icon {
+  width: 12px;
+  height: 12px;
+}
+.node-status .status-label {
+  margin: 0;
+  color: inherit;
+}
+.status-executed .node-status {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.status-configured .node-status {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.status-running .node-status {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.status-running .node-status::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  margin-left: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--info), transparent);
+  background-size: 200% 100%;
+  animation: stream 1s linear infinite;
+}
+.status-failed .node-status,
+.status-unconfigured .node-status {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.status-skipped_branch,
+.status-skipped_upstream {
+  opacity: 0.58;
+}
+.inline-table {
+  width: 100%;
+  margin-top: 7px;
+  border-collapse: collapse;
+  background: var(--on-primary);
+  font-size: var(--font-size-xs);
+}
+.inline-table th,
+.inline-table td {
+  max-width: 90px;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid var(--line);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inline-table th {
+  background: var(--surface-subtle);
+  color: var(--ink-soft);
+}

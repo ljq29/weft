@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "../api/client";
+import { api, formatApiError } from "../api/client";
 import { Icon } from "../components/Icon";
 
 interface Change {
@@ -60,7 +60,7 @@ export function ChangeReviewPanel({ runId }: { runId: string }) {
           setOpen(!open);
           if (!open)
             void load().catch((reason: unknown) => {
-              setNotice(String(reason));
+              setNotice(formatApiError(reason));
             });
         }}
       >

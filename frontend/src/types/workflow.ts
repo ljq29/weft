@@ -10,6 +10,7 @@ export interface PortDecl {
 export interface NodeTypeDecl {
   type: string;
   name: string;
+  display_name: string;
   description: string;
   category: string;
   cache_policy: string;

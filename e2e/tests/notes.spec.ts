@@ -5,7 +5,9 @@ import { resolve } from "node:path";
 
 const config = resolve(
   import.meta.dirname,
-  "../../.test-reports/e2e-config/session.json",
+  "../..",
+  process.env.WEFT_E2E_CONFIG_DIR ?? ".test-reports/e2e-config",
+  "session.json",
 );
 const projectRoot = resolve(import.meta.dirname, "../..");
 const token = () => JSON.parse(readFileSync(config, "utf8")).token as string;
@@ -49,11 +51,13 @@ test("US-DES-10/AC-1,2: edit comment and persist a styled Markdown note", async 
       UV_INDEX_URL: "https://pypi.tuna.tsinghua.edu.cn/simple",
     },
   });
-  page.once("dialog", (dialog) => void dialog.accept(root));
+  await page.getByRole("button", { name: "打开工作流" }).click();
+  const openDialog = page.getByRole("dialog", { name: "打开工作流" });
+  await openDialog.getByLabel("工作流目录").fill(root);
   const opened = page.waitForResponse(
     (response) => response.url().endsWith("/workflows/open") && response.ok(),
   );
-  await page.getByRole("button", { name: "打开工作流" }).click();
+  await openDialog.getByRole("button", { name: "打开", exact: true }).click();
   await opened;
   await expect(page.locator(".weft-node p")).toHaveText("需要人工复核");
   await expect(page.getByRole("heading", { name: "交接说明" })).toBeVisible();

@@ -27,6 +27,7 @@ class Joiner(ExtraTableNode):
     type = "table.joiner"
     category = "table"
     name = "Joiner"
+    display_name = "表格连接"
     description = "按指定列连接两个表格"
     inputs = (Port("left", "table", "左表"), Port("right", "table", "右表"))
     params_schema = schema(
@@ -58,6 +59,7 @@ class Concatenate(ExtraTableNode):
     type = "table.concatenate"
     category = "table"
     name = "Concatenate"
+    display_name = "表格拼接"
     description = "按动态命名输入拼接表格"
     inputs = ()
     dynamic_inputs = (DynamicPortGroup("in_", "table", min_ports=2),)
@@ -86,11 +88,40 @@ class GroupBy(ExtraTableNode):
     type = "table.groupby"
     category = "table"
     name = "GroupBy"
+    display_name = "分组聚合"
     description = "按分组列聚合表格"
     params_schema = schema(
         {
-            "group_by": prop("array", "分组列"),
-            "aggregations": prop("array", "聚合表达式列表"),
+            "group_by": prop("array", "分组列", items=prop("string", "分组列名")),
+            "aggregations": prop(
+                "array",
+                "聚合表达式列表",
+                items=prop(
+                    "object",
+                    "单项聚合配置",
+                    properties={
+                        "column": prop("string", "聚合列名"),
+                        "agg": prop(
+                            "string",
+                            "聚合方式",
+                            enum=[
+                                "sum",
+                                "mean",
+                                "min",
+                                "max",
+                                "count",
+                                "count_distinct",
+                                "first",
+                                "last",
+                                "list",
+                                "concat_str",
+                            ],
+                        ),
+                        "alias": prop("string", "输出列别名"),
+                    },
+                    required=["column", "agg"],
+                ),
+            ),
         },
         ["group_by", "aggregations"],
     )
@@ -116,10 +147,11 @@ class Pivot(ExtraTableNode):
     type = "table.pivot"
     category = "table"
     name = "Pivot"
+    display_name = "数据透视"
     description = "将行透视成列"
     params_schema = schema(
         {
-            "index": prop("array", "行索引列"),
+            "index": prop("array", "行索引列", items=prop("string", "索引列名")),
             "columns": prop("string", "透视列"),
             "values": prop("string", "值列"),
             "agg": prop("string", "聚合方式"),
@@ -142,11 +174,12 @@ class Unpivot(ExtraTableNode):
     type = "table.unpivot"
     category = "table"
     name = "Unpivot"
+    display_name = "逆透视"
     description = "将列展开成行"
     params_schema = schema(
         {
-            "index": prop("array", "保留索引列"),
-            "on": prop("array", "展开列"),
+            "index": prop("array", "保留索引列", items=prop("string", "保留列名")),
+            "on": prop("array", "展开列", items=prop("string", "展开列名")),
             "variable_name": prop("string", "变量列名", default="variable"),
             "value_name": prop("string", "值列名", default="value"),
         }
@@ -167,10 +200,16 @@ class DuplicateFilter(ExtraTableNode):
     type = "table.duplicate_filter"
     category = "table"
     name = "Duplicate Filter"
+    display_name = "重复值筛选"
     description = "按列去重"
     params_schema = schema(
         {
-            "columns": prop("array", "去重列，空为全部", default=[]),
+            "columns": prop(
+                "array",
+                "去重列，空为全部",
+                default=[],
+                items=prop("string", "列名"),
+            ),
             "keep": prop("string", "保留项", enum=["first", "last"], default="first"),
         }
     )
@@ -189,8 +228,30 @@ class MissingValue(ExtraTableNode):
     type = "table.missing_value"
     category = "table"
     name = "Missing Value"
+    display_name = "缺失值处理"
     description = "按列处理缺失值"
-    params_schema = schema({"strategies": prop("object", "每列的缺失值策略")}, ["strategies"])
+    params_schema = schema(
+        {
+            "strategies": prop(
+                "object",
+                "每列的缺失值策略",
+                additionalProperties=prop(
+                    "object",
+                    "单列缺失值策略",
+                    properties={
+                        "action": prop(
+                            "string",
+                            "处理动作",
+                            enum=["drop_row", "fill_const", "fill_mean", "fill_prev"],
+                        ),
+                        "value": {"description": "fill_const 使用的填充值"},
+                    },
+                    required=["action"],
+                ),
+            )
+        },
+        ["strategies"],
+    )
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         table = inputs["in"]
@@ -211,10 +272,19 @@ class TypeCast(ExtraTableNode):
     type = "table.type_cast"
     category = "table"
     name = "Type Cast"
+    display_name = "类型转换"
     description = "转换列的数据类型"
     params_schema = schema(
         {
-            "mapping": prop("object", "列到类型的映射"),
+            "mapping": prop(
+                "object",
+                "列到类型的映射",
+                additionalProperties=prop(
+                    "string",
+                    "目标类型",
+                    enum=["int", "float", "str", "bool", "date", "datetime"],
+                ),
+            ),
             "strict": prop("boolean", "失败是否报错", default=False),
         },
         ["mapping"],
@@ -298,8 +368,26 @@ class PolarsExpression(ExtraTableNode):
     type = "table.polars_expression"
     category = "table"
     name = "Polars Expression"
+    display_name = "Polars 表达式"
     description = "用 AST 白名单表达式新增列"
-    params_schema = schema({"expressions": prop("array", "表达式与别名列表")}, ["expressions"])
+    params_schema = schema(
+        {
+            "expressions": prop(
+                "array",
+                "表达式与别名列表",
+                items=prop(
+                    "object",
+                    "单个表达式",
+                    properties={
+                        "expr": prop("string", "Polars 表达式"),
+                        "alias": prop("string", "输出列别名"),
+                    },
+                    required=["expr", "alias"],
+                ),
+            )
+        },
+        ["expressions"],
+    )
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -316,6 +404,7 @@ class MathFormula(ExtraTableNode):
     type = "table.math_formula"
     category = "table"
     name = "Math Formula"
+    display_name = "数学公式"
     description = "用 $列名$ 语法新增计算列"
     params_schema = schema(
         {"formula": prop("string", "计算公式"), "alias": prop("string", "输出列别名")},
@@ -331,12 +420,31 @@ class StringManipulation(ExtraTableNode):
     type = "table.string_manipulation"
     category = "table"
     name = "String Manipulation"
+    display_name = "字符串处理"
     description = "执行常用字符串函数"
     params_schema = schema(
         {
             "column": prop("string", "输入列"),
-            "operation": prop("string", "字符串操作"),
-            "args": prop("array", "操作参数", default=[]),
+            "operation": prop(
+                "string",
+                "字符串操作",
+                enum=[
+                    "upper",
+                    "lower",
+                    "strip",
+                    "replace",
+                    "regex_replace",
+                    "substr",
+                    "concat",
+                    "pad",
+                ],
+            ),
+            "args": prop(
+                "array",
+                "操作参数",
+                default=[],
+                items={"description": "操作参数值"},
+            ),
             "alias": prop("string", "输出列别名"),
         },
         ["column", "operation", "alias"],
@@ -365,6 +473,7 @@ class TableToVariables(Node):
     type = "table.to_variables"
     category = "table"
     name = "Table to Variables"
+    display_name = "表格转为变量"
     description = "将表格行或列转换为流变量"
     cache_policy = CachePolicy.PURE
     inputs = (Port("in", "table", "输入表格"),)
@@ -390,11 +499,14 @@ class VariablesToTable(Node):
     type = "table.from_variables"
     category = "table"
     name = "Variables to Table"
+    display_name = "变量转为表格"
     description = "将选中流变量转换为单行表"
     cache_policy = CachePolicy.PURE
     inputs = (Port("variables", "variable", "流变量"),)
     outputs = (Port("out", "table", "输出表格"),)
-    params_schema = schema({"names": prop("array", "变量名列表")}, ["names"])
+    params_schema = schema(
+        {"names": prop("array", "变量名列表", items=prop("string", "变量名"))}, ["names"]
+    )
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -406,10 +518,25 @@ class TableCreator(Node):
     type = "table.creator"
     category = "table"
     name = "Table Creator"
+    display_name = "创建表格"
     description = "从参数中的行创建表格"
     cache_policy = CachePolicy.PURE
+    inputs = (Port("variables", "variable", "可选流变量"),)
     outputs = (Port("out", "table", "输出表格"),)
-    params_schema = schema({"rows": prop("array", "表格行数据")}, ["rows"])
+    params_schema = schema(
+        {
+            "rows": prop(
+                "array",
+                "表格行数据",
+                items=prop(
+                    "object",
+                    "动态表格行",
+                    additionalProperties={"description": "单元格值"},
+                ),
+            )
+        },
+        ["rows"],
+    )
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         table = pl.DataFrame(params["rows"])
@@ -421,10 +548,49 @@ class RuleEngine(ExtraTableNode):
     type = "table.rule_engine"
     category = "table"
     name = "Rule Engine"
+    display_name = "规则引擎"
     description = "按有序规则赋值，首个命中生效，其余使用默认值"
     params_schema = schema(
         {
-            "rules": prop("array", "有序规则 [{condition, value}]"),
+            "rules": prop(
+                "array",
+                "有序规则 [{condition, value}]",
+                items=prop(
+                    "object",
+                    "单条赋值规则",
+                    properties={
+                        "condition": prop(
+                            "object",
+                            "Row Filter 条件",
+                            properties={
+                                "column": prop("string", "条件列名"),
+                                "operator": prop(
+                                    "string",
+                                    "比较操作",
+                                    enum=[
+                                        "==",
+                                        "!=",
+                                        ">",
+                                        ">=",
+                                        "<",
+                                        "<=",
+                                        "contains",
+                                        "starts_with",
+                                        "regex",
+                                        "is_null",
+                                        "is_not_null",
+                                        "in",
+                                    ],
+                                ),
+                                "value": {"description": "比较值"},
+                            },
+                            required=["column", "operator"],
+                        ),
+                        "value": {"description": "条件命中时的赋值"},
+                    },
+                    required=["condition"],
+                ),
+            ),
             "default": {"description": "未命中时的默认值"},
             "alias": prop("string", "输出列名"),
         },
@@ -446,6 +612,7 @@ class TableView(ExtraTableNode):
     type = "table.view"
     category = "table"
     name = "Table View"
+    display_name = "表格预览"
     description = "在节点内预览输入表格"
     params_schema = schema({"rows": prop("integer", "节点内显示行数", default=10)})
 
@@ -457,10 +624,13 @@ class PathJoin(Node):
     type = "file.path_join"
     category = "file"
     name = "Path Join"
+    display_name = "路径拼接"
     description = "拼接并规范化路径"
     cache_policy = CachePolicy.PURE
     outputs = (Port("variables", "variable", "path 变量"),)
-    params_schema = schema({"parts": prop("array", "路径片段")}, ["parts"])
+    params_schema = schema(
+        {"parts": prop("array", "路径片段", items=prop("string", "路径片段"))}, ["parts"]
+    )
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         return {"variables": {"path": str(Path(*params["parts"]))}}
@@ -489,6 +659,7 @@ class FileCopy(FileOperation):
     type = "file.copy"
     category = "file"
     name = "File Copy"
+    display_name = "复制文件"
     description = "复制文件或目录"
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
@@ -508,6 +679,7 @@ class FileMove(FileOperation):
     type = "file.move"
     category = "file"
     name = "File Move"
+    display_name = "移动文件"
     description = "移动文件或目录"
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
@@ -525,6 +697,7 @@ class FileRename(FileOperation):
     type = "file.rename"
     category = "file"
     name = "File Rename"
+    display_name = "重命名文件"
     description = "重命名文件或目录"
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
@@ -541,6 +714,7 @@ class FileDelete(FileOperation):
     type = "file.delete"
     category = "file"
     name = "File Delete"
+    display_name = "删除文件"
     description = "移入回收站或永久删除"
 
     def execute(self, ctx: Any, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
@@ -559,14 +733,42 @@ class PythonScript(Node):
     type = "code.python"
     category = "code"
     name = "Python Script"
+    display_name = "Python 脚本"
     description = "在可信 Worker 中执行用户 Python 代码"
     params_schema = schema(
         {
             "source": prop("string", "代码来源", enum=["inline", "file"], default="inline"),
             "code": prop("string", "内联代码"),
             "path": prop("string", "代码文件路径"),
-            "inputs": prop("array", "输入端口映射", default=[]),
-            "outputs": prop("array", "输出端口声明", default=[]),
+            "inputs": prop(
+                "array",
+                "输入端口映射",
+                default=[],
+                items=prop(
+                    "object",
+                    "单个输入映射",
+                    properties={
+                        "port": prop("string", "输入端口名"),
+                        "var": prop("string", "脚本变量名"),
+                    },
+                    required=["port", "var"],
+                ),
+            ),
+            "outputs": prop(
+                "array",
+                "输出端口声明",
+                default=[],
+                items=prop(
+                    "object",
+                    "单个输出声明",
+                    properties={
+                        "var": prop("string", "脚本变量名"),
+                        "port": prop("string", "输出端口名"),
+                        "type": prop("string", "输出类型，例如 Table 或 Variable"),
+                    },
+                    required=["var", "port", "type"],
+                ),
+            ),
         }
     )
 

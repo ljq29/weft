@@ -6,6 +6,7 @@ import type { NodeTypeDecl } from "../types/workflow";
 const declaration: NodeTypeDecl = {
   type: "table.test",
   name: "Test",
+  display_name: "测试节点",
   description: "Test",
   category: "table",
   cache_policy: "pure",

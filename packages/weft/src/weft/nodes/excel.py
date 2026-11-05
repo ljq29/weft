@@ -35,6 +35,7 @@ class ExcelConnectNode(Node):
     type = "excel.connect"
     category = "excel"
     name = "Excel Connect"
+    display_name = "连接 Excel"
     description = "连接可见 Excel 或创建独立的可见/隐藏实例"
     lane = Lane.TRUSTED_SERVICE
     outputs = (Port("app", "excel", "Excel App 引用"),)
@@ -79,6 +80,7 @@ class ExcelWorkbookNode(Node):
     type = "excel.workbook"
     category = "excel"
     name = "Excel Workbook"
+    display_name = "Excel 工作簿"
     description = "引用已打开工作簿、打开文件或新建工作簿"
     lane = Lane.TRUSTED_SERVICE
     inputs = (Port("app", "excel", "Excel App 引用"),)
@@ -113,6 +115,7 @@ class ExcelReadRangeNode(Node):
     type = "excel.read_range"
     category = "excel"
     name = "Excel Read Range"
+    display_name = "读取 Excel 区域"
     description = "实时读取 Excel 区域、表对象或命名区域为表格"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.VOLATILE
@@ -125,7 +128,14 @@ class ExcelReadRangeNode(Node):
             "sheet": {"type": "string", "description": "工作表名"},
             "range": {"type": "string", "description": "A1 区域、表对象或命名区域；空为 UsedRange"},
             "header": {"type": "boolean", "description": "首行为表头"},
-            "dtype_hints": {"type": "object", "description": "按列指定 Arrow 类型"},
+            "dtype_hints": {
+                "type": "object",
+                "description": "按列指定 Arrow 类型",
+                "additionalProperties": {
+                    "type": "string",
+                    "description": "Arrow 类型别名，例如 int64、string",
+                },
+            },
         },
         ["sheet"],
     )
@@ -148,6 +158,7 @@ class ExcelWriteTableNode(Node):
     type = "excel.write_table"
     category = "excel"
     name = "Excel Write Table"
+    display_name = "写入 Excel 表格"
     description = "整块写入、追加或覆盖 Excel 工作表区域"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.SIDE_EFFECT
@@ -204,6 +215,7 @@ class ExcelCellUpdateNode(Node):
     type = "excel.cell_update"
     category = "excel"
     name = "Excel Cell Update"
+    display_name = "更新单元格"
     description = "原子更新若干不连续单元格，默认禁止公式"
     lane = Lane.TRUSTED_SERVICE
     inputs = (
@@ -214,7 +226,20 @@ class ExcelCellUpdateNode(Node):
     params_schema = schema(
         {
             "sheet": {"type": "string", "description": "目标工作表"},
-            "cells": {"type": "array", "description": "单元格地址与值列表"},
+            "cells": {
+                "type": "array",
+                "description": "单元格地址与值列表",
+                "default": [],
+                "items": {
+                    "type": "object",
+                    "description": "单个单元格更新",
+                    "properties": {
+                        "address": {"type": "string", "description": "单元格地址，例如 B2"},
+                        "value": {"description": "要写入的单元格值"},
+                    },
+                    "required": ["address", "value"],
+                },
+            },
             "allow_formula": {"type": "boolean", "description": "是否允许公式"},
         },
         ["sheet"],
@@ -240,6 +265,7 @@ class ExcelSheetNamesNode(Node):
     type = "excel.sheet_names"
     category = "excel"
     name = "Excel Sheet Names"
+    display_name = "列出工作表"
     description = "列出工作表名、索引与可见状态"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.VOLATILE
@@ -256,6 +282,7 @@ class ExcelSheetNode(Node):
     type = "excel.sheet"
     category = "excel"
     name = "Excel Sheet"
+    display_name = "工作表操作"
     description = "创建、删除、重命名或清空工作表"
     lane = Lane.TRUSTED_SERVICE
     inputs = (Port("workbook", "excel", "Excel Workbook 引用"),)
@@ -290,6 +317,7 @@ class ExcelSaveNode(Node):
     type = "excel.save"
     category = "excel"
     name = "Excel Save"
+    display_name = "保存工作簿"
     description = "显式保存或另存工作簿，不隐式覆盖文件"
     lane = Lane.TRUSTED_SERVICE
     inputs = (Port("workbook", "excel", "Excel Workbook 引用"),)
@@ -328,6 +356,7 @@ class ExcelRunMacroNode(Node):
     type = "excel.run_macro"
     category = "excel"
     name = "Excel Run Macro"
+    display_name = "运行 Excel 宏"
     description = "通过 ExcelWorker 的 STA 串行队列调用 Application.Run"
     lane = Lane.TRUSTED_SERVICE
     cache_policy = CachePolicy.SIDE_EFFECT
@@ -340,6 +369,7 @@ class ExcelRunMacroNode(Node):
                 "type": "array",
                 "description": "按顺序传给宏的参数",
                 "default": [],
+                "items": {"description": "宏参数值"},
             },
         },
         ["macro"],

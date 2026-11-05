@@ -462,14 +462,14 @@ TriggerManager
 | ----------| ----------------------------------------------------| ----------------------------------------------------------------|
 |框架|React 18 + TypeScript + Vite||
 |画布|@xyflow/react (React Flow 12)|自定义节点组件：状态条、端口颜色、内嵌 Table View|
-|状态|Zustand|`workflowStore`（图编辑，含 undo 栈）、`runStore`（执行状态，由 WS 驱动）、`settingsStore`|
-|数据获取|TanStack Query|REST 封装；启动 URL 的随机会话令牌只存 sessionStorage，REST 用 Bearer，WS 先 authenticate 再订阅|
+|状态|Zustand|`workflowStore`（图编辑、undo 栈与 provisional 配置状态）、`runStore`（执行状态，由 WS 驱动）|
+|数据获取|轻量 `api()`（fetch 封装）|启动 URL 的随机会话令牌只存 sessionStorage，REST 用 Bearer，WS 先 authenticate 再订阅|
 |表格预览|TanStack Table + Arrow JS (`apache-arrow`)|端口视图直接消费 Arrow IPC 流；无 sort_by 时按 record batch 分页，指定排序时 v1 允许全量稳定排序，不预建索引|
 |表单|JSON Schema → 表单（`@rjsf` 或自研轻量版，开发期定）|节点参数表单自动生成（US-DES-04）|
 |diff|`react-diff-view`|变更审批面板|
 |聊天|自研轻组件 + `react-markdown`||
 
-原则：**前端无业务规则**。端口兼容性、表达式校验、Loop 配对等一律后端判定，前端只渲染结果（US-DES-03 AC-5）。编辑操作本地乐观更新 + 自动保存防抖 2 s 提交（US-DES-07）。Host/Origin 与 UI 会话令牌均由服务端校验，`X-Weft-Client` 不构成鉴权。
+原则：**前端无业务规则**。端口兼容性、表达式校验、Loop 配对等一律后端判定，前端只渲染结果（US-DES-03 AC-5）。`workflowStore` 对 `required` 的本地检查只提供 provisional 即时反馈；`applyValidation` 应用 `/validate` 返回的节点级错误，但不改写 `running`、`executed` 等运行态。最终配置与执行状态以后端 `validate`/`run` 为准，不在前端复制完整业务校验。编辑操作本地乐观更新 + 自动保存防抖 2 s 提交（US-DES-07）。Host/Origin 与 UI 会话令牌均由服务端校验，`X-Weft-Client` 不构成鉴权。
 
 ## 10. 可观测性
 

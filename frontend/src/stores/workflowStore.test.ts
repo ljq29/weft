@@ -5,6 +5,7 @@ import type { NodeTypeDecl } from "../types/workflow";
 const declaration: NodeTypeDecl = {
   type: "table.read_csv",
   name: "Read CSV",
+  display_name: "读取 CSV",
   description: "Read CSV",
   category: "table",
   cache_policy: "pure",
@@ -34,6 +35,8 @@ describe("T2.2 workflow editing store", () => {
     const node = useWorkflowStore.getState().nodes[0];
     expect(node.id).toMatch(/^n_[0-9a-f]{8}$/);
     expect(node.position).toEqual({ x: 300, y: 200 });
+    expect(node.data.name).toBe("Read CSV");
+    expect(node.data.name).not.toBe(declaration.display_name);
     expect(node.data.params).toEqual({ path: "data/a.csv" });
     expect(useWorkflowStore.getState().dirty).toBe(true);
   });
@@ -82,5 +85,53 @@ describe("T2.2 workflow editing store", () => {
     const node = useWorkflowStore.getState().nodes[0];
     expect(node.data.status).toBe("configured");
     expect(node.data.params.path).toEqual({ $var: "input" });
+  });
+
+  it("US-DES-04/AC-3, US-DES-05/AC-1: applies and clears backend node validation errors", () => {
+    useWorkflowStore.getState().addNode(declaration.type, { x: 0, y: 0 });
+    const id = useWorkflowStore.getState().nodes[0].id;
+    const historyLength = useWorkflowStore.getState().history.length;
+
+    useWorkflowStore.getState().applyValidation([
+      { code: "INVALID_PARAMS", message: "Invalid path", node_id: id },
+      { code: "GRAPH_CYCLE", message: "Cycle", node_id: null },
+    ]);
+    expect(useWorkflowStore.getState().nodes[0].data.status).toBe(
+      "unconfigured",
+    );
+    expect(useWorkflowStore.getState().history).toHaveLength(historyLength);
+
+    useWorkflowStore.getState().applyValidation([]);
+    expect(useWorkflowStore.getState().nodes[0].data.status).toBe("configured");
+  });
+
+  it("US-DES-05/AC-1,2: validation does not flatten runtime states", () => {
+    const statuses = ["running", "executed", "failed", "skipped"];
+    for (const status of statuses) {
+      useWorkflowStore.getState().addNode(declaration.type, { x: 0, y: 0 });
+      const nodes = useWorkflowStore.getState().nodes;
+      const id = nodes.at(-1)?.id;
+      useWorkflowStore.setState({
+        nodes: nodes.map((node) =>
+          node.id === id ? { ...node, data: { ...node.data, status } } : node,
+        ),
+      });
+    }
+    const before = useWorkflowStore.getState().nodes.map((node) => ({
+      id: node.id,
+      status: node.data.status,
+    }));
+
+    useWorkflowStore.getState().applyValidation(
+      before.map(({ id }) => ({
+        code: "INVALID_PARAMS",
+        message: "Invalid",
+        node_id: id,
+      })),
+    );
+
+    expect(
+      useWorkflowStore.getState().nodes.map((node) => node.data.status),
+    ).toEqual(statuses);
   });
 });

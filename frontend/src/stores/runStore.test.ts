@@ -43,6 +43,65 @@ describe("T2.3 execution visualization", () => {
     expect(useRunStore.getState().statuses.n_1).toBe("executed");
   });
 
+  it("US-EXE-05/AC-3, US-AGT-12/AC-2: restores logs and unresolved confirmations from a run baseline", () => {
+    useRunStore.getState().baseline(
+      {
+        run_id: "r_2",
+        status: "waiting",
+        nodes: { n_1: { status: "running" } },
+      },
+      [
+        {
+          event: "node.log",
+          node_id: "n_1",
+          data: { level: "WARN", message: "check" },
+        },
+        {
+          event: "node.confirm_request",
+          node_id: "n_1",
+          data: {
+            request_id: "request_1",
+            run_id: "r_2",
+            tool: "write",
+            args: { path: "out.txt" },
+          },
+        },
+        {
+          event: "node.confirm_request",
+          node_id: "n_1",
+          data: {
+            request_id: "request_2",
+            run_id: "r_2",
+            tool: "edit",
+            args: {},
+          },
+        },
+        {
+          event: "node.confirm_resolved",
+          node_id: "n_1",
+          data: { request_id: "request_1" },
+        },
+      ],
+    );
+    const state = useRunStore.getState();
+    expect(state.runId).toBe("r_2");
+    expect(state.runStatus).toBe("waiting");
+    expect(state.logs).toEqual([
+      { node_id: "n_1", level: "WARN", message: "check" },
+    ]);
+    expect(state.pendingConfirmations.map((item) => item.request_id)).toEqual([
+      "request_2",
+    ]);
+  });
+
+  it("US-EXE-05/AC-3: ignores unknown events without changing run state", () => {
+    const before = useRunStore.getState();
+    useRunStore
+      .getState()
+      .apply({ event: "node.unknown", data: { node_id: "n_1" } });
+    expect(useRunStore.getState()).toBe(before);
+  });
+
   it("US-EXE-10/AC-3: records iteration progress for the loop node", () => {
     useRunStore.getState().apply({
       event: "node.iteration",

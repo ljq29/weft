@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 function token() {
-  const configDir = process.env.WEFT_E2E_CONFIG_DIR ?? ".test-reports/e2e-config";
+  const configDir =
+    process.env.WEFT_E2E_CONFIG_DIR ?? ".test-reports/e2e-config";
   const path = resolve(import.meta.dirname, "../..", configDir, "session.json");
   return JSON.parse(readFileSync(path, "utf8")).token as string;
 }
@@ -23,17 +24,19 @@ test("US-DES-01/AC-1,3, US-DES-02/AC-1,4, US-DES-07/AC-1,2: create and save a wo
   await page.getByLabel("父目录").fill(testInfo.outputPath());
   await page.getByRole("button", { name: "新建工作流" }).click();
   await expect(
-    page.getByRole("button", { name: "Trigger", exact: true }),
+    page.getByRole("button", { name: "Trigger · 触发器", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("e2e", { exact: true })).toBeVisible();
   await page.getByLabel("搜索节点").fill("read");
   await expect(
-    page.getByRole("button", { name: "Read CSV", exact: true }),
+    page.getByRole("button", { name: "Read CSV · 读取 CSV", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Trigger", exact: true }),
+    page.getByRole("button", { name: "Trigger · 触发器", exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Read CSV", exact: true }).dblclick();
+  await page
+    .getByRole("button", { name: "Read CSV · 读取 CSV", exact: true })
+    .dblclick();
   await expect(
     page.locator(".weft-node").filter({ hasText: "Read CSV" }),
   ).toBeVisible();
@@ -41,7 +44,9 @@ test("US-DES-01/AC-1,3, US-DES-02/AC-1,4, US-DES-07/AC-1,2: create and save a wo
   await expect(page.getByText("e2e *", { exact: true })).toHaveCount(0, {
     timeout: 10_000,
   });
-  await page.getByRole("button", { name: "Read CSV", exact: true }).dblclick();
+  await page
+    .getByRole("button", { name: "Read CSV · 读取 CSV", exact: true })
+    .dblclick();
   await expect(page.getByText("e2e *", { exact: true })).toBeVisible();
   await page.keyboard.press("Control+s");
   await expect(page.getByText("e2e *", { exact: true })).toHaveCount(0);
@@ -55,7 +60,9 @@ test("US-DES-08/AC-1,2, US-DES-11/AC-1,2: history and view navigation work", asy
   await page.getByLabel("父目录").fill(testInfo.outputPath());
   await page.getByRole("button", { name: "新建工作流" }).click();
   await expect(page.locator(".weft-node")).toHaveCount(1);
-  await page.getByRole("button", { name: "Read CSV", exact: true }).dblclick();
+  await page
+    .getByRole("button", { name: "Read CSV · 读取 CSV", exact: true })
+    .dblclick();
   await expect(page.locator(".weft-node")).toHaveCount(2);
   await page
     .locator(".react-flow__pane")
@@ -89,7 +96,9 @@ test("US-DES-08/AC-2, US-DES-11/AC-1: left drag selects nodes and middle drag pa
   await page.getByLabel("父目录").fill(testInfo.outputPath());
   await page.getByRole("button", { name: "新建工作流" }).click();
   await expect(page.locator(".weft-node")).toHaveCount(1);
-  await page.getByRole("button", { name: "Read CSV", exact: true }).dblclick();
+  await page
+    .getByRole("button", { name: "Read CSV · 读取 CSV", exact: true })
+    .dblclick();
   await expect(page.locator(".weft-node")).toHaveCount(2);
   await page.keyboard.press("Shift+1");
 
@@ -117,7 +126,8 @@ test("US-DES-08/AC-2, US-DES-11/AC-1: left drag selects nodes and middle drag pa
   const left = Math.min(first.x, second.x) - 20;
   const top = Math.min(first.y, second.y) - 20;
   const right = Math.max(first.x + first.width, second.x + second.width) + 20;
-  const bottom = Math.max(first.y + first.height, second.y + second.height) + 20;
+  const bottom =
+    Math.max(first.y + first.height, second.y + second.height) + 20;
   await page.mouse.move(left, top);
   await page.mouse.down();
   await page.mouse.move(right, bottom, { steps: 12 });
@@ -138,7 +148,9 @@ test("US-DES-07/AC-3: save failure preserves dirty state and shows an error", as
     if (route.request().method() === "PUT") return route.abort();
     return route.continue();
   });
-  await page.getByRole("button", { name: "Read CSV", exact: true }).dblclick();
+  await page
+    .getByRole("button", { name: "Read CSV · 读取 CSV", exact: true })
+    .dblclick();
   await expect(page.getByText("failure *", { exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("failure *", { exact: true })).toBeVisible();
