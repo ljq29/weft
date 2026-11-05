@@ -22,6 +22,7 @@
 - CSV and table demo ZIPs passed fresh unpack, environment synchronization and real execution; demo resources were also loaded directly from a built wheel.
 - Seventeen local Windows real/benchmark tests passed with real Excel, Sandboxie and pi.
 - The portable ZIP passed clean bootstrap without host Python/uv, cached offline execution, authenticated service and frontend acceptance.
+- All four downloaded Release assets matched their API SHA-256 hashes; the downloaded Windows ZIP also passed local bootstrap, offline CSV, service and frontend acceptance.
 - Real LLM execution remains subject to user-supplied OpenAI-compatible settings; no API key is bundled.
 
 ## [0.2.2] - 2026-11-05
