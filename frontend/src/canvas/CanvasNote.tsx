@@ -4,6 +4,7 @@ import type { NodeProps } from "@xyflow/react";
 import ReactMarkdown from "react-markdown";
 import type { FlowNode } from "../stores/workflowStore";
 import { useWorkflowStore } from "../stores/workflowStore";
+import { Icon } from "../components/Icon";
 
 export function CanvasNote({ data, selected }: NodeProps<FlowNode>) {
   const [editing, setEditing] = useState(false);
@@ -48,11 +49,13 @@ export function CanvasNote({ data, selected }: NodeProps<FlowNode>) {
           }}
         />
         <button
+          className="note-edit-button"
           type="button"
           onClick={() => {
             setEditing(!editing);
           }}
         >
+          <Icon name={editing ? "eye" : "code"} />
           {editing ? "预览便签" : "编辑便签"}
         </button>
       </div>

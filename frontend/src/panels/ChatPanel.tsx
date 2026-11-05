@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useRunStore } from "../stores/runStore";
+import { Icon } from "../components/Icon";
 
 interface ChatMessage {
   message_id: string;
@@ -186,46 +187,115 @@ export function ChatPanel({
   };
   return (
     <section className="chat-panel" aria-label="聊天面板">
-      <button onClick={onClose}>关闭</button>
-      <button
-        onClick={() => {
-          setSessionId(newSession());
-          setRunId("");
-          setMessages([]);
-          setNotice("");
-        }}
-      >
-        新会话
-      </button>
-      <button
-        onClick={() => {
-          void api(`/workflows/${workflowId}/chat/${sessionId}/clear`, {
-            method: "POST",
-            body: JSON.stringify({ clear_memory: false }),
-          }).then(() => {
-            setMessages([]);
-          });
-        }}
-      >
-        清空会话
-      </button>
-      <div aria-live="polite">
+      <header className="chat-header">
+        <div className="chat-title">
+          <img src="/weft-mark.svg" alt="" />
+          <div>
+            <h2>Weft 对话</h2>
+            <span>
+              <span className={`status-dot ${enabled ? "succeeded" : ""}`} />
+              {enabled ? "聊天触发已启用" : "聊天触发未启用"}
+            </span>
+          </div>
+        </div>
+        <div className="chat-actions">
+          <button
+            className="button ghost"
+            onClick={() => {
+              setSessionId(newSession());
+              setRunId("");
+              setMessages([]);
+              setNotice("");
+            }}
+          >
+            <Icon name="plus" />
+            新会话
+          </button>
+          <button
+            className="button ghost"
+            onClick={() => {
+              void api(`/workflows/${workflowId}/chat/${sessionId}/clear`, {
+                method: "POST",
+                body: JSON.stringify({ clear_memory: false }),
+              }).then(() => {
+                setMessages([]);
+              });
+            }}
+          >
+            <Icon name="trash" />
+            清空会话
+          </button>
+          <button className="icon-button" aria-label="关闭" onClick={onClose}>
+            <Icon name="close" />
+          </button>
+        </div>
+      </header>
+      <div className="chat-messages" aria-live="polite">
         {messages.map((message) => (
-          <p key={message.message_id} data-role={message.role}>
-            {message.content}
-            {message.streaming ? " …" : ""}
-          </p>
+          <div
+            className="chat-message"
+            key={message.message_id}
+            data-role={message.role}
+          >
+            <span className="message-avatar">
+              {message.role === "user" ? (
+                "你"
+              ) : message.role === "assistant" ? (
+                <img src="/weft-mark.svg" alt="" />
+              ) : (
+                <Icon name="info" />
+              )}
+            </span>
+            <div>
+              <strong>
+                {message.role === "user"
+                  ? "你"
+                  : message.role === "assistant"
+                    ? "Weft"
+                    : "系统"}
+              </strong>
+              <p>
+                {message.content}
+                {message.streaming ? " …" : ""}
+              </p>
+            </div>
+          </div>
         ))}
+        {messages.length === 0 && (
+          <div className="empty-state">
+            <span className="empty-state-icon">
+              <Icon name="send" />
+            </span>
+            <h3>用对话触发工作流</h3>
+            <p>描述你希望这个工作流完成的事情。</p>
+          </div>
+        )}
       </div>
-      <textarea
-        aria-label="聊天内容"
-        value={input}
-        onChange={(event) => {
-          setInput(event.target.value);
-        }}
-      />
-      <button onClick={() => void send()}>发送</button>
-      <p role="status">{notice}</p>
+      <div className="chat-composer">
+        <div className="composer-box">
+          <textarea
+            aria-label="聊天内容"
+            placeholder="描述你想要这个工作流完成的事…"
+            value={input}
+            onChange={(event) => {
+              setInput(event.target.value);
+            }}
+          />
+          <div>
+            <span>
+              <Icon name="shield" />
+              本地工作流 · 会话独立保存
+            </span>
+            <button className="button primary" onClick={() => void send()}>
+              <Icon name="send" />
+              发送
+            </button>
+          </div>
+        </div>
+        <p className="chat-notice" role="status">
+          {notice}
+        </p>
+      </div>
     </section>
   );
 }

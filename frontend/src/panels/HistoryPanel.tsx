@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { Icon } from "../components/Icon";
 
 interface RunSummary {
   run_id: string;
@@ -60,85 +61,139 @@ export function HistoryPanel({
     setTraceNode("");
   };
   return (
-    <section className="history-panel" aria-label="运行历史">
-      <button
-        onClick={() => {
-          setOpen(!open);
-        }}
-      >
-        历史
-      </button>
+    <section
+      className={`history-panel${open ? " open" : ""}`}
+      aria-label="运行历史"
+    >
+      <header className="bottom-panel-header">
+        <button
+          className="history-toggle"
+          onClick={() => {
+            setOpen(!open);
+          }}
+        >
+          <Icon name="history" />
+          <span>历史</span>
+          <Icon name="down" className={open ? "rotated" : ""} />
+        </button>
+        {open && (
+          <span className="panel-caption">最近 20 次运行 · 只读快照</span>
+        )}
+      </header>
       {open && (
-        <div>
-          {runs.map((run) => (
-            <button key={run.run_id} onClick={() => void select(run.run_id)}>
-              {run.run_id} · {run.trigger_source} · {run.status}
-            </button>
-          ))}
+        <div className="history-layout">
+          <div className="run-list">
+            {runs.map((run) => (
+              <button
+                className={
+                  detail?.run_id === run.run_id
+                    ? "run-item selected"
+                    : "run-item"
+                }
+                key={run.run_id}
+                onClick={() => void select(run.run_id)}
+              >
+                <span className={`status-dot ${run.status}`} />
+                <span>
+                  <strong>{run.run_id}</strong>
+                  <small>
+                    {" · "}
+                    {run.trigger_source} · {run.status}
+                  </small>
+                </span>
+                <Icon name="chevron" />
+              </button>
+            ))}
+            {runs.length === 0 && (
+              <div className="bottom-empty">暂无运行记录</div>
+            )}
+          </div>
           {detail && (
-            <section aria-label="历史运行详情">
-              <h3>
-                {detail.run_id} · {detail.status}
-              </h3>
-              <table>
-                <thead>
-                  <tr>
-                    <th>节点</th>
-                    <th>状态</th>
-                    <th>缓存</th>
-                    <th>只读操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(detail.nodes).map(([nodeId, node]) => (
-                    <tr key={nodeId}>
-                      <td>{nodeId}</td>
-                      <td>{node.status}</td>
-                      <td>{node.from_cache ? "是" : "否"}</td>
-                      <td>
-                        <button
-                          onClick={() => {
-                            setTraceNode(nodeId);
-                            void api<unknown[]>(
-                              `/runs/${detail.run_id}/nodes/${nodeId}/trace`,
-                            ).then(setTraces);
-                          }}
-                        >
-                          查看轨迹
-                        </button>
-                        {Object.keys(node.outputs).map((port) => (
+            <section className="history-detail" aria-label="历史运行详情">
+              <header>
+                <div>
+                  <span className={`tag ${detail.status}`}>
+                    {detail.status}
+                  </span>
+                  <h3>{detail.run_id}</h3>
+                </div>
+                <span>{detail.trigger.source} 触发</span>
+              </header>
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>节点</th>
+                      <th>状态</th>
+                      <th>缓存</th>
+                      <th>只读操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(detail.nodes).map(([nodeId, node]) => (
+                      <tr key={nodeId}>
+                        <td>{nodeId}</td>
+                        <td>
+                          <span className={`tag ${node.status}`}>
+                            {node.status}
+                          </span>
+                        </td>
+                        <td>{node.from_cache ? "是" : "否"}</td>
+                        <td className="table-actions">
                           <button
-                            key={port}
+                            className="text-button"
                             onClick={() => {
-                              onPreview(detail.run_id, nodeId, port);
+                              setTraceNode(nodeId);
+                              void api<unknown[]>(
+                                `/runs/${detail.run_id}/nodes/${nodeId}/trace`,
+                              ).then(setTraces);
                             }}
                           >
-                            查看 {port}
+                            查看轨迹
                           </button>
-                        ))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          {Object.keys(node.outputs).map((port) => (
+                            <button
+                              className="text-button"
+                              key={port}
+                              onClick={() => {
+                                onPreview(detail.run_id, nodeId, port);
+                              }}
+                            >
+                              查看 {port}
+                            </button>
+                          ))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               {Object.entries(detail.nodes).map(([nodeId, node]) =>
                 node.error ? (
-                  <pre key={nodeId}>
+                  <pre className="error-details" key={nodeId}>
                     {nodeId}: {node.error.traceback ?? node.error.message}
                   </pre>
                 ) : null,
               )}
-              <h4>历史日志</h4>
-              {logs.map((entry, index) => (
-                <p key={index}>
-                  {entry.event} {entry.node_id}{" "}
-                  {typeof entry.data.message === "string"
-                    ? entry.data.message
-                    : JSON.stringify(entry.data.message ?? "")}
-                </p>
-              ))}
-              {traceNode && <h4>{traceNode} 轨迹</h4>}
-              {traceNode && <pre>{JSON.stringify(traces, null, 2)}</pre>}
+              <div className="history-lower">
+                <section>
+                  <h4>历史日志</h4>
+                  {logs.map((entry, index) => (
+                    <p className="history-log" key={index}>
+                      <strong>{entry.event}</strong> {entry.node_id}{" "}
+                      {typeof entry.data.message === "string"
+                        ? entry.data.message
+                        : JSON.stringify(entry.data.message ?? "")}
+                    </p>
+                  ))}
+                </section>
+                {traceNode && (
+                  <section>
+                    <h4>{traceNode} 轨迹</h4>
+                    <pre>{JSON.stringify(traces, null, 2)}</pre>
+                  </section>
+                )}
+              </div>
             </section>
           )}
         </div>

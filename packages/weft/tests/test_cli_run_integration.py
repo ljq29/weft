@@ -27,9 +27,9 @@ def test_cli_csv_closed_loop_cache_and_variable_override(
     (root / "pyproject.toml").write_text(
         f'''[project]
 name = "minimal-csv"
-version = "0.2.0"
+version = "0.2.1"
 requires-python = ">=3.12"
-dependencies = ["weft-worker==0.2.0"]
+dependencies = ["weft-worker==0.2.1"]
 [tool.uv.sources]
 weft-worker = {{ path = "{(PROJECT_ROOT / "packages/weft-worker").as_posix()}" }}
 weft-sdk = {{ path = "{(PROJECT_ROOT / "packages/weft-sdk").as_posix()}" }}
@@ -120,7 +120,7 @@ weft-sdk = {{ path = "{(PROJECT_ROOT / "packages/weft-sdk").as_posix()}" }}
                     headers={"Authorization": f"Bearer {load_session().token}"},
                 )
                 with urllib.request.urlopen(request, timeout=0.2) as response:
-                    assert json.loads(response.read())["version"] == "0.2.0"
+                    assert json.loads(response.read())["version"] == "0.2.1"
                     break
             except OSError:
                 time.sleep(0.1)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { Icon } from "../components/Icon";
 
 interface LLMConfig {
   base_url: string;
@@ -82,150 +83,205 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   };
   return (
     <div className="modal-backdrop" role="dialog" aria-label="设置">
-      <section className="port-view">
-        <h2>LLM 配置</h2>
-        <button onClick={onClose}>关闭</button>
-        <button
-          onClick={() => {
-            const suffix = (Object.keys(configs).length + 1).toString();
-            const name = `llm-${suffix}`;
-            setConfigs({ ...configs, [name]: { ...emptyConfig } });
-            setSelected(name);
-            setHeaders("{}");
-          }}
-        >
-          新增配置
-        </button>
-        <button
-          disabled={!selected}
-          onClick={() => {
-            const next = Object.fromEntries(
-              Object.entries(configs).filter(([name]) => name !== selected),
-            );
-            setConfigs(next);
-            setSelected(Object.keys(next)[0] ?? "");
-          }}
-        >
-          删除配置
-        </button>
-        <label>
-          配置名
-          <select
-            value={selected}
-            onChange={(event) => {
-              setSelected(event.target.value);
-              const config = configs[event.target.value];
-              setHeaders(
-                JSON.stringify(
-                  Object.hasOwn(configs, event.target.value)
-                    ? config.extra_headers
-                    : {},
-                ),
-              );
+      <section className="modal settings-modal">
+        <header className="modal-header">
+          <div>
+            <span className="dialog-icon">
+              <Icon name="settings" />
+            </span>
+            <div>
+              <h2>设置</h2>
+              <p>管理模型连接、运行保留策略与本地服务</p>
+            </div>
+          </div>
+          <button className="icon-button" aria-label="关闭" onClick={onClose}>
+            <Icon name="close" />
+          </button>
+        </header>
+        <div className="settings-toolbar">
+          <label className="inline-field">
+            <span>LLM 配置</span>
+            <select
+              aria-label="配置名"
+              value={selected}
+              onChange={(event) => {
+                setSelected(event.target.value);
+                const config = configs[event.target.value];
+                setHeaders(
+                  JSON.stringify(
+                    Object.hasOwn(configs, event.target.value)
+                      ? config.extra_headers
+                      : {},
+                  ),
+                );
+              }}
+            >
+              {!selected && <option value="">无配置</option>}
+              {Object.keys(configs).map((name) => (
+                <option key={name}>{name}</option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="button secondary"
+            onClick={() => {
+              const suffix = (Object.keys(configs).length + 1).toString();
+              const name = `llm-${suffix}`;
+              setConfigs({ ...configs, [name]: { ...emptyConfig } });
+              setSelected(name);
+              setHeaders("{}");
             }}
           >
-            {!selected && <option value="">无配置</option>}
-            {Object.keys(configs).map((name) => (
-              <option key={name}>{name}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Base URL
-          <input
-            aria-label="Base URL"
-            value={current.base_url}
-            onChange={(event) => {
-              update({ base_url: event.target.value });
+            <Icon name="plus" />
+            新增配置
+          </button>
+          <button
+            className="button ghost danger-text"
+            disabled={!selected}
+            onClick={() => {
+              const next = Object.fromEntries(
+                Object.entries(configs).filter(([name]) => name !== selected),
+              );
+              setConfigs(next);
+              setSelected(Object.keys(next)[0] ?? "");
             }}
-          />
-        </label>
-        <label>
-          API Key
-          <input
-            aria-label="API Key"
-            type="password"
-            value={current.api_key}
-            onChange={(event) => {
-              update({ api_key: event.target.value });
-            }}
-          />
-        </label>
-        <label>
-          模型
-          <input
-            aria-label="模型"
-            value={current.model}
-            onChange={(event) => {
-              update({ model: event.target.value });
-            }}
-          />
-        </label>
-        <label>
-          超时秒数
-          <input
-            aria-label="超时秒数"
-            type="number"
-            value={current.timeout}
-            onChange={(event) => {
-              update({ timeout: Number(event.target.value) });
-            }}
-          />
-        </label>
-        <label>
-          额外请求头（JSON）
-          <textarea
-            aria-label="额外请求头（JSON）"
-            value={headers}
-            onChange={(event) => {
-              setHeaders(event.target.value);
-            }}
-          />
-        </label>
-        <label>
-          最近 Run 保留数
-          <input
-            aria-label="最近 Run 保留数"
-            type="number"
-            min={0}
-            value={Number(cache.run_retention ?? 50)}
-            onChange={(event) => {
-              setCache({
-                ...cache,
-                run_retention: Number(event.target.value),
-              });
-            }}
-          />
-        </label>
-        <label>
-          运行与运维配置（JSON）
-          <textarea
-            aria-label="运行与运维配置（JSON）"
-            value={advanced}
-            onChange={(event) => {
-              setAdvanced(event.target.value);
-            }}
-          />
-          <small>server.host / server.port 保存后需要重启服务。</small>
-        </label>
-        <button onClick={() => void save()}>保存设置</button>
-        <button
-          disabled={!selected}
-          onClick={() => {
-            void api<{ ok: boolean }>(`/settings/llm/${selected}/test`, {
-              method: "POST",
-            })
-              .then(() => {
-                setMessage("连接成功");
+          >
+            <Icon name="trash" />
+            删除配置
+          </button>
+        </div>
+        <div className="settings-body">
+          <div className="security-inline">
+            <Icon name="shield" />
+            <span>
+              密钥仅由沙箱外的 LLMProxy 读取，不会写入日志、轨迹或打包产物。
+            </span>
+          </div>
+          <section className="settings-card">
+            <div className="settings-card-heading">
+              <div>
+                <h3>模型连接</h3>
+                <p>OpenAI 兼容端点，节点只引用配置名。</p>
+              </div>
+              <span className="tag neutral">{selected || "未选择"}</span>
+            </div>
+            <div className="settings-form-grid">
+              <label className="form-field wide">
+                <span>Base URL</span>
+                <input
+                  aria-label="Base URL"
+                  placeholder="https://api.openai.com/v1"
+                  value={current.base_url}
+                  onChange={(event) => {
+                    update({ base_url: event.target.value });
+                  }}
+                />
+              </label>
+              <label className="form-field">
+                <span>API Key</span>
+                <input
+                  aria-label="API Key"
+                  type="password"
+                  value={current.api_key}
+                  onChange={(event) => {
+                    update({ api_key: event.target.value });
+                  }}
+                />
+              </label>
+              <label className="form-field">
+                <span>模型</span>
+                <input
+                  aria-label="模型"
+                  value={current.model}
+                  onChange={(event) => {
+                    update({ model: event.target.value });
+                  }}
+                />
+              </label>
+              <label className="form-field">
+                <span>超时秒数</span>
+                <input
+                  aria-label="超时秒数"
+                  type="number"
+                  value={current.timeout}
+                  onChange={(event) => {
+                    update({ timeout: Number(event.target.value) });
+                  }}
+                />
+              </label>
+              <label className="form-field wide">
+                <span>额外请求头（JSON）</span>
+                <textarea
+                  aria-label="额外请求头（JSON）"
+                  value={headers}
+                  onChange={(event) => {
+                    setHeaders(event.target.value);
+                  }}
+                />
+              </label>
+            </div>
+          </section>
+          <section className="settings-card">
+            <div className="settings-card-heading">
+              <div>
+                <h3>运行与运维</h3>
+                <p>配置本地历史保留和高级服务参数。</p>
+              </div>
+            </div>
+            <label className="form-field retention-field">
+              <span>最近 Run 保留数</span>
+              <input
+                aria-label="最近 Run 保留数"
+                type="number"
+                min={0}
+                value={Number(cache.run_retention ?? 50)}
+                onChange={(event) => {
+                  setCache({
+                    ...cache,
+                    run_retention: Number(event.target.value),
+                  });
+                }}
+              />
+            </label>
+            <label className="form-field">
+              <span>运行与运维配置（JSON）</span>
+              <textarea
+                className="advanced-config"
+                aria-label="运行与运维配置（JSON）"
+                value={advanced}
+                onChange={(event) => {
+                  setAdvanced(event.target.value);
+                }}
+              />
+              <small>server.host / server.port 保存后需要重启服务。</small>
+            </label>
+          </section>
+        </div>
+        <footer className="modal-footer">
+          <p role="status">{message}</p>
+          <button
+            className="button secondary"
+            disabled={!selected}
+            onClick={() => {
+              void api<{ ok: boolean }>(`/settings/llm/${selected}/test`, {
+                method: "POST",
               })
-              .catch((reason: unknown) => {
-                setMessage(String(reason));
-              });
-          }}
-        >
-          测试连接
-        </button>
-        <p role="status">{message}</p>
+                .then(() => {
+                  setMessage("连接成功");
+                })
+                .catch((reason: unknown) => {
+                  setMessage(String(reason));
+                });
+            }}
+          >
+            <Icon name="trigger" />
+            测试连接
+          </button>
+          <button className="button primary" onClick={() => void save()}>
+            <Icon name="save" />
+            保存设置
+          </button>
+        </footer>
       </section>
     </div>
   );

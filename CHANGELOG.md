@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## [0.2.1] - 2026-11-05
+
+### Added
+
+- Add an original woven Weft logo, SVG favicon and a dependency-free interface icon system with categorized node icons.
+
+### Changed
+
+- Restyle the workflow editor with a Dify-inspired light workspace, refined node cards, dot-grid canvas and responsive three-column layout.
+- Unify parameter forms, run logs, history, chat, settings, port previews, audit trails, confirmations and change review with consistent spacing, states and accessible controls.
+- Cap the initial canvas fit at 100% zoom and preserve all existing workflow interactions and API contracts.
+
 ## [0.2.0] - 2026-11-05
 
 ### Changed

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { Icon } from "../components/Icon";
 
 interface ConfirmRequest {
   request_id: string;
@@ -54,22 +55,53 @@ export function ConfirmPanel({ runId }: { runId: string }) {
     }
   };
   return (
-    <section
-      role="alertdialog"
-      aria-label="工具调用确认"
-      className="confirm-card"
-    >
-      <h3>确认调用 {request.tool}</h3>
-      <textarea
-        aria-label="确认参数"
-        value={args}
-        onChange={(event) => {
-          setArgs(event.target.value);
-        }}
-      />
-      <button onClick={() => void decide("approve")}>批准</button>
-      <button onClick={() => void decide("reject")}>拒绝</button>
-      {error && <p role="alert">{error}</p>}
-    </section>
+    <div className="confirm-backdrop">
+      <section
+        role="alertdialog"
+        aria-label="工具调用确认"
+        className="confirm-card"
+      >
+        <header>
+          <span className="dialog-icon warning">
+            <Icon name="shield" />
+          </span>
+          <div>
+            <h3>确认调用 {request.tool}</h3>
+            <p>Agent 请求执行此工具，请核对参数后决定。</p>
+          </div>
+        </header>
+        <label className="form-field">
+          <span>调用参数（JSON）</span>
+          <textarea
+            aria-label="确认参数"
+            value={args}
+            onChange={(event) => {
+              setArgs(event.target.value);
+            }}
+          />
+        </label>
+        <footer>
+          <button
+            className="button secondary"
+            onClick={() => void decide("reject")}
+          >
+            <Icon name="close" />
+            拒绝
+          </button>
+          <button
+            className="button primary"
+            onClick={() => void decide("approve")}
+          >
+            <Icon name="check" />
+            批准
+          </button>
+        </footer>
+        {error && (
+          <p className="inline-error" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+    </div>
   );
 }

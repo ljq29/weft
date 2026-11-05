@@ -10,6 +10,7 @@ import {
 } from "@xyflow/react";
 import type { Connection, Edge, NodeChange } from "@xyflow/react";
 import { api } from "./api/client";
+import { Icon, nodeVisual } from "./components/Icon";
 import { AuditPanel } from "./panels/AuditPanel";
 import { WeftNode } from "./canvas/WeftNode";
 import { CanvasNote } from "./canvas/CanvasNote";
@@ -620,196 +621,327 @@ function Editor() {
 
   return (
     <main className="editor-shell">
-      <header className="toolbar">
-        <strong>Weft</strong>
-        <input
-          aria-label="工作流名称"
-          value={name}
-          onChange={(event) => {
-            setName(event.target.value);
-          }}
-        />
-        <input
-          aria-label="父目录"
-          value={parent}
-          onChange={(event) => {
-            setParent(event.target.value);
-          }}
-        />
-        <button onClick={() => void create()}>新建工作流</button>
-        <button onClick={() => void open()}>打开工作流</button>
-        <button onClick={() => void importWorkflow()}>导入工作流</button>
-        {store.document && (
-          <button onClick={() => void pack()}>打包工作流</button>
-        )}
-        <button
-          onClick={() => {
-            setSettingsOpen(true);
-          }}
-        >
-          设置
-        </button>
-        {store.document && (
+      <aside className="app-rail" aria-label="工作流工具">
+        <img className="brand-mark" src="/weft-mark.svg" alt="" />
+        <nav className="rail-nav" aria-label="工作流操作">
           <button
-            onClick={() => {
-              setChatOpen(true);
-            }}
+            className="rail-button"
+            aria-label="打开工作流"
+            data-tooltip="打开工作流"
+            onClick={() => void open()}
           >
-            聊天
+            <Icon name="open" />
           </button>
-        )}
-        {store.document && (
-          <span>
-            {store.document.name}
-            {store.dirty ? " *" : ""}
-          </span>
-        )}
-        {breadcrumbs.length > 0 && (
-          <nav aria-label="Metanode 面包屑">
-            {store.document?.name} &gt;{" "}
-            {breadcrumbs.map((item) => item.name).join(" > ")}
-            <button onClick={leaveMetanode}>返回上级</button>
-          </nav>
-        )}
-        {store.selected.length > 0 && (
-          <button onClick={collapse}>折叠为 Metanode</button>
-        )}
-        <button onClick={() => void save()}>保存</button>
-        <button onClick={() => void execute()}>运行</button>
-        {run.runId && (
           <button
-            onClick={() => {
-              void api(`/runs/${run.runId}/cancel`, { method: "POST" });
-            }}
+            className="rail-button"
+            aria-label="导入工作流"
+            data-tooltip="导入工作流"
+            onClick={() => void importWorkflow()}
           >
-            停止
+            <Icon name="import" />
           </button>
-        )}
-      </header>
-      {serverWarning && <div role="alert">{serverWarning}</div>}
-      {error && (
-        <div role="alert" className="error-banner">
-          {error}
-        </div>
-      )}
-      {pathIssues.length > 0 && (
-        <section aria-label="绝对路径警告">
-          {pathIssues.map((issue) => (
+          {store.document && (
             <button
-              key={`${issue.node_id}:${issue.param}`}
+              className="rail-button"
+              aria-label="打包工作流"
+              data-tooltip="打包工作流"
+              onClick={() => void pack()}
+            >
+              <Icon name="package" />
+            </button>
+          )}
+          {store.document && (
+            <button
+              className="rail-button"
+              aria-label="聊天"
+              data-tooltip="聊天"
               onClick={() => {
-                store.setSelected([issue.node_id]);
-                const node = store.nodes.find(
-                  (item) => item.id === issue.node_id,
-                );
-                if (node) void flow.fitView({ nodes: [node] });
+                setChatOpen(true);
               }}
             >
-              定位 {issue.node_id}.{issue.param}：{issue.value}
+              <Icon name="send" />
             </button>
-          ))}
-        </section>
-      )}
-      <div className="editor-body">
-        <NodePanel types={store.nodeTypes} onAdd={addAtCenter} />
-        <section className="canvas" aria-label="工作流画布">
-          <ReactFlow
-            nodes={displayNodes}
-            edges={store.edges}
-            nodeTypes={{ weft: WeftNode, note: CanvasNote }}
-            onPaneContextMenu={(event) => {
-              event.preventDefault();
-              store.addNote(
-                flow.screenToFlowPosition({
-                  x: event.clientX,
-                  y: event.clientY,
-                }),
-              );
+          )}
+        </nav>
+        <div className="rail-bottom">
+          <button
+            className="rail-button"
+            aria-label="设置"
+            data-tooltip="设置"
+            onClick={() => {
+              setSettingsOpen(true);
             }}
-            onNodesChange={(changes: NodeChange<FlowNode>[]) => {
-              store.moveNodes(applyNodeChanges(changes, store.nodes));
-            }}
-            onConnect={(connection) => void connect(connection)}
-            onNodeDoubleClick={(_, node) => {
-              enterMetanode(node);
-            }}
-            onNodeContextMenu={(event, node) => {
-              event.preventDefault();
-              setMenu({ nodeId: node.id, x: event.clientX, y: event.clientY });
-            }}
-            onSelectionChange={({ nodes }) => {
-              selectNodes(nodes);
-            }}
-            onMoveEnd={(_, value) => {
-              viewport.current = value;
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              const type = event.dataTransfer.getData("application/weft-node");
-              if (type)
-                store.addNode(
-                  type,
-                  flow.screenToFlowPosition({
+          >
+            <Icon name="settings" />
+          </button>
+        </div>
+      </aside>
+      <div className="app-shell">
+        <header className="toolbar">
+          <div className="brand-lockup">
+            <img src="/weft-logo.svg" alt="Weft" />
+            <span>LOCAL WORKFLOW</span>
+          </div>
+          <div className="workflow-create">
+            <label className="compact-field">
+              <span>名称</span>
+              <input
+                aria-label="工作流名称"
+                value={name}
+                onChange={(event) => {
+                  setName(event.target.value);
+                }}
+              />
+            </label>
+            <label className="compact-field parent-field">
+              <span>位置</span>
+              <input
+                aria-label="父目录"
+                value={parent}
+                onChange={(event) => {
+                  setParent(event.target.value);
+                }}
+              />
+            </label>
+            <button className="button secondary" onClick={() => void create()}>
+              <Icon name="plus" />
+              新建工作流
+            </button>
+          </div>
+          <div className="toolbar-actions">
+            {store.document && (
+              <span className="workflow-identity" title="当前工作流">
+                <Icon name="flow" />
+                <span>
+                  {store.document.name}
+                  {store.dirty ? " *" : ""}
+                </span>
+              </span>
+            )}
+            {breadcrumbs.length > 0 && (
+              <nav className="breadcrumbs" aria-label="Metanode 面包屑">
+                {store.document?.name} &gt;{" "}
+                {breadcrumbs.map((item) => item.name).join(" > ")}
+                <button className="text-button" onClick={leaveMetanode}>
+                  返回上级
+                </button>
+              </nav>
+            )}
+            {store.selected.length > 0 && (
+              <button
+                className="button ghost collapse-action"
+                onClick={collapse}
+              >
+                <Icon name="grid" />
+                折叠为 Metanode
+              </button>
+            )}
+            <button className="button secondary" onClick={() => void save()}>
+              <Icon name="save" />
+              保存
+            </button>
+            <button className="button primary" onClick={() => void execute()}>
+              <Icon name="play" />
+              运行
+            </button>
+            {run.runId && (
+              <button
+                className="button danger-subtle"
+                onClick={() => {
+                  void api(`/runs/${run.runId}/cancel`, { method: "POST" });
+                }}
+              >
+                <Icon name="stop" />
+                停止
+              </button>
+            )}
+          </div>
+        </header>
+        {serverWarning && (
+          <div className="error-banner" role="alert">
+            <Icon name="warn" />
+            {serverWarning}
+          </div>
+        )}
+        {error && (
+          <div className="error-banner" role="alert">
+            <Icon name="warn" />
+            <span>{error}</span>
+          </div>
+        )}
+        {pathIssues.length > 0 && (
+          <section className="path-issues" aria-label="绝对路径警告">
+            <Icon name="warn" />
+            <div>
+              {pathIssues.map((issue) => (
+                <button
+                  key={`${issue.node_id}:${issue.param}`}
+                  onClick={() => {
+                    store.setSelected([issue.node_id]);
+                    const node = store.nodes.find(
+                      (item) => item.id === issue.node_id,
+                    );
+                    if (node) void flow.fitView({ nodes: [node] });
+                  }}
+                >
+                  定位 {issue.node_id}.{issue.param}：{issue.value}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+        <div className="editor-body">
+          <NodePanel types={store.nodeTypes} onAdd={addAtCenter} />
+          <div className="canvas-column">
+            <section className="canvas" aria-label="工作流画布">
+              <div className="canvas-caption">
+                <span className="canvas-mode">
+                  <Icon name="flow" />
+                  设计
+                </span>
+                <span>右键画布添加便签</span>
+              </div>
+              <ReactFlow
+                nodes={displayNodes}
+                edges={store.edges}
+                nodeTypes={{ weft: WeftNode, note: CanvasNote }}
+                onPaneContextMenu={(event) => {
+                  event.preventDefault();
+                  store.addNote(
+                    flow.screenToFlowPosition({
+                      x: event.clientX,
+                      y: event.clientY,
+                    }),
+                  );
+                }}
+                onNodesChange={(changes: NodeChange<FlowNode>[]) => {
+                  store.moveNodes(applyNodeChanges(changes, store.nodes));
+                }}
+                onConnect={(connection) => void connect(connection)}
+                onNodeDoubleClick={(_, node) => {
+                  enterMetanode(node);
+                }}
+                onNodeContextMenu={(event, node) => {
+                  event.preventDefault();
+                  setMenu({
+                    nodeId: node.id,
                     x: event.clientX,
                     y: event.clientY,
-                  }),
-                );
-            }}
-            onDragOver={(event) => {
-              event.preventDefault();
-            }}
-            minZoom={0.25}
-            maxZoom={2}
-            fitView
-          >
-            <Background />
-            <MiniMap />
-            <Controls />
-          </ReactFlow>
-        </section>
-        <aside className="inspector">
-          {selectedNode && (
-            <SchemaForm
-              node={selectedNode.data}
-              declaration={nodeTypes.get(selectedNode.data.type)}
-              root={root}
-              columnHints={columnHints}
-              variables={variableNames}
-              onChange={(params) => {
-                store.updateParams(selectedNode.id, params);
-              }}
-              onCommentChange={(comment) => {
-                store.updateComment(selectedNode.id, comment);
-              }}
-            />
-          )}
-          {selectedNode?.data.type === "flow.trigger" && (
-            <TriggerStatusPanel
-              workflowId={store.document?.id ?? ""}
-              params={selectedNode.data.params}
-            />
-          )}
-          {selectedNode && (
-            <TracePanel entries={run.traces[selectedNode.id] ?? []} />
-          )}
-          {selectedNode && <AuditPanel runId={run.runId} />}
-          {selectedNode && run.runId && <ChangeReviewPanel runId={run.runId} />}
-          {selectedNode && Object.hasOwn(run.errors, selectedNode.id) && (
-            <pre className="error-details">
-              {JSON.stringify(run.errors[selectedNode.id], null, 2)}
-            </pre>
-          )}
-        </aside>
+                  });
+                }}
+                onSelectionChange={({ nodes }) => {
+                  selectNodes(nodes);
+                }}
+                onMoveEnd={(_, value) => {
+                  viewport.current = value;
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const type = event.dataTransfer.getData(
+                    "application/weft-node",
+                  );
+                  if (type)
+                    store.addNode(
+                      type,
+                      flow.screenToFlowPosition({
+                        x: event.clientX,
+                        y: event.clientY,
+                      }),
+                    );
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                }}
+                minZoom={0.25}
+                maxZoom={2}
+                fitView
+                fitViewOptions={{ maxZoom: 1 }}
+              >
+                <Background color="#d4d1dc" gap={18} size={1} />
+                <MiniMap />
+                <Controls />
+              </ReactFlow>
+            </section>
+            <LogPanel />
+            {store.document && (
+              <HistoryPanel
+                workflowId={store.document.id}
+                onPreview={(runId, nodeId, port) => {
+                  setPreview({ runId, nodeId, port });
+                }}
+              />
+            )}
+          </div>
+          <aside className="inspector">
+            <div className="inspector-heading">
+              {selectedNode ? (
+                <>
+                  <span
+                    className={`palette-icon ${nodeVisual(selectedNode.data.type).tone}`}
+                  >
+                    <Icon name={nodeVisual(selectedNode.data.type).icon} />
+                  </span>
+                  <div>
+                    <h2>{selectedNode.data.name}</h2>
+                    <span>{selectedNode.data.type}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="palette-icon flow">
+                    <Icon name="settings" />
+                  </span>
+                  <div>
+                    <h2>节点配置</h2>
+                    <span>检查器</span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="inspector-content">
+              {selectedNode ? (
+                <>
+                  <SchemaForm
+                    node={selectedNode.data}
+                    declaration={nodeTypes.get(selectedNode.data.type)}
+                    root={root}
+                    columnHints={columnHints}
+                    variables={variableNames}
+                    onChange={(params) => {
+                      store.updateParams(selectedNode.id, params);
+                    }}
+                    onCommentChange={(comment) => {
+                      store.updateComment(selectedNode.id, comment);
+                    }}
+                  />
+                  {selectedNode.data.type === "flow.trigger" && (
+                    <TriggerStatusPanel
+                      workflowId={store.document?.id ?? ""}
+                      params={selectedNode.data.params}
+                    />
+                  )}
+                  <TracePanel entries={run.traces[selectedNode.id] ?? []} />
+                  <AuditPanel runId={run.runId} />
+                  {run.runId && <ChangeReviewPanel runId={run.runId} />}
+                  {Object.hasOwn(run.errors, selectedNode.id) && (
+                    <pre className="error-details">
+                      {JSON.stringify(run.errors[selectedNode.id], null, 2)}
+                    </pre>
+                  )}
+                </>
+              ) : (
+                <div className="empty-state">
+                  <span className="empty-state-icon">
+                    <Icon name="flow" />
+                  </span>
+                  <h3>选择一个节点</h3>
+                  <p>查看并编辑节点参数、运行轨迹与审计信息。</p>
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
       </div>
-      <LogPanel />
-      {store.document && (
-        <HistoryPanel
-          workflowId={store.document.id}
-          onPreview={(runId, nodeId, port) => {
-            setPreview({ runId, nodeId, port });
-          }}
-        />
-      )}
       {menu && (
         <div className="context-menu" style={{ left: menu.x, top: menu.y }}>
           <button

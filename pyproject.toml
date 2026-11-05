@@ -1,13 +1,13 @@
 [project]
 name = "weft-monorepo"
-version = "0.2.0"
+version = "0.2.1"
 description = "Development workspace for Weft"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-  "weft==0.2.0",
-  "weft-worker==0.2.0",
-  "weft-sdk==0.2.0",
+  "weft==0.2.1",
+  "weft-worker==0.2.1",
+  "weft-sdk==0.2.1",
 ]
 
 [dependency-groups]

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { tableFromIPC } from "apache-arrow";
 import { sessionToken } from "../api/client";
+import { Icon } from "../components/Icon";
 
 interface Row {
   values: unknown[];
@@ -83,70 +84,127 @@ export function PortView({
   }, [workflowId, runId, nodeId, port, offset, sortBy, descending]);
   return (
     <div className="modal-backdrop" role="dialog" aria-label="端口预览">
-      <section className="port-view">
-        <button onClick={onClose}>关闭</button>
-        <button
-          disabled={offset === 0}
-          onClick={() => {
-            setOffset(Math.max(0, offset - 100));
-          }}
-        >
-          上一页
-        </button>
-        <button
-          disabled={offset + 100 >= total}
-          onClick={() => {
-            setOffset(offset + 100);
-          }}
-        >
-          下一页
-        </button>
-        <span>共 {total} 行，每页 100 行</span>
-        {error && <p role="alert">{error}</p>}
-        {jsonValue && <pre>{JSON.stringify(jsonValue.value, null, 2)}</pre>}
+      <section className="modal port-view">
+        <header className="modal-header">
+          <div>
+            <span className="dialog-icon">
+              <Icon name="table" />
+            </span>
+            <div>
+              <h2>端口预览</h2>
+              <p>
+                {nodeId} · {port} · 只读数据快照
+              </p>
+            </div>
+          </div>
+          <button className="icon-button" aria-label="关闭" onClick={onClose}>
+            <Icon name="close" />
+          </button>
+        </header>
+        <div className="table-meta">
+          <span>
+            <strong>{total}</strong> 行
+          </span>
+          <span>每页 100 行</span>
+          {sortBy && (
+            <span className="tag neutral">
+              按 {sortBy} {descending ? "降序" : "升序"}
+            </span>
+          )}
+        </div>
+        {error && (
+          <p className="inline-error" role="alert">
+            {error}
+          </p>
+        )}
+        {jsonValue && (
+          <pre className="json-preview">
+            {JSON.stringify(jsonValue.value, null, 2)}
+          </pre>
+        )}
         {!jsonValue && (
-          <table>
-            <thead>
-              <tr>
-                {columns.map((column) => (
-                  <th key={column}>
-                    <button
-                      onClick={() => {
-                        if (sortBy === column) setDescending(!descending);
-                        else {
-                          setSortBy(column);
-                          setDescending(false);
-                        }
-                        setOffset(0);
-                      }}
-                    >
-                      {column}
-                    </button>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={index}>
-                  {row.values.map((value, cell) => (
-                    <td key={cell}>
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  {columns.map((column) => (
+                    <th key={column}>
                       <button
+                        className="sort-button"
                         onClick={() => {
-                          void navigator.clipboard.writeText(
-                            formatValue(value),
-                          );
+                          if (sortBy === column) setDescending(!descending);
+                          else {
+                            setSortBy(column);
+                            setDescending(false);
+                          }
+                          setOffset(0);
                         }}
                       >
-                        {formatValue(value)}
+                        {column}
+                        {sortBy === column && (
+                          <Icon
+                            name="down"
+                            className={descending ? "rotated" : ""}
+                          />
+                        )}
                       </button>
-                    </td>
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((row, index) => (
+                  <tr key={index}>
+                    {row.values.map((value, cell) => (
+                      <td key={cell}>
+                        <button
+                          className="cell-value"
+                          title="点击复制"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(
+                              formatValue(value),
+                            );
+                          }}
+                        >
+                          {formatValue(value)}
+                        </button>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {rows.length === 0 && !error && (
+              <div className="bottom-empty">暂无可预览数据</div>
+            )}
+          </div>
         )}
+        <footer className="modal-footer">
+          <span>
+            显示 {total === 0 ? 0 : offset + 1}–{Math.min(offset + 100, total)}
+            ，共 {total} 行
+          </span>
+          <div>
+            <button
+              className="button secondary"
+              disabled={offset === 0}
+              onClick={() => {
+                setOffset(Math.max(0, offset - 100));
+              }}
+            >
+              上一页
+            </button>
+            <button
+              className="button secondary"
+              disabled={offset + 100 >= total}
+              onClick={() => {
+                setOffset(offset + 100);
+              }}
+            >
+              下一页
+            </button>
+          </div>
+        </footer>
       </section>
     </div>
   );

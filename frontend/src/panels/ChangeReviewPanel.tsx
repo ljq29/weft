@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client";
+import { Icon } from "../components/Icon";
 
 interface Change {
   path: string;
@@ -52,25 +53,35 @@ export function ChangeReviewPanel({ runId }: { runId: string }) {
   const group = (external: boolean) =>
     changes.filter((change) => (change.rel_root === null) === external);
   return (
-    <section aria-label="变更审批">
+    <section className="inspector-section" aria-label="变更审批">
       <button
+        className="section-toggle"
         onClick={() => {
-          setOpen(true);
-          void load().catch((reason: unknown) => {
-            setNotice(String(reason));
-          });
+          setOpen(!open);
+          if (!open)
+            void load().catch((reason: unknown) => {
+              setNotice(String(reason));
+            });
         }}
       >
-        变更审批
+        <span>
+          <Icon name="shield" />
+          变更审批
+        </span>
+        <Icon name="down" className={open ? "rotated" : ""} />
       </button>
       {open && (
-        <div>
-          {!complete && <p role="alert">审计不完整</p>}
+        <div className="section-content change-review">
+          {!complete && (
+            <p className="inline-error" role="alert">
+              审计不完整
+            </p>
+          )}
           {[false, true].map((external) => (
-            <section key={String(external)}>
+            <section className="change-group" key={String(external)}>
               <h4>{external ? "Root 外" : "Root 内"}</h4>
               {group(external).map((change) => (
-                <div key={change.path}>
+                <div className="change-item" key={change.path}>
                   <input
                     type="checkbox"
                     aria-label={`选择 ${change.path}`}
@@ -84,11 +95,20 @@ export function ChangeReviewPanel({ runId }: { runId: string }) {
                       );
                     }}
                   />
-                  <span>
-                    {change.kind} {change.path}（{change.size} 字节，
-                    {change.state}）
+                  <span className="change-icon">
+                    <Icon name="file" />
                   </span>
+                  <div>
+                    <strong>{change.path}</strong>
+                    <small>
+                      {change.kind} · {change.size} 字节 · {change.state}
+                    </small>
+                    {change.error && (
+                      <small className="field-error">{change.error}</small>
+                    )}
+                  </div>
                   <button
+                    className="text-button"
                     onClick={() => {
                       void api<{ diff: string }>(
                         `/runs/${runId}/changes/diff?path=${encodeURIComponent(change.path)}`,
@@ -99,31 +119,45 @@ export function ChangeReviewPanel({ runId }: { runId: string }) {
                   >
                     查看 diff
                   </button>
-                  {change.error && <span>{change.error}</span>}
                 </div>
               ))}
             </section>
           ))}
-          <pre>{diff}</pre>
-          <button disabled={!selected.length} onClick={() => void apply(false)}>
-            应用所选
-          </button>
-          <button disabled={!selected.length} onClick={() => void apply(true)}>
-            显式覆盖冲突
-          </button>
-          <button
-            onClick={() => {
-              void api(`/runs/${runId}/changes/discard`, {
-                method: "POST",
-                body: JSON.stringify({
-                  paths: selected.length ? selected : null,
-                }),
-              }).then(() => load());
-            }}
-          >
-            丢弃变更
-          </button>
-          <p role="status">{notice}</p>
+          {diff && <pre className="diff-preview">{diff}</pre>}
+          <div className="change-actions">
+            <button
+              className="button primary"
+              disabled={!selected.length}
+              onClick={() => void apply(false)}
+            >
+              <Icon name="check" />
+              应用所选
+            </button>
+            <button
+              className="button secondary"
+              disabled={!selected.length}
+              onClick={() => void apply(true)}
+            >
+              显式覆盖冲突
+            </button>
+            <button
+              className="button ghost danger-text"
+              onClick={() => {
+                void api(`/runs/${runId}/changes/discard`, {
+                  method: "POST",
+                  body: JSON.stringify({
+                    paths: selected.length ? selected : null,
+                  }),
+                }).then(() => load());
+              }}
+            >
+              <Icon name="trash" />
+              丢弃变更
+            </button>
+          </div>
+          <p className="section-notice" role="status">
+            {notice}
+          </p>
         </div>
       )}
     </section>

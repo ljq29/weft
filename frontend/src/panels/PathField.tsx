@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client";
+import { Icon } from "../components/Icon";
 
 interface Entry {
   name: string;
@@ -37,17 +38,24 @@ export function PathField({
   };
   const isAbsolute = /^[a-zA-Z]:[\\/]/.test(value) || value.startsWith("/");
   return (
-    <>
-      <input
-        aria-label={label}
-        value={value}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      />
-      <button type="button" onClick={() => void browse()}>
-        选择路径
-      </button>
+    <div className="path-field">
+      <div className="path-input-row">
+        <input
+          aria-label={label}
+          value={value}
+          onChange={(event) => {
+            onChange(event.target.value);
+          }}
+        />
+        <button
+          className="button ghost"
+          type="button"
+          onClick={() => void browse()}
+        >
+          <Icon name="folder" />
+          选择路径
+        </button>
+      </div>
       {entries.length > 0 && (
         <select
           aria-label={`${label}候选项`}
@@ -63,7 +71,7 @@ export function PathField({
           ))}
         </select>
       )}
-      {isAbsolute && <small>绝对路径不可移植</small>}
-    </>
+      {isAbsolute && <small className="field-warning">绝对路径不可移植</small>}
+    </div>
   );
 }
