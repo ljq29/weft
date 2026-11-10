@@ -178,6 +178,26 @@ def test_run_freezes_graph_params_manifest_and_outputs(tmp_path: Path) -> None:
     asyncio.run(scenario())
 
 
+def test_finished_event_contains_immutable_output_references(tmp_path: Path) -> None:
+    """US-EXE-05/AC-6: the current Run receives previewable output references immediately."""
+    engine = Engine()
+    events: list[dict] = []
+    engine.event_sink = events.append
+    document = workflow([node("n_00000001", "flow.trigger"), node("n_00000002", "user.timed", 7)])
+
+    record = asyncio.run(engine.run(engine.prepare(document, tmp_path, registry())))
+
+    assert record.status == "succeeded"
+    finished = next(
+        event
+        for event in events
+        if event["event"] == "node.finished" and event["node_id"] == "n_00000002"
+    )
+    assert finished["data"]["from_cache"] is False
+    assert finished["data"]["outputs"]["out"]["kind"] == "json"
+    assert finished["data"]["outputs"]["out"]["inline"] == {"value": 7}
+
+
 def test_branch_skip_and_merge_reach_terminal_states(tmp_path: Path) -> None:
     """T1.4: inactive branches skip while Merge executes once with one successful input."""
 

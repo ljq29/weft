@@ -25,6 +25,7 @@ import { LogPanel } from "./panels/LogPanel";
 import { PortView } from "./panels/PortView";
 import { NodePanel } from "./panels/NodePanel";
 import { SchemaForm } from "./panels/SchemaForm";
+import { UpstreamOutputPicker } from "./panels/UpstreamOutputPicker";
 import { SettingsPanel } from "./panels/SettingsPanel";
 import { TracePanel } from "./panels/TracePanel";
 import { ChatPanel } from "./panels/ChatPanel";
@@ -616,7 +617,11 @@ function Editor() {
                 <Controls />
               </ReactFlow>
             </section>
-            <LogPanel />
+            <LogPanel
+              onPreview={(nodeId, port) => {
+                if (run.runId) openPreview({ runId: run.runId, nodeId, port });
+              }}
+            />
             {store.document && (
               <HistoryPanel
                 workflowId={store.document.id}
@@ -655,6 +660,29 @@ function Editor() {
             <div className="inspector-content">
               {selectedNode ? (
                 <>
+                  <div className="node-test-action">
+                    <button
+                      className="button secondary"
+                      onClick={() =>
+                        void execute({
+                          kind: "to_node",
+                          node_id: selectedNode.id,
+                        })
+                      }
+                    >
+                      <Icon name="play" />
+                      测试到此
+                    </button>
+                    <span>复用有效 pure 缓存，执行到当前节点。</span>
+                  </div>
+                  {selectedNode.data.inputs.length > 0 && (
+                    <UpstreamOutputPicker
+                      target={selectedNode}
+                      nodes={store.nodes}
+                      edges={store.edges}
+                      onConnect={connect}
+                    />
+                  )}
                   <SchemaForm
                     node={selectedNode.data}
                     declaration={nodeTypes.get(selectedNode.data.type)}

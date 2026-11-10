@@ -108,6 +108,16 @@ def run_doctor(cleanup: bool = False, settings: SettingsStore | None = None) -> 
             _check(checks, "excel", "FAIL", str(exception))
     else:
         _check(checks, "excel", "WARN", "Windows 以外的平台不提供真实 Excel")
+    if os.name == "nt":
+        from weft.desktop import webview2_version
+
+        runtime = webview2_version()
+        _check(
+            checks,
+            "webview2",
+            "OK" if runtime else "WARN",
+            f"WebView2 Runtime {runtime}" if runtime else "未找到 WebView2；--gui 不可用",
+        )
     start = Path(config["sandbox"]["sandboxie"]["start_exe"])
     if os.name != "nt":
         _check(checks, "sandboxie", "WARN", "Sandboxie 仅支持 Windows")

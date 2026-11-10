@@ -43,7 +43,7 @@
 
 **名称**：Weft（纬线）。经线是固定的数据与 Excel，纬线（工作流）穿梭其间织出结果。CLI `weft`，Python 包 `weft`，工作流目录后缀 `.weft`。正式发布前需核查 PyPI 与商标。
 
-**产品形态（v1）** ：本机运行的 Python 服务 + 浏览器访问的 Web UI。为桌面壳（Tauri / pywebview）预留，但 v1 不做。
+**产品形态（v1）** ：本机运行的 Python 服务 + 同源 Web UI；默认使用浏览器，也可通过 `weft serve --gui` 在 Microsoft Edge WebView2 桌面窗口中打开。桌面窗口只是 UI 承载方式，不另建业务进程或数据通道。
 
 ---
 
@@ -284,9 +284,9 @@
 |ID|需求|优先级|
 | ----------| ---------------------------------------------------------------------------------| --------|
 |F-SET-01|用户级设置文件（`%APPDATA%/weft/config.toml`）：LLM 配置、Sandboxie 路径、默认 Excel 策略、监听端口|P0|
-|F-SET-02|服务默认 `127.0.0.1:7788`，启动后自动打开浏览器；可配置|P0|
+|F-SET-02|服务默认 `127.0.0.1:7788`，启动后自动打开浏览器；`--gui` 使用 WebView2 桌面窗口；可配置|P0|
 |F-SET-03|结构化日志（服务日志 + 每个 Run 的日志），保留策略可配|P0|
-|F-SET-04|CLI：`weft serve` / `weft run` / `weft pack` / `weft unpack` / `weft doctor`（环境检测：Python、uv、Excel、Sandboxie）|P0|
+|F-SET-04|CLI：`weft serve` / `weft run` / `weft pack` / `weft unpack` / `weft doctor`（环境检测：Python、uv、Excel、Sandboxie、WebView2）|P0|
 |F-SET-05|系统托盘图标（显示状态、打开 UI、退出）|P2|
 |F-SET-06|提供 Windows 轻量目录版：内置 CMD 启动器、uv、生产依赖锁与同版本本地 wheel；首次启动自动下载托管 CPython 和锁定依赖，无需宿主 Python/uv，支持国内镜像及缓存离线运行|P1|
 
@@ -302,7 +302,6 @@
 |云同步、工作流市场|不在视野内|
 |agent 修改工作流图|安全与可控性优先，v1 禁止|
 |Excel 侧事件触发 / Ribbon（xlOil）|v2 伴侣插件|
-|桌面壳（Tauri / pywebview）|绿色目录版仍采用浏览器访问，v1 不额外维护桌面壳|
 |本地模型推理|走 OpenAI 兼容网关（NewAPI / Ollama 的兼容端点）即可，不内置推理|
 |超内存数据处理|v1 只支持可放入内存的数据；Polars lazy 不等于超内存执行能力，GB 级流式/分布式另行评估|
 |Rust 实现引擎|见决策 D-01|
@@ -319,6 +318,7 @@
 - **Sandboxie 边界**：沙箱内进程无法访问主机 COM；写入重定向到 `C:\Sandbox\<user>\<box>\`。
 - **Sandboxie-Plus 为 GPL**：仅以外部进程方式调用 `Start.exe`，不链接、不分发其代码。
 - **pi 为外部依赖**：以子进程调用，要求用户自行安装（Node.js 环境）；Weft 不捆绑。
+- **WebView2 为可选 GUI 运行时**：`--gui` 仅允许环回服务地址；pywebview 使用 `edgechromium`，窗口关闭后停止本服务，Runtime 缺失不影响浏览器模式。
 - **执行环境隔离**：工作流代码运行在工作流自己的 venv 中；Weft 本体运行在自己的环境中；两者通过子进程/IPC 通信（见 `03-architecture.md`）。
 
 ### 9.2 环境假设
@@ -326,7 +326,7 @@
 - Windows 10/11 64 位，桌面版 Excel 2016+（Microsoft 365）。
 - Python 3.12+、uv 已安装（`weft doctor` 检测）。
 - 用户拥有 OpenAI 兼容 API 的访问凭据。
-- 可选：Sandboxie-Plus、pi coding agent、Node.js。
+- 可选：Sandboxie-Plus、pi coding agent、Node.js；`--gui` 另需 Microsoft Edge WebView2 Runtime。
 
 ### 9.3 性能基准目标
 
@@ -355,7 +355,7 @@
 |D-07|双车道模型：确定性节点在主机，agent 自由工具在沙箱|全部沙箱 / 全部主机|全沙箱则 Excel 不可用；全主机则 agent 风险不可控；Excel 仅经授权 NodeTool；LLM 请求由沙箱外代理签发|
 |D-08|工作流 = 自包含目录，路径默认相对 Root，绝对路径显式声明|中央数据库|KNIME 验证过的模式；zip 即打包；git 友好；外部资源在跨机运行前预检|
 |D-09|环境管理用 uv|pip/venv、conda|可管解释器 + lock；接收方只需 uv 一个二进制|
-|D-10|v1 浏览器访问，不做桌面壳|Electron/Tauri|开发快；后续套 pywebview/Tauri 成本低|
+|D-10|默认浏览器，提供 pywebview + WebView2 可选桌面窗口|Electron/Tauri、自写 C# 壳|复用同一 SPA 与本地服务，Windows 用户无需访问外部网站；不引入第二套 UI、Rust/.NET 工程或独立业务进程|
 |D-11|默认 attach 用户可见 Excel 实例|默认隐藏实例|用户核心诉求是"实时联动、同时操作"；隐藏实例作为可选项|
 |D-12|agent 不能修改工作流图|允许|v1 以可控为先|
 |D-13|模型仅 OpenAI 兼容 API|多厂商 SDK|用户通过 NewAPI 等网关统一；减少适配|

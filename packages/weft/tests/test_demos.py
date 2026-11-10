@@ -42,9 +42,9 @@ def test_builtin_demos_create_independent_valid_workflows_and_zip_packages(
             names = archive.namelist()
             assert f"{root.name}/workflow.json" in names
             assert f"{root.name}/uv.lock" in names
-            assert f"{root.name}/vendor/weft_worker-0.4.0-py3-none-any.whl" in names
+            assert f"{root.name}/vendor/weft_worker-0.5.0-py3-none-any.whl" in names
             lock = archive.read(f"{root.name}/uv.lock").decode("utf-8")
-            assert 'source = { path = "vendor/weft_worker-0.4.0-py3-none-any.whl" }' in lock
+            assert 'source = { path = "vendor/weft_worker-0.5.0-py3-none-any.whl" }' in lock
             assert tmp_path.as_posix() not in lock
             assert not any("/.runs/" in name or "/.venv/" in name for name in names)
         if demo.id == "csv-sales":

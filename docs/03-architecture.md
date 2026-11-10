@@ -19,7 +19,7 @@
 
 ```
 ┌─────────────────────────── 用户机器（Windows，登录会话） ───────────────────────────┐
-│  浏览器 (React + React Flow) ── HTTP / WebSocket (127.0.0.1:7788)                  │
+│  浏览器或 WebView2 (React) ── HTTP / WebSocket (127.0.0.1:7788)                    │
 │                                      ▼                                             │
 │  ┌──────────────────── weft 服务进程（Weft 自带环境） ────────────────────┐          │
 │  │ FastAPI / WorkflowStore / Engine / TriggerManager                     │          │
@@ -48,6 +48,7 @@
 - **四类子进程**：Workflow Worker（可信车道的节点执行）、沙箱内进程（非可信车道）、ExcelWorker（独立 STA 执行与故障隔离）、Excel（被驱动的外部程序）。
 - **ExcelWorker 由服务监督但独立于服务进程和 Workflow Worker**——理由见 §5.2。
 - 服务进程必须以登录用户普通进程运行（PRD §9.1），不能是 Windows 服务。
+- `weft serve --gui` 通过 pywebview 的 `edgechromium` 后端打开 WebView2。Uvicorn 在该进程的守护线程运行，窗口关闭后将 `should_exit` 置位并执行正常 lifespan 收尾；GUI 只允许环回地址，沿用同源 SPA、会话令牌、REST/WS 与所有安全边界。浏览器和 GUI 模式均关闭 Uvicorn access log，避免启动 URL 中的会话令牌进入日志。
 
 ### 1.2 代码分层（服务进程内）
 
@@ -62,7 +63,8 @@ weft/
 ├── sandbox/        # Sandbox 接口、NoneSandbox、SandboxieSandbox、变更收集
 ├── triggers/       # TriggerManager 与 5 种触发源；从 Trigger params 派生运行视图
 ├── workflow/       # workflow.json 模型、校验、revision/CAS、迁移、打包
-└── cli/            # weft serve/run/pack/unpack/doctor
+├── desktop.py      # 可选 WebView2 窗口、环回限制与服务线程收尾
+└── cli.py          # weft serve/run/pack/unpack/doctor
 
 packages/weft-worker/  # 独立包：Worker 入口、RPC、可信 Worker 内置节点实现
 packages/weft-sdk/     # weft_ctx 与声明协议，不依赖主包/Worker
@@ -512,5 +514,4 @@ PRD D-01..D-13 之外，本文新增：
 
 - **Runner**：Workflow Worker 协议不变，传输从 stdio 换为 WebSocket + 文件上传；`ValueRef` 已含内容哈希可做增量传输。
 - **xlOil 伴侣插件**：触发事件结构已含 `source: excel`；插件经 HTTP 触发端点回调。
-- **桌面壳**：pywebview/Tauri 包一层，服务进程不变。
 - **PyO3 引擎热点替换**：调度器与缓存键计算是纯函数，接口稳定后可逐个替换。  

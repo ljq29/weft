@@ -338,8 +338,18 @@ P0 仍表示完整 v1 必须交付，但不等于首个公开版全交付。**M0
 【产出】样式按 base/layout/canvas/panels/overlays 拆分并保留设计令牌；补 WS、401、409 与 Dialog 键盘故障路径 E2E
 【验收】US-SET-02/AC-2；US-EXE-05/AC-3；US-SBX-09/AC-4,5；100% 缩放与全量 E2E 通过
 
+- [x] **T7.23 WebView2 桌面窗口**
+【依赖】T7.9
+【产出】`weft serve --gui` 使用 pywebview edgechromium 承载同源 UI；仅允许本机地址，关闭窗口停止本服务；doctor 报告 WebView2 Runtime；便携依赖锁定
+【验收】US-SET-02/AC-4；US-SET-04/AC-2；单元测试与 Windows 真实窗口启动/关闭通过
+
+- [x] **T7.24 Windmill 式调试与结果工作区**
+【依赖】T7.22
+【产出】声明驱动的候选上游输出选择器、检查器“测试到此”、当前运行日志/输出视图；node.finished 携带 Run 已物化 ValueRef；保留后端校验与 REST baseline
+【验收】US-DES-03/AC-7；US-EXE-02/AC-1；US-EXE-05/AC-6；前端单元、API/WS 契约与真实浏览器执行通过
+
 - [ ] **T7.10 完整 v1 发布**
-【依赖】T7.1..T7.9、T7.11..T7.22
+【依赖】T7.1..T7.9、T7.11..T7.24
 【产出】README/安装文档/CHANGELOG、三个 wheel 与 CMD 启动器轻量 ZIP 的正式构建与发布；版本号发布前确定，不预写 0.1.0
 【验收】全量 CI 与 win_real 绿、同机性能回归通过、PRD 成功标准启动跟踪
 

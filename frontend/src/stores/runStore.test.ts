@@ -6,7 +6,7 @@ describe("T2.3 execution visualization", () => {
     useRunStore.getState().reset();
   });
 
-  it("US-DES-05/AC-1,2, US-EXE-05/AC-4: applies node status, errors and grouped logs", () => {
+  it("US-DES-05/AC-1,2, US-EXE-05/AC-4,6: applies node status, output references and grouped logs", () => {
     useRunStore.getState().started("r_1");
     useRunStore
       .getState()
@@ -14,9 +14,19 @@ describe("T2.3 execution visualization", () => {
     expect(useRunStore.getState().statuses.n_1).toBe("running");
     useRunStore.getState().apply({
       event: "node.finished",
-      data: { node_id: "n_1", from_cache: true },
+      data: {
+        node_id: "n_1",
+        from_cache: true,
+        outputs: {
+          out: { kind: "table", path: "out.arrow", rows: 3, cols: 2 },
+        },
+      },
     });
     expect(useRunStore.getState().statuses.n_1).toBe("executed");
+    expect(useRunStore.getState().outputs.n_1.out).toMatchObject({
+      kind: "table",
+      rows: 3,
+    });
     useRunStore.getState().apply({
       event: "node.log",
       data: { node_id: "n_1", level: "INFO", message: "done" },
@@ -38,9 +48,17 @@ describe("T2.3 execution visualization", () => {
     expect(useRunStore.getState().errors.n_2.traceback).toBe("trace");
   });
 
-  it("US-EXE-05/AC-3: restores final node state from a REST snapshot after reconnect", () => {
-    useRunStore.getState().snapshot({ nodes: { n_1: { status: "executed" } } });
+  it("US-EXE-05/AC-3,6: restores final node state and outputs from a REST snapshot", () => {
+    useRunStore.getState().snapshot({
+      nodes: {
+        n_1: {
+          status: "executed",
+          outputs: { out: { kind: "json", inline: { value: 7 } } },
+        },
+      },
+    });
     expect(useRunStore.getState().statuses.n_1).toBe("executed");
+    expect(useRunStore.getState().outputs.n_1.out.inline).toEqual({ value: 7 });
   });
 
   it("US-EXE-05/AC-3, US-AGT-12/AC-2: restores logs and unresolved confirmations from a run baseline", () => {

@@ -41,7 +41,7 @@ async function saveDocument(id: string, document: any) {
   }
 }
 
-test("US-EXE-01/AC-1, US-EXE-05/AC-4, US-EXE-06/AC-1,4,5: run and preview CSV in browser", async ({
+test("US-DES-03/AC-7, US-EXE-01/AC-1, US-EXE-02/AC-1, US-EXE-05/AC-4,6, US-EXE-06/AC-1,4,5: run and preview CSV in browser", async ({
   page,
 }, testInfo) => {
   page.on("response", (response) => {
@@ -129,6 +129,18 @@ test("US-EXE-01/AC-1, US-EXE-05/AC-4, US-EXE-06/AC-1,4,5: run and preview CSV in
   await dialog.getByRole("button", { name: "打开", exact: true }).click();
   await opened;
   await expect(page.locator(".weft-node")).toHaveCount(5);
+  await page.locator(".weft-node").filter({ hasText: "Row Filter" }).click();
+  await expect(page.getByRole("button", { name: "测试到此" })).toBeVisible();
+  await expect(page.getByLabel("输入 in", { exact: true })).toHaveValue(
+    "n_00000002:out",
+  );
+  await page.getByRole("button", { name: "测试到此" }).click();
+  await expect(page.locator(".status-executed")).toHaveCount(2, {
+    timeout: 30_000,
+  });
+  await expect(
+    page.locator(".weft-node").filter({ hasText: "Write CSV" }),
+  ).not.toHaveClass(/status-executed/);
   await page.getByRole("button", { name: "运行", exact: true }).click();
   await expect(page.locator(".status-executed")).toHaveCount(5, {
     timeout: 30_000,
@@ -142,5 +154,17 @@ test("US-EXE-01/AC-1, US-EXE-05/AC-4, US-EXE-06/AC-1,4,5: run and preview CSV in
   await expect(page.getByRole("dialog", { name: "端口预览" })).toBeVisible();
   await expect(page.getByRole("dialog")).toContainText("共 3 行");
   await expect(page.getByRole("dialog")).toContainText("amount");
+  await page.getByRole("button", { name: "关闭", exact: true }).click();
   await expect(page.getByLabel("执行日志")).toBeVisible();
+  await page.getByRole("button", { name: /^输出 \d+$/ }).click();
+  const outputs = page.getByLabel("当前运行输出");
+  await expect(outputs).toContainText("Read CSV");
+  await expect(outputs).toContainText("3 行 × 1 列");
+  await outputs
+    .locator(".run-output-item")
+    .filter({ hasText: "Read CSV" })
+    .click();
+  await expect(page.getByRole("dialog", { name: "端口预览" })).toContainText(
+    "共 3 行",
+  );
 });

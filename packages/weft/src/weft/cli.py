@@ -156,7 +156,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     serve = subparsers.add_parser("serve", help="start the local service")
     serve.add_argument("--host")
     serve.add_argument("--port", type=int)
-    serve.add_argument("--no-browser", action="store_true")
+    ui_mode = serve.add_mutually_exclusive_group()
+    ui_mode.add_argument("--no-browser", action="store_true")
+    ui_mode.add_argument("--gui", action="store_true", help="open the UI in WebView2")
     serve.add_argument("--no-triggers", action="store_true")
     serve.add_argument("--json", action="store_true")
     pack = subparsers.add_parser("pack", help="pack a portable workflow")
@@ -198,10 +200,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         application = create_app(host=host, port=port, enable_triggers=not args.no_triggers)
         if args.json:
             print(json.dumps({"status": "started", "host": host, "port": port}))
+        if args.gui:
+            from weft.desktop import DesktopError, run_webview2
+
+            try:
+                run_webview2(application, host, port, application.state.session.token)
+            except (DesktopError, OSError) as exception:
+                print(f"GUI 启动失败：{exception}")
+                return 1
+            return 0
         if not args.no_browser:
             webbrowser.open(f"http://{host}:{port}/?token={application.state.session.token}")
         try:
-            uvicorn.run(application, host=host, port=port)
+            uvicorn.run(application, host=host, port=port, access_log=False)
         except OSError as exception:
             print(f"服务启动失败：{exception}；请使用 --port")
             return 1

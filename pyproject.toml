@@ -1,13 +1,13 @@
 [project]
 name = "weft-monorepo"
-version = "0.4.0"
+version = "0.5.0"
 description = "Development workspace for Weft"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-  "weft==0.4.0",
-  "weft-worker==0.4.0",
-  "weft-sdk==0.4.0",
+  "weft==0.5.0",
+  "weft-worker==0.5.0",
+  "weft-sdk==0.5.0",
 ]
 
 [dependency-groups]
@@ -61,7 +61,7 @@ python_version = "3.12"
 packages = ["weft", "weft_worker", "weft_sdk"]
 
 [[tool.mypy.overrides]]
-module = ["pyarrow", "simpleeval", "apscheduler.*", "watchdog.*"]
+module = ["pyarrow", "simpleeval", "apscheduler.*", "watchdog.*", "webview"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

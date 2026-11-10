@@ -880,3 +880,116 @@
 .cell-value:hover {
   color: var(--primary);
 }
+
+.node-test-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+.node-test-action > span {
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
+.upstream-picker {
+  margin: 0 var(--space-4);
+  padding: var(--space-4) 0 var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+.upstream-picker > h3 {
+  margin-bottom: var(--space-1);
+  color: var(--ink-soft);
+  font-size: var(--font-size-xs);
+  font-weight: 650;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+.upstream-picker > p {
+  margin-bottom: var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+}
+.upstream-picker select {
+  width: 100%;
+  min-height: var(--control-height-md);
+  padding: 6px var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--font-size-md);
+}
+.run-view-tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: var(--space-2);
+}
+.run-view-tabs > button {
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+}
+.run-view-tabs > button[aria-pressed="true"] {
+  background: var(--surface-hover);
+  color: var(--primary);
+}
+.run-output-list {
+  height: calc(100% - var(--control-height-lg));
+  overflow: auto;
+  padding: var(--space-1) 0;
+}
+.run-output-item {
+  width: 100%;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 1fr) minmax(80px, 0.5fr) minmax(130px, 0.6fr)
+    16px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 4px var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--line-subtle);
+  background: transparent;
+  color: var(--ink-soft);
+  text-align: left;
+}
+.run-output-item:hover {
+  background: var(--log-hover);
+}
+.run-output-item > span:first-child {
+  min-width: 0;
+}
+.run-output-item strong,
+.run-output-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-output-item strong {
+  font-size: var(--font-size-sm);
+}
+.run-output-item small,
+.run-output-kind {
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+}
+.run-output-port {
+  color: var(--primary);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: var(--font-size-xs);
+}
+.run-output-item > .app-icon {
+  width: 12px;
+  height: 12px;
+  color: var(--muted);
+}

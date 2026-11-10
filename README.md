@@ -10,6 +10,7 @@ Weft 是本地优先的可视化工作流工具：以 KNIME 式表格数据流�
 
 ```bat
 weft.cmd serve
+weft.cmd serve --gui
 weft.cmd --china serve
 weft.cmd --offline serve
 weft.cmd --repair serve
@@ -42,6 +43,8 @@ uv run weft serve
 ```
 
 服务默认仅监听 `127.0.0.1:7788`，自动打开带随机会话令牌的同源 URL。令牌同时保存在仅当前用户可读的会话文件中；不要分享该 URL 或会话文件。
+
+需要桌面窗口时使用 `weft serve --gui`（便携版为 `weft.cmd serve --gui`）。该模式通过 pywebview 调用 Microsoft Edge WebView2 Runtime，打开同一套 UI；关闭窗口会停止本次服务。`--gui` 仅允许环回地址，不改变 REST/WS、鉴权或工作流执行语义。WebView2 Runtime 缺失时可先使用浏览器模式，并通过 `weft doctor` 检查。
 
 常用 CLI：
 
@@ -85,7 +88,7 @@ uv run python scripts/verify_portable.py
 - 项目仅支持 Windows，不支持 WSL/Linux；Fake 结果不能替代真实 Excel、Sandboxie 或真实模型验收。
 - Sandboxie 独立 box、网络拒绝、进程归属和真实 Excel 宏已成功通过 `win_real` 验证。
 - 跨机交接要求兼容 Weft/uv、锁定依赖及声明的外部资源在目标机可用。
-- 当前发布版本为 `0.4.0`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
+- 当前发布版本为 `0.5.0`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
 
 ## License
 

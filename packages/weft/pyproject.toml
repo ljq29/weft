@@ -1,12 +1,12 @@
 [project]
 name = "weft"
-version = "0.4.0"
+version = "0.5.0"
 description = "Local-first visual workflow tool"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-  "weft-sdk==0.4.0",
-  "weft-worker==0.4.0",
+  "weft-sdk==0.5.0",
+  "weft-worker==0.5.0",
   "pydantic>=2.10",
   "jsonschema>=4.23",
   "polars>=1.0",
@@ -21,6 +21,7 @@ dependencies = [
   "xlwings>=0.30; sys_platform == 'win32'",
   "pywin32>=306; sys_platform == 'win32'",
   "loguru>=0.7",
+  "pywebview>=6.0 ; sys_platform == 'win32'",
 ]
 
 [project.scripts]

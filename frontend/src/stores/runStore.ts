@@ -37,11 +37,25 @@ export interface ConfirmRequest {
   args: Record<string, unknown>;
   timeout_at?: string;
 }
+export interface RunValueRef {
+  kind: "table" | "json" | "none";
+  path?: string;
+  inline?: unknown;
+  hash?: string;
+  rows?: number;
+  cols?: number;
+}
+export interface RunNodeBaseline {
+  status: string;
+  error?: NodeError;
+  from_cache?: boolean;
+  outputs?: Record<string, RunValueRef>;
+}
 export interface RunBaseline {
   run_id: string;
   status: string;
   workflow_id?: string;
-  nodes: Record<string, { status: string; error?: NodeError }>;
+  nodes: Record<string, RunNodeBaseline>;
 }
 export interface RunLogEntry {
   event: string;
@@ -55,14 +69,13 @@ interface RunState {
   statuses: Record<string, string>;
   errors: Record<string, NodeError>;
   logs: LogEntry[];
+  outputs: Record<string, Record<string, RunValueRef>>;
   iterations: Record<string, { index: number; total: number }>;
   traces: Record<string, TraceEntry[]>;
   pendingConfirmations: ConfirmRequest[];
   started: (runId: string) => void;
   apply: (event: RunEvent) => void;
-  snapshot: (record: {
-    nodes: Record<string, { status: string; error?: NodeError }>;
-  }) => void;
+  snapshot: (record: { nodes: Record<string, RunNodeBaseline> }) => void;
   baseline: (record: RunBaseline | null, entries: RunLogEntry[]) => void;
   reset: () => void;
 }
@@ -92,6 +105,7 @@ function emptyRun(runId = "", runStatus = "") {
     statuses: {},
     errors: {},
     logs: [],
+    outputs: {},
     iterations: {},
     traces: {},
     pendingConfirmations: [],
@@ -127,6 +141,7 @@ export const useRunStore = create<RunState>()(
         const errors = { ...state.errors };
         let runStatus = state.runStatus;
         let logs = state.logs;
+        let outputs = state.outputs;
         let iterations = state.iterations;
         let traces = state.traces;
         let pendingConfirmations = state.pendingConfirmations;
@@ -156,7 +171,15 @@ export const useRunStore = create<RunState>()(
           };
         if (event === "node.started") statuses[nodeId] = "running";
         if (event === "node.status") statuses[nodeId] = text(data.status);
-        if (event === "node.finished") statuses[nodeId] = "executed";
+        if (event === "node.finished") {
+          statuses[nodeId] = "executed";
+          const eventOutputs = record(data.outputs);
+          if (Object.keys(eventOutputs).length)
+            outputs = {
+              ...outputs,
+              [nodeId]: eventOutputs as Record<string, RunValueRef>,
+            };
+        }
         if (event === "node.failed") {
           statuses[nodeId] = "failed";
           errors[nodeId] = (data.error as NodeError | undefined) ?? {
@@ -202,6 +225,7 @@ export const useRunStore = create<RunState>()(
           statuses,
           errors,
           logs,
+          outputs,
           iterations,
           traces,
           pendingConfirmations,
@@ -217,7 +241,12 @@ export const useRunStore = create<RunState>()(
           node.error ? [[id, node.error]] : [],
         ),
       );
-      set({ statuses, errors });
+      const outputs = Object.fromEntries(
+        Object.entries(record.nodes).flatMap(([id, node]) =>
+          node.outputs ? [[id, node.outputs]] : [],
+        ),
+      );
+      set({ statuses, errors, outputs });
     },
     baseline: (baseline, entries) => {
       if (!baseline) {
@@ -233,6 +262,11 @@ export const useRunStore = create<RunState>()(
         ),
       );
       const logs: LogEntry[] = [];
+      const outputs = Object.fromEntries(
+        Object.entries(baseline.nodes).flatMap(([id, node]) =>
+          node.outputs ? [[id, node.outputs]] : [],
+        ),
+      );
       const iterations: RunState["iterations"] = {};
       const traces: RunState["traces"] = {};
       const pending = new Map<string, ConfirmRequest>();
@@ -285,6 +319,7 @@ export const useRunStore = create<RunState>()(
         statuses,
         errors,
         logs,
+        outputs,
         iterations,
         traces,
         pendingConfirmations: [...pending.values()],

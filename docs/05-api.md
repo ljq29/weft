@@ -162,7 +162,8 @@
 |`run.finished`|`{run_id, status, usage}`||
 |`run.queued` / `run.dequeued`|`{run_id, position}`|US-EXE-13|
 |`node.status`|`{node_id, status}`（unconfigured/configured/running/executed/failed/cancelled/out_of_scope/skipped_branch/skipped_upstream）；out_of_scope 与失败后的 skipped_upstream 在 UI 显示 configured，skipped_branch 显示灰色 skipped|US-DES-05|
-|`node.started` / `node.finished`|`{node_id, duration_ms?, from_cache?}`||
+|`node.started`|`{node_id, duration_ms?}`||
+|`node.finished`|`{node_id, duration_ms?, from_cache, outputs: {port: ValueRef}}`；outputs 是该 Run 已物化的不可变输出快照，供当前运行结果页直接预览|US-EXE-05 AC-6|
 |`node.failed`|`{node_id, error: {code, type, message}}`（完整 traceback 走 REST，code 见 §12）|US-EXE-07|
 |`node.progress`|`{node_id, fraction, message?}`||
 |`node.log`|`{node_id, level, message}`||

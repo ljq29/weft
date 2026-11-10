@@ -55,7 +55,7 @@ weft/
 |包管理|uv（workspace 模式）|不用 pip/poetry|
 |Node|22 LTS + pnpm||
 |TypeScript|5.x，`strict: true`||
-|后端主要依赖|fastapi, uvicorn, pydantic v2, jsonschema, polars, pyarrow, fastexcel, xlsxwriter, xlwings (win), pywin32 (win), apscheduler, watchdog, httpx, loguru, jinja2, simpleeval, send2trash|jsonschema 校验节点 schema；fastexcel 读 Excel 文件、xlsxwriter 写 Excel 文件；新增依赖须在 PR 描述说明理由|
+|后端主要依赖|fastapi, uvicorn, pydantic v2, jsonschema, polars, pyarrow, fastexcel, xlsxwriter, xlwings (win), pywin32 (win), pywebview (win), apscheduler, watchdog, httpx, loguru, jinja2, simpleeval, send2trash|jsonschema 校验节点 schema；fastexcel 读 Excel 文件、xlsxwriter 写 Excel 文件；pywebview 以 edgechromium/WebView2 承载桌面 GUI；新增依赖须在 PR 描述说明理由|
 |前端主要依赖|react 18, @xyflow/react 12, zustand, @tanstack/react-table, apache-arrow, react-diff-view, react-markdown|REST 使用轻量 `api()` 封装；diff 用于变更审批，Markdown 用于聊天；新增依赖须在 PR 描述说明理由|
 
 ## 3. 代码风格
@@ -100,6 +100,7 @@ weft/
 # 后端（默认使用中国镜像；可用 UV_INDEX_URL 显式覆盖）
 UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple uv sync  # 根 workspace 同步
 uv run weft serve --no-browser            # 启动开发服务
+uv run weft serve --gui                   # 使用 WebView2 桌面窗口
 uv run pytest                             # 单元
 uv run pytest -m integration              # 集成
 uv run ruff check . && uv run ruff format --check .

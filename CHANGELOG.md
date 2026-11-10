@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## [0.5.0] - 2026-11-10
+
+### Added
+
+- Add `weft serve --gui` to host the same authenticated SPA in a Microsoft Edge WebView2 desktop window through pywebview, with loopback-only startup and graceful service shutdown when the window closes.
+- Report the optional WebView2 Runtime in `weft doctor` and include the Windows GUI dependency in locked wheel and portable installations.
+- Add declaration-driven upstream output selection and a visible Test up to this node action to the node inspector.
+- Add a current-Run output workspace with node, port, type and table-shape summaries alongside the existing log and history views.
+
+### Changed
+
+- Include immutable per-Run `ValueRef` outputs and cache provenance in `node.finished` events, and restore the same output references from REST snapshots and reconnect baselines.
+- Keep connection validation and execution rules in the backend; the upstream picker only presents compatible, acyclic candidates.
+- Update the built-in demos to locked same-version Worker and SDK wheels.
+
+### Verified
+
+- Five focused desktop/CLI tests, eight engine scheduler tests and 65 frontend Vitest tests passed during implementation.
+- `poe check` passed with 245 backend unit/contract tests and 65 frontend tests; 37 integration and 26 Playwright E2E tests also passed.
+- Seventeen Windows real/benchmark tests passed with Excel, Sandboxie and pi.
+- WebView2 opened the authenticated UI and closed with graceful lifespan shutdown in both the development environment and the portable bundle; startup tokens were absent from server logs.
+- Portable clean bootstrap, cached offline workflow/repair, authenticated service API and SPA acceptance passed without host Python or uv.
+- This entry does not mark T7.10 or its remaining manual adoption gates complete.
+
 ## [0.4.0] - 2026-11-05
 
 ### Added

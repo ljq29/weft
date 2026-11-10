@@ -280,7 +280,18 @@ class Engine:
                     record.status = "executed"
                     record.finished_at = now()
                     cache.touch(node_id)
-                    self._event(prepared, "node.finished", node_id, {"from_cache": True})
+                    self._event(
+                        prepared,
+                        "node.finished",
+                        node_id,
+                        {
+                            "from_cache": True,
+                            "outputs": {
+                                port: value.model_dump(mode="json")
+                                for port, value in record.outputs.items()
+                            },
+                        },
+                    )
                     return
             if node.type == "flow.trigger":
                 event = prepared.record.trigger
@@ -377,7 +388,18 @@ class Engine:
             record.finished_at = now()
             if cache_key is not None:
                 cache.store(node_id, cache_key, record.outputs, activated)
-            self._event(prepared, "node.finished", node_id)
+            self._event(
+                prepared,
+                "node.finished",
+                node_id,
+                {
+                    "from_cache": False,
+                    "outputs": {
+                        port: value.model_dump(mode="json")
+                        for port, value in record.outputs.items()
+                    },
+                },
+            )
         except (Cancelled, asyncio.CancelledError):
             record.status = "cancelled"
             record.finished_at = now()

@@ -72,9 +72,9 @@ def test_shell_worker_streams_logs_in_real_time(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text(
         f'''[project]
 name = "shell-test"
-version = "0.4.0"
+version = "0.5.0"
 requires-python = ">=3.12"
-dependencies = ["weft-worker==0.4.0"]
+dependencies = ["weft-worker==0.5.0"]
 [tool.uv.sources]
 weft-worker = {{ path = "{(PROJECT_ROOT / "packages/weft-worker").as_posix()}" }}
 weft-sdk = {{ path = "{(PROJECT_ROOT / "packages/weft-sdk").as_posix()}" }}

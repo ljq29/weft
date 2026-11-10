@@ -104,6 +104,7 @@ AC-2  ...
 - AC-4 Given 连线会形成环路（非 Loop Start/End 对） When 释放 Then 连线被拒绝，提示"不允许形成循环，请使用 Loop 节点"。
 - AC-5 `[unit]` 端口兼容性由后端 `ports.is_compatible(src_type, dst_type)` 决定，前端仅做展示；对 6 种类型的 36 种组合有完整的单元测试表。
 - AC-6 `[unit]` 动态输入通过多个命名端口实例化，每个端口仍最多一条入边；Concatenate 声明 `in_1...in_N`（N ≥ 2），Merge 固定两个命名输入并允许部分 skipped，不得借 Tool/Variable 例外绕过普通端口基数约束。
+- AC-7 `[unit][e2e]` 选中节点后，检查器按后端节点声明列出各输入的候选上游输出；候选过滤只提供操作提示，不展示会成环或类型明显不兼容的选项，实际连接仍经后端 validate 校验，并显示当前已连接输出。
 
 ### US-DES-04 编辑节点参数 [P0] [e2e][unit]
 
@@ -246,6 +247,7 @@ AC-2  ...
 - AC-3 Given WebSocket 断线重连 Then 客户端显示连接状态，以带退避的新连接代际重新 authenticate，等待认证 ACK 后 subscribe，并通过 `GET /api/runs/{id}` 等 REST baseline 补齐状态；旧代际事件不得污染状态，不丢最终结果，用户可手工立即重连。
 - AC-4 `[e2e]` 底部日志面板按节点分组显示日志，支持筛选级别（INFO/WARN/ERROR）与按节点过滤。
 - AC-5 `[int]` 未认证或令牌无效的 WS 连接不得订阅或接收事件；认证成功前发送 subscribe 返回认证错误并关闭连接。
+- AC-6 `[unit][int][e2e]` `node.finished` 携带该 Run 已物化的 `outputs: {port: ValueRef}` 和 `from_cache`；当前运行面板可切换日志/输出，输出项显示节点、端口、类型及表格行列数并打开对应 Run 的只读预览；REST snapshot/baseline 同样恢复输出引用。
 
 ### US-EXE-06 端口视图 [P0] [int][e2e]
 
@@ -962,6 +964,7 @@ AC-2  ...
 - AC-1 `weft serve` 启动后 2 s 内监听就绪；默认自动打开携带随机 UI 会话令牌的同源 URL（`--no-browser` 关闭），令牌不得写入日志。
 - AC-2 `[manual]` 冷启动到 UI 可交互 < 5 s（PRD §9.3）。
 - AC-3 端口被占用时报错并提示 `--port`。
+- AC-4 `[unit][int-win]` `weft serve --gui` 在 Windows 上使用 pywebview 的 `edgechromium` 后端打开同一同源 UI，不调用系统浏览器；只允许环回地址，窗口启动失败给出 Runtime 提示并停止服务，关闭窗口后正常执行服务 lifespan 收尾；令牌不写入日志。
 
 ### US-SET-03 日志 [P0] [int]
 
@@ -977,7 +980,7 @@ AC-2  ...
 关联：F-SET-04
 
 - AC-1 `weft --help` 列出 `serve run pack unpack doctor`；全部命令支持 `--json` 输出。
-- AC-2 `weft doctor` 检查并逐项报告 OK/WARN/FAIL：Python 版本、uv、Excel 可连接性、Sandboxie、pi、端口占用、`%APPDATA%` 可写；退出码 = FAIL 项数。
+- AC-2 `weft doctor` 检查并逐项报告 OK/WARN/FAIL：Python 版本、uv、Excel 可连接性、Sandboxie、pi、WebView2 Runtime、端口占用、`%APPDATA%` 可写；退出码 = FAIL 项数，WebView2 缺失仅 WARN，因为浏览器模式仍可用。
 - AC-3 `weft doctor --cleanup` 清理孤儿隐藏 Excel 实例（US-XLS-02 AC-3）与沙箱残留进程。
 - AC-4 `[int]` Windows 轻量目录内置 CMD 启动器、uv、生产依赖锁与同版本本地 wheel，不内置 Python 或编译主程序；在不含宿主 Python/uv 的 PATH 和独立 `%LOCALAPPDATA%` 下，`weft.cmd --version`、首次托管 Python/依赖下载、真实 CSV 工作流、缓存离线重跑、鉴权服务 API 与前端均通过，Excel/Sandboxie doctor 使用应用环境 Python，工作流 venv 使用 uv 托管 base Python。
 
