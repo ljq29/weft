@@ -6,7 +6,7 @@
 
 Weft 是**本地优先、仅支持 Windows** 的可视化工作流工具：用 KNIME 式节点图编排表格与文件处理，联动本机 Excel COM，并在受控沙箱中运行 AI agent 工具。产品形态是本机 Python 服务加同源 Web UI，可由浏览器或 WebView2 桌面窗口承载，不是多用户服务端平台。
 
-- 当前三个 Python 包与前端版本均为 `0.5.0`；版本分散在各包 `pyproject.toml`、`__init__.py` 和 `frontend/package.json` 中，发布时必须同步。
+- 当前三个 Python 包与前端版本均为 `0.5.1`；版本分散在各包 `pyproject.toml`、`__init__.py` 和 `frontend/package.json` 中，发布时必须同步。
 - 主要能力包括 DAG/循环/Metanode、分类缓存、独立 Worker pool、表格/文件/Excel 节点、LLM 与 Agent Loop、授权 NodeTool、五类触发器、沙箱变更审批、运行历史和工作流打包。
 - 工作流是 `<name>.weft/` 自包含目录；运行数据和配置以文件保存，**没有 ORM 或数据库**。
 - M1–M7 的大多数任务卡已完成，`T7.10` 仍未完成；完整 v1 的双机交接、人工体验和采用门禁以 `docs/07-roadmap.md` 为准，不要把“已有发布”理解成所有人工验收均已完成。

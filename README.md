@@ -88,7 +88,7 @@ uv run python scripts/verify_portable.py
 - 项目仅支持 Windows，不支持 WSL/Linux；Fake 结果不能替代真实 Excel、Sandboxie 或真实模型验收。
 - Sandboxie 独立 box、网络拒绝、进程归属和真实 Excel 宏已成功通过 `win_real` 验证。
 - 跨机交接要求兼容 Weft/uv、锁定依赖及声明的外部资源在目标机可用。
-- 当前发布版本为 `0.5.0`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
+- 当前发布版本为 `0.5.1`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
 
 ## License
 

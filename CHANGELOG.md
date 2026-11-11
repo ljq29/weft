@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## [0.5.1] - 2026-11-11
+
+### Documentation
+
+- Add the repository-wide Agent engineering guide, including Windows runtime, testing, security, packaging and release conventions.
+- Add the interactive GUI design prototype and preview for future usability evaluation.
+- Add the DSH GUI architecture research and improvement history as a dated reference document.
+
+### Notes
+
+- No production behavior or public API changes since 0.5.0; package versions and same-version demo dependencies are synchronized for this documentation release.
+- T7.10 and its remaining manual adoption gates remain incomplete.
+
+### Verified
+
+- The prototype JavaScript passed `node --check`; `poe check` passed with 245 backend and 65 frontend tests.
+- Portable clean bootstrap, cached offline workflow/repair, authenticated service API and SPA acceptance passed without host Python or uv.
+- No new real Excel/Sandboxie/pi or manual GUI verification was needed for this documentation-only release; the 0.5.0 records remain the applicable behavioral baseline.
+
 ## [0.5.0] - 2026-11-10
 
 ### Added
