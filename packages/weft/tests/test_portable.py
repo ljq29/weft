@@ -18,7 +18,7 @@ def test_portable_paths_use_application_python_managed_base_uv_and_wheels(
     """US-SET-04/AC-4: the launcher separates application helpers from the workflow base."""
     root = tmp_path / "bundle"
     (root / "app").mkdir(parents=True)
-    (root / "app" / "VERSION").write_text("0.5.1\n", encoding="utf-8")
+    (root / "app" / "VERSION").write_text("0.5.2\n", encoding="utf-8")
     (root / "wheels").mkdir()
     (root / "tools").mkdir()
     (root / "tools" / "uv.exe").touch()

@@ -237,7 +237,7 @@ uv run python scripts/build_portable.py --skip-frontend-build --skip-wheel-build
 uv run python scripts/verify_portable.py
 ```
 
-产物为 `dist/*.whl`、`dist/weft-windows-x64/` 和 `dist/weft-windows-x64.zip`。便携目录只携带 CMD 启动器、uv、生产锁、manifest 和同版本 wheel，不携带 Python 或 Nuitka 主程序。首次运行通过内置 uv 在 `%LOCALAPPDATA%/Weft` 安装托管 CPython 3.12 和版本化应用环境。
+产物为 `dist/*.whl`、`dist/weft-windows-x64/` 和 `dist/weft-windows-x64.zip`。便携目录只携带 CMD 启动器、PowerShell 源选择助手、uv、生产锁、manifest 和同版本 wheel，不携带 Python 或 Nuitka 主程序。首次运行通过内置 uv 在 `%LOCALAPPDATA%/Weft` 安装托管 CPython 3.12 和版本化应用环境；未显式指定包源时提示选择官方、已配置且可用的 pip 源或清华源。
 
 ```bat
 weft.cmd serve
@@ -247,7 +247,7 @@ weft.cmd --repair serve
 weft.cmd --bootstrap-help
 ```
 
-`verify_portable.py` 使用隔离的 PATH、`LOCALAPPDATA` 和配置目录，验证 manifest、无宿主 Python/uv 的首次下载、真实 CSV、缓存离线执行/repair、认证服务 API 和 SPA；首次验收需要网络。
+`verify_portable.py` 使用隔离的 PATH、`LOCALAPPDATA` 和配置目录，验证 manifest、无宿主 Python/uv 的已配置 pip 源交互下载、真实 CSV、缓存离线执行/repair、认证服务 API 和 SPA；首次验收需要网络。
 
 ### 自动化与发布流程
 

@@ -17,12 +17,12 @@ from weft.worker import (
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
-def make_workflow(root: Path, worker_version: str = "0.5.1") -> None:
+def make_workflow(root: Path, worker_version: str = "0.5.2") -> None:
     (root / "nodes").mkdir(parents=True)
     (root / "pyproject.toml").write_text(
         f'''[project]
 name = "worker-fixture"
-version = "0.5.1"
+version = "0.5.2"
 requires-python = ">=3.12"
 dependencies = ["weft-worker=={worker_version}", "polars", "pyarrow"]
 
@@ -62,7 +62,7 @@ class SlowNode(Node):
 @pytest.fixture
 def workflow_env(tmp_path: Path) -> WorkflowEnvironment:
     make_workflow(tmp_path)
-    env = WorkflowEnvironment(tmp_path, service_version="0.5.1")
+    env = WorkflowEnvironment(tmp_path, service_version="0.5.2")
     env.sync()
     return env
 
@@ -148,7 +148,7 @@ def test_worker_cooperative_cancellation(workflow_env: WorkflowEnvironment) -> N
 def test_worker_version_mismatch_is_rejected(tmp_path: Path) -> None:
     """US-EXE-14/AC-5,7: service and worker versions must match exactly before execution."""
     make_workflow(tmp_path, worker_version="9.9.9")
-    env = WorkflowEnvironment(tmp_path, service_version="0.5.1")
+    env = WorkflowEnvironment(tmp_path, service_version="0.5.2")
     with pytest.raises(WorkerVersionError, match="weft-worker==9.9.9"):
         env.sync()
 
@@ -157,9 +157,9 @@ def test_worker_version_mismatch_is_rejected(tmp_path: Path) -> None:
 def test_explicit_worker_update_relocks_and_syncs(tmp_path: Path) -> None:
     """US-EXE-14/AC-7: an explicit update changes the dependency and produces a usable worker."""
     make_workflow(tmp_path, worker_version="9.9.9")
-    env = WorkflowEnvironment(tmp_path, service_version="0.5.1")
+    env = WorkflowEnvironment(tmp_path, service_version="0.5.2")
     env.update_worker()
-    assert "weft-worker==0.5.1" in (tmp_path / "pyproject.toml").read_text(encoding="utf-8")
+    assert "weft-worker==0.5.2" in (tmp_path / "pyproject.toml").read_text(encoding="utf-8")
     assert (tmp_path / "uv.lock").is_file()
     assert env.python.is_file()
 
@@ -171,7 +171,7 @@ def test_uv_failure_contains_complete_output(tmp_path: Path) -> None:
     path = tmp_path / "pyproject.toml"
     path.write_text(
         path.read_text(encoding="utf-8").replace(
-            '"weft-worker==0.5.1",', '"weft-worker==0.5.1", "missing-local",'
+            '"weft-worker==0.5.2",', '"weft-worker==0.5.2", "missing-local",'
         )
         + '\n[tool.uv.sources.missing-local]\npath = "missing-local-package"\n',
         encoding="utf-8",

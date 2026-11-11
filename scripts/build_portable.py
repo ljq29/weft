@@ -82,6 +82,7 @@ def copy_distribution() -> None:
     (BUNDLE / "tools").mkdir(parents=True)
     (BUNDLE / "wheels").mkdir()
     shutil.copy2(ROOT / "packaging" / "weft.cmd", BUNDLE / "weft.cmd")
+    shutil.copy2(ROOT / "packaging" / "bootstrap-index.ps1", BUNDLE / "bootstrap-index.ps1")
     shutil.copy2(shutil.which("uv") or "uv", BUNDLE / "tools" / "uv.exe")
     for distribution in ("weft", "weft-worker", "weft-sdk"):
         shutil.copy2(DIST / wheel_name(distribution), BUNDLE / "wheels" / wheel_name(distribution))
@@ -113,7 +114,9 @@ def copy_distribution() -> None:
     (BUNDLE / "README.txt").write_text(
         f"Weft {__version__} - Windows x64\n\n"
         "Run weft.cmd. The first application run downloads managed CPython and locked\n"
-        "dependencies with the bundled uv; no host Python or uv is required.\n\n"
+        "dependencies with the bundled uv; no host Python or uv is required.\n"
+        "Before downloading, choose the official PyPI index, a reachable configured pip\n"
+        "index, or the Tsinghua index. Use --china or --index-url for unattended setup.\n\n"
         "Examples:\n"
         "  weft.cmd serve\n"
         "  weft.cmd --china serve\n"

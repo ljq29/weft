@@ -6,7 +6,7 @@ Weft 是本地优先的可视化工作流工具：以 KNIME 式表格数据流�
 
 ### Windows 轻量目录版
 
-下载并解压 `weft-windows-x64.zip`，运行其中的 `weft.cmd`。目录只包含启动器、uv、生产依赖锁和同版本 wheel，不含 Python 或 Nuitka 主程序。首次执行应用命令时，启动器通过 uv 在 `%LOCALAPPDATA%/Weft` 下载托管 CPython 3.12、创建版本化应用环境并安装锁定依赖，无需预装 Python 或 uv。
+下载并解压 `weft-windows-x64.zip`，运行其中的 `weft.cmd`。目录只包含启动器、源选择助手、uv、生产依赖锁和同版本 wheel，不含 Python 或 Nuitka 主程序。首次执行应用命令时，启动器通过 uv 在 `%LOCALAPPDATA%/Weft` 下载托管 CPython 3.12、创建版本化应用环境并安装锁定依赖，无需预装 Python 或 uv。
 
 ```bat
 weft.cmd serve
@@ -17,9 +17,12 @@ weft.cmd --repair serve
 weft.cmd --bootstrap-help
 ```
 
-- `--china` 使用清华 PyPI 源，并通过 `gh-proxy.com` 下载 python-build-standalone；`--index-url` 和 `--python-mirror` 可分别自定义包与 Python 下载镜像。
-- `--offline` 只使用已缓存的 Python 和包；首次从未安装过的机器不能离线 bootstrap。
+- 首次安装或 `--repair` 且未显式指定包源时，启动器提示选择：1）PyPI 官方源；2）已配置且连通性检测可用的 pip 源；3）清华大学镜像源。已有源可用时默认选择它，否则默认官方源。
+- 已有源从 `PIP_INDEX_URL`、`UV_INDEX_URL`、`PIP_CONFIG_FILE` 及标准 pip 配置文件读取；显示地址时隐藏凭据。内网 HTTP 源会为主机启用 uv 的显式允许配置，TLS 使用 Windows 证书存储。
+- `--china` 使用清华 PyPI 源，并通过 `gh-proxy.com` 下载 python-build-standalone；`--index-url` 和 `--python-mirror` 可分别自定义包与 Python 下载镜像。`--china` 和 `--index-url` 跳过源选择，适用于无人值守安装。
+- `--offline` 只使用已缓存的 Python 和包，不显示源选择；首次从未安装过的机器不能离线 bootstrap。
 - 应用环境按版本隔离，升级不会覆盖旧环境；`--repair` 强制重装当前版本。
+- pip 源选择只影响 Python 包下载；托管 CPython 仍使用 uv 默认地址或 `--python-mirror` 指定的镜像。
 - Excel、Sandboxie-Plus 和可选的 Node.js/pi 仍需单独安装。
 
 ### 开发与 wheel 安装
@@ -88,7 +91,7 @@ uv run python scripts/verify_portable.py
 - 项目仅支持 Windows，不支持 WSL/Linux；Fake 结果不能替代真实 Excel、Sandboxie 或真实模型验收。
 - Sandboxie 独立 box、网络拒绝、进程归属和真实 Excel 宏已成功通过 `win_real` 验证。
 - 跨机交接要求兼容 Weft/uv、锁定依赖及声明的外部资源在目标机可用。
-- 当前发布版本为 `0.5.1`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
+- 当前发布版本为 `0.5.2`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
 
 ## License
 

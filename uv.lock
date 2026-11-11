@@ -1782,7 +1782,7 @@ wheels = [
 
 [[package]]
 name = "weft"
-version = "0.5.1"
+version = "0.5.2"
 source = { editable = "packages/weft" }
 dependencies = [
     { name = "apscheduler" },
@@ -1827,7 +1827,7 @@ requires-dist = [
 
 [[package]]
 name = "weft-monorepo"
-version = "0.5.1"
+version = "0.5.2"
 source = { virtual = "." }
 dependencies = [
     { name = "weft" },
@@ -1866,12 +1866,12 @@ dev = [
 
 [[package]]
 name = "weft-sdk"
-version = "0.5.1"
+version = "0.5.2"
 source = { editable = "packages/weft-sdk" }
 
 [[package]]
 name = "weft-worker"
-version = "0.5.1"
+version = "0.5.2"
 source = { editable = "packages/weft-worker" }
 dependencies = [
     { name = "polars" },

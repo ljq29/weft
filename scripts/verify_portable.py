@@ -23,12 +23,14 @@ def isolated_environment() -> dict[str, str]:
     environment["PATH"] = str(system_root / "System32")
     environment["LOCALAPPDATA"] = str(WORK / "local-app-data")
     environment["WEFT_CONFIG_DIR"] = str(WORK / "config")
-    environment["UV_INDEX_URL"] = "https://pypi.tuna.tsinghua.edu.cn/simple"
+    environment["PIP_INDEX_URL"] = "https://pypi.tuna.tsinghua.edu.cn/simple"
     for name in (
         "PYTHONPATH",
         "PYTHONHOME",
         "VIRTUAL_ENV",
         "UV_PYTHON",
+        "UV_INDEX_URL",
+        "PIP_CONFIG_FILE",
         "UV_PROJECT_ENVIRONMENT",
         "UV_FIND_LINKS",
         "UV_CACHE_DIR",
@@ -121,10 +123,15 @@ dependencies = ["weft-worker=={__version__}"]
 
 
 def run_workflow(
-    executable: Path, environment: dict[str, str], workflow: Path, *options: str
+    executable: Path,
+    environment: dict[str, str],
+    workflow: Path,
+    *options: str,
+    input_text: str | None = None,
 ) -> None:
     result = subprocess.run(
         launcher_command(executable, environment, *options, "run", str(workflow), "--wait"),
+        input=input_text,
         env=environment,
         capture_output=True,
         text=True,
@@ -234,15 +241,23 @@ def main() -> None:
         timeout=30,
     )
     assert "--china" in help_result.stdout and "--offline" in help_result.stdout
+    assert "configured" in help_result.stdout
     workflow = WORK / "csv.weft"
     write_workflow(workflow)
-    run_workflow(executable, environment, workflow, "--china")
+    run_workflow(
+        executable,
+        environment,
+        workflow,
+        "--python-mirror",
+        "https://gh-proxy.com/https://github.com/astral-sh/python-build-standalone/releases/download",
+        input_text="2\n",
+    )
     run_workflow(executable, environment, workflow, "--offline")
     run_workflow(executable, environment, workflow, "--offline", "--repair")
     verify_service(executable, environment)
     print(
-        "Portable bootstrap, cached offline repair/workflow, service API and frontend passed "
-        "without host Python or uv"
+        "Portable configured-index bootstrap, cached offline repair/workflow, service API and "
+        "frontend passed without host Python or uv"
     )
 
 

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## [0.5.2] - 2026-11-11
+
+### Added
+
+- Add an interactive package-index choice during portable first-run and repair setup: official PyPI, a reachable configured pip index, or the Tsinghua mirror.
+- Discover existing pip settings from environment variables and standard configuration files, redact URL credentials in prompts, and support approved intranet HTTP indexes and Windows certificate roots.
+
+### Changed
+
+- Keep `--china`, `--index-url` and `--offline` non-interactive, and extend portable acceptance to select the configured pip index through the real launcher before running workflows and service checks.
+
+### Verified
+
+- `poe check` passed with 245 backend and 65 frontend tests; all 26 Playwright E2E tests passed.
+- Four focused portable bootstrap integration tests passed for reachable and unavailable configured indexes, official and Tsinghua choices, and HTTP host handling.
+- Portable configured-index bootstrap, cached offline workflow/repair, authenticated service API and SPA acceptance passed without host Python or uv.
+- The local integration run passed 40 of 41 tests; the existing real-service test could not bind its fixed port 7899 because Windows reserves 7847–7946 on this host. The tag workflow remains the clean-runner full-integration release gate.
+- Real Excel/Sandboxie/pi and manual GUI acceptance were not rerun for this bootstrap-only change; earlier records remain the applicable baseline and T7.10 remains incomplete.
+
 ## [0.5.1] - 2026-11-11
 
 ### Documentation

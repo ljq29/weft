@@ -196,7 +196,7 @@ def test_real_serve_readiness_session_and_doctor(tmp_path: Path) -> None:
             headers={"Authorization": f"Bearer {session.token}"},
         )
         with urllib.request.urlopen(request, timeout=1) as response:
-            assert json.loads(response.read())["version"] == "0.5.1"
+            assert json.loads(response.read())["version"] == "0.5.2"
         report = run_doctor(settings=SettingsStore(tmp_path / "config" / "config.toml"))
         assert {item["name"] for item in report["checks"]} == {
             "python",

@@ -257,7 +257,7 @@ def test_real_service_cold_start_benchmark(tmp_path: Path) -> None:
             headers={"Authorization": f"Bearer {session['token']}"},
         )
         with urllib.request.urlopen(request, timeout=1) as response:
-            assert json.loads(response.read())["version"] == "0.5.1"
+            assert json.loads(response.read())["version"] == "0.5.2"
         elapsed = time.perf_counter() - started
     finally:
         process.terminate()
