@@ -8,12 +8,14 @@ import socket
 import subprocess
 import time
 import urllib.request
+import zipfile
 from pathlib import Path
 
 from weft import __version__
 
 ROOT = Path(__file__).resolve().parents[1]
 BUNDLE = Path(os.environ.get("WEFT_VERIFY_BUNDLE", ROOT / "dist" / "weft-windows-x64"))
+ARCHIVE = ROOT / "dist" / f"weft-{__version__}-windows-x64.zip"
 WORK = ROOT / ".test-reports" / "portable-acceptance"
 
 
@@ -52,12 +54,30 @@ def launcher_command(executable: Path, environment: dict[str, str], *args: str) 
     return [str(system_root / "System32" / "cmd.exe"), "/c", str(executable), *args]
 
 
+def verify_archive_layout() -> None:
+    assert ARCHIVE.is_file()
+    assert not (ROOT / "dist" / "weft-windows-x64.zip").exists()
+    with zipfile.ZipFile(ARCHIVE) as archive:
+        names = archive.namelist()
+    roots = {name.split("/", 1)[0] for name in names}
+    assert roots == {"weft.cmd", "runtime"}
+    assert "weft.cmd" in names
+    assert "runtime/bootstrap-index.ps1" in names
+    assert "runtime/app/manifest.json" in names
+    assert "runtime/README.txt" in names
+    assert "runtime/LICENSE.txt" in names
+    assert not any(name.startswith("weft-windows-x64/") for name in names)
+
+
 def verify_manifest() -> None:
-    manifest = json.loads((BUNDLE / "app" / "manifest.json").read_text(encoding="utf-8"))
+    assert {path.name for path in BUNDLE.iterdir()} == {"weft.cmd", "runtime"}
+    manifest = json.loads(
+        (BUNDLE / "runtime" / "app" / "manifest.json").read_text(encoding="utf-8")
+    )
     assert manifest["version"] == __version__
     assert manifest["entrypoint"] == "weft.cmd"
     assert manifest["first_run_download"] is True
-    assert (BUNDLE / "bootstrap-index.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
+    assert (BUNDLE / "runtime" / "bootstrap-index.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
     expected = manifest["files"]
     actual = {
         str(path.relative_to(BUNDLE)): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -65,7 +85,6 @@ def verify_manifest() -> None:
         if path.is_file() and path.name != "manifest.json"
     }
     assert actual == expected
-    assert not (BUNDLE / "runtime").exists()
     assert not (BUNDLE / "weft.exe").exists()
 
 
@@ -223,6 +242,7 @@ def main() -> None:
     WORK.mkdir(parents=True)
     executable = BUNDLE / "weft.cmd"
     environment = isolated_environment()
+    verify_archive_layout()
     verify_manifest()
     result = subprocess.run(
         launcher_command(executable, environment, "--version"),

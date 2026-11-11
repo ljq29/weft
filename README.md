@@ -6,7 +6,7 @@ Weft 是本地优先的可视化工作流工具：以 KNIME 式表格数据流�
 
 ### Windows 轻量目录版
 
-下载并解压 `weft-windows-x64.zip`，运行其中的 `weft.cmd`。目录只包含启动器、源选择助手、uv、生产依赖锁和同版本 wheel，不含 Python 或 Nuitka 主程序。首次执行应用命令时，启动器通过 uv 在 `%LOCALAPPDATA%/Weft` 下载托管 CPython 3.12、创建版本化应用环境并安装锁定依赖，无需预装 Python 或 uv。
+下载 `weft-<version>-windows-x64.zip`，解压到一个独立空目录并运行其中的 `weft.cmd`。ZIP 根目录只保留 `weft.cmd`，README、许可证、源选择助手、uv、生产依赖锁、manifest 与同版本 wheel 统一位于 `runtime/`，不含 Python 或 Nuitka 主程序。首次执行应用命令时，启动器通过 uv 在 `%LOCALAPPDATA%/Weft` 下载托管 CPython 3.12、创建版本化应用环境并安装锁定依赖，无需预装 Python 或 uv。
 
 ```bat
 weft.cmd serve
@@ -93,7 +93,7 @@ uv run python scripts/verify_portable.py
 - 项目仅支持 Windows，不支持 WSL/Linux；Fake 结果不能替代真实 Excel、Sandboxie 或真实模型验收。
 - Sandboxie 独立 box、网络拒绝、进程归属和真实 Excel 宏已成功通过 `win_real` 验证。
 - 跨机交接要求兼容 Weft/uv、锁定依赖及声明的外部资源在目标机可用。
-- 当前发布版本为 `0.5.3`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
+- 当前发布版本为 `0.5.4`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
 
 ## License
 

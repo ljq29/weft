@@ -11,7 +11,7 @@ def portable_root() -> Path | None:
     if value is None:
         return None
     root = Path(value).resolve()
-    if (root / "app" / "VERSION").is_file() and (root / "wheels").is_dir():
+    if (root / "runtime" / "app" / "VERSION").is_file() and (root / "runtime" / "wheels").is_dir():
         return root
     return None
 
@@ -30,7 +30,7 @@ def base_python_executable() -> Path:
 def uv_executable() -> str:
     root = portable_root()
     if root is not None:
-        return str(root / "tools" / "uv.exe")
+        return str(root / "runtime" / "tools" / "uv.exe")
     return shutil.which("uv") or "uv"
 
 
@@ -39,7 +39,7 @@ def uv_environment() -> dict[str, str]:
     root = portable_root()
     if root is not None:
         environment.setdefault("UV_PYTHON", str(base_python_executable()))
-        environment.setdefault("UV_FIND_LINKS", str(root / "wheels"))
+        environment.setdefault("UV_FIND_LINKS", str(root / "runtime" / "wheels"))
         environment.setdefault("UV_PYTHON_PREFERENCE", "only-managed")
         environment.setdefault("UV_PYTHON_DOWNLOADS", "automatic")
         local_app_data = environment.get("LOCALAPPDATA")

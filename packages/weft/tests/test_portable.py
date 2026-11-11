@@ -17,11 +17,11 @@ def test_portable_paths_use_application_python_managed_base_uv_and_wheels(
 ) -> None:
     """US-SET-04/AC-4: the launcher separates application helpers from the workflow base."""
     root = tmp_path / "bundle"
-    (root / "app").mkdir(parents=True)
-    (root / "app" / "VERSION").write_text("0.5.3\n", encoding="utf-8")
-    (root / "wheels").mkdir()
-    (root / "tools").mkdir()
-    (root / "tools" / "uv.exe").touch()
+    (root / "runtime" / "app").mkdir(parents=True)
+    (root / "runtime" / "app" / "VERSION").write_text("0.5.4\n", encoding="utf-8")
+    (root / "runtime" / "wheels").mkdir()
+    (root / "runtime" / "tools").mkdir()
+    (root / "runtime" / "tools" / "uv.exe").touch()
     application_python = tmp_path / "app-env" / "Scripts" / "python.exe"
     base_python = tmp_path / "managed" / "python.exe"
     monkeypatch.setattr("weft.portable.sys.executable", str(application_python))
@@ -38,10 +38,10 @@ def test_portable_paths_use_application_python_managed_base_uv_and_wheels(
     assert portable_root() == root
     assert python_executable() == application_python
     assert base_python_executable() == base_python
-    assert uv_executable() == str(root / "tools" / "uv.exe")
+    assert uv_executable() == str(root / "runtime" / "tools" / "uv.exe")
     environment = uv_environment()
     assert environment["UV_PYTHON"] == str(base_python)
-    assert environment["UV_FIND_LINKS"] == str(root / "wheels")
+    assert environment["UV_FIND_LINKS"] == str(root / "runtime" / "wheels")
     assert environment["UV_PYTHON_PREFERENCE"] == "only-managed"
     assert environment["UV_PYTHON_DOWNLOADS"] == "automatic"
     assert environment["UV_CACHE_DIR"] == str(tmp_path / "local" / "Weft" / "cache")

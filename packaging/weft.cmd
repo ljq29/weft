@@ -2,13 +2,14 @@
 setlocal EnableExtensions DisableDelayedExpansion
 
 set "ROOT=%~dp0"
-set "APP=%ROOT%app"
-set "UV=%ROOT%tools\uv.exe"
+set "RUNTIME=%ROOT%runtime"
+set "APP=%RUNTIME%\app"
+set "UV=%RUNTIME%\tools\uv.exe"
 set "PYTHON_VERSION=3.12"
 
 if not exist "%APP%\VERSION" goto missing_files
 if not exist "%UV%" goto missing_files
-if not exist "%ROOT%bootstrap-index.ps1" goto missing_files
+if not exist "%RUNTIME%\bootstrap-index.ps1" goto missing_files
 set /p WEFT_APP_VERSION=<"%APP%\VERSION"
 if not defined LOCALAPPDATA goto no_local_app_data
 
@@ -19,7 +20,7 @@ set "UV_PROJECT_ENVIRONMENT=%WEFT_APP_ENV%"
 set "UV_PYTHON_INSTALL_DIR=%LOCALAPPDATA%\Weft\python"
 set "UV_PYTHON_PREFERENCE=only-managed"
 set "UV_CACHE_DIR=%LOCALAPPDATA%\Weft\cache"
-set "UV_FIND_LINKS=%ROOT%wheels"
+set "UV_FIND_LINKS=%RUNTIME%\wheels"
 if not defined UV_PYTHON_DOWNLOADS set "UV_PYTHON_DOWNLOADS=automatic"
 set "READY=%WEFT_APP_ENV%\.weft-ready"
 set "BASE_PYTHON_FILE=%WEFT_APP_ENV%.base-python"
@@ -118,7 +119,7 @@ goto launch
 :select_index
 if exist "%INDEX_SELECTION_FILE%" del /q "%INDEX_SELECTION_FILE%"
 if exist "%INDEX_INSECURE_FILE%" del /q "%INDEX_INSECURE_FILE%"
-"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%bootstrap-index.ps1" -SelectionFile "%INDEX_SELECTION_FILE%" -InsecureHostFile "%INDEX_INSECURE_FILE%"
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%RUNTIME%\bootstrap-index.ps1" -SelectionFile "%INDEX_SELECTION_FILE%" -InsecureHostFile "%INDEX_INSECURE_FILE%"
 if errorlevel 1 exit /b 1
 if not exist "%INDEX_SELECTION_FILE%" exit /b 1
 set /p WEFT_SELECTED_INDEX=<"%INDEX_SELECTION_FILE%"
@@ -162,7 +163,7 @@ echo Weft launcher: an option requires a value. 1>&2
 exit /b 2
 
 :missing_files
-echo Weft launcher: app\VERSION, tools\uv.exe or bootstrap-index.ps1 is missing. 1>&2
+echo Weft launcher: runtime\app\VERSION, runtime\tools\uv.exe or runtime\bootstrap-index.ps1 is missing. 1>&2
 exit /b 2
 
 :no_local_app_data

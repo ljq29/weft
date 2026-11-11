@@ -59,7 +59,7 @@ def write_manifest() -> None:
         for path in sorted(BUNDLE.rglob("*"))
         if path.is_file() and path.name != "manifest.json"
     }
-    (BUNDLE / "app" / "manifest.json").write_text(
+    (BUNDLE / "runtime" / "app" / "manifest.json").write_text(
         json.dumps(
             {
                 "schema_version": 1,
@@ -79,20 +79,23 @@ def write_manifest() -> None:
 def copy_distribution() -> None:
     if BUNDLE.exists():
         shutil.rmtree(BUNDLE)
-    (BUNDLE / "tools").mkdir(parents=True)
-    (BUNDLE / "wheels").mkdir()
+    runtime = BUNDLE / "runtime"
+    tools = runtime / "tools"
+    wheels = runtime / "wheels"
+    tools.mkdir(parents=True)
+    wheels.mkdir()
     shutil.copy2(ROOT / "packaging" / "weft.cmd", BUNDLE / "weft.cmd")
-    shutil.copy2(ROOT / "packaging" / "bootstrap-index.ps1", BUNDLE / "bootstrap-index.ps1")
-    shutil.copy2(shutil.which("uv") or "uv", BUNDLE / "tools" / "uv.exe")
+    shutil.copy2(ROOT / "packaging" / "bootstrap-index.ps1", runtime / "bootstrap-index.ps1")
+    shutil.copy2(shutil.which("uv") or "uv", tools / "uv.exe")
     for distribution in ("weft", "weft-worker", "weft-sdk"):
-        shutil.copy2(DIST / wheel_name(distribution), BUNDLE / "wheels" / wheel_name(distribution))
-    app = BUNDLE / "app"
+        shutil.copy2(DIST / wheel_name(distribution), wheels / wheel_name(distribution))
+    app = runtime / "app"
     write_application_project(app)
     environment = os.environ.copy()
     environment.setdefault("UV_INDEX_URL", "https://pypi.tuna.tsinghua.edu.cn/simple")
     run([shutil.which("uv") or "uv", "lock"], cwd=app, env=environment)
-    shutil.copy2(ROOT / "LICENSE", BUNDLE / "LICENSE.txt")
-    (BUNDLE / "LICENSE-uv.txt").write_text(
+    shutil.copy2(ROOT / "LICENSE", runtime / "LICENSE.txt")
+    (tools / "LICENSE-uv.txt").write_text(
         "MIT License\n\nCopyright (c) uv developers\n\n"
         "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
         'of this software and associated documentation files (the "Software"), to deal\n'
@@ -111,10 +114,11 @@ def copy_distribution() -> None:
         "SOFTWARE.\n",
         encoding="utf-8",
     )
-    (BUNDLE / "README.txt").write_text(
+    (runtime / "README.txt").write_text(
         f"Weft {__version__} - Windows x64\n\n"
-        "Run weft.cmd. The first application run downloads managed CPython and locked\n"
-        "dependencies with the bundled uv; no host Python or uv is required.\n"
+        "Extract the versioned ZIP into an empty directory and run weft.cmd. Application\n"
+        "resources are under runtime. The first application run downloads managed CPython and\n"
+        "locked dependencies with the bundled uv; no host Python or uv is required.\n"
         "Before downloading, choose the official PyPI index, a configured pip index, or\n"
         "the Tsinghua index. Failed probes include details; choice 4 forces the configured\n"
         "index. Use --china, --index-url or --force-configured-index for unattended setup.\n\n"
@@ -129,11 +133,12 @@ def copy_distribution() -> None:
 
 
 def write_archive() -> Path:
-    archive = DIST / "weft-windows-x64.zip"
+    (DIST / "weft-windows-x64.zip").unlink(missing_ok=True)
+    archive = DIST / f"weft-{__version__}-windows-x64.zip"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as output:
         for path in sorted(BUNDLE.rglob("*")):
             if path.is_file():
-                output.write(path, path.relative_to(DIST))
+                output.write(path, path.relative_to(BUNDLE))
     return archive
 
 

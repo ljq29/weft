@@ -497,7 +497,7 @@ PRD D-01..D-13 之外，本文新增：
 |A-09|表单由 JSON Schema 生成|节点作者只写 schema；UI 自动获得|每节点手写表单组件（节点数量 × 维护成本）|
 |A-10|Arrow 贯穿 引擎-Worker-前端 三层|一种表格格式走到底，预览不经 JSON 转换|后端 Arrow + 前端 JSON（大表预览慢、类型丢失）|
 |A-11|本机 UI/API/WS 使用随机会话令牌，并校验 Host/Origin|覆盖跨站请求与 DNS rebinding；`X-Weft-Client` 不作为权限控制|本机完全免鉴权、仅检查自定义头|
-|A-12|轻量目录以 CMD 启动器调用内置 uv，首次在 `%LOCALAPPDATA%/Weft` 安装托管 CPython 和锁定生产依赖；包源通过 Windows 自带 PowerShell 提供官方、pip 配置源、清华源与跳过探测的强制已有源菜单；Weft 以 wheel 纯 Python 运行|避免 Nuitka 主程序与完整 Python 重复携带 Polars/Arrow；应用 helper 共用应用 venv，工作流仍用独立 venv 和托管 base Python；复用内网 pip 配置且不要求宿主 Python|Nuitka standalone/onefile、下载预建 `.venv`、为启动器引入 Rust 工具链|
+|A-12|版本化 ZIP 根目录仅保留 `weft.cmd`，其余文件归入 `runtime/`，以 CMD 调用 `runtime/` 内置 uv，首次在 `%LOCALAPPDATA%/Weft` 安装托管 CPython 和锁定生产依赖；包源通过 Windows 自带 PowerShell 提供官方、pip 配置源、清华源与跳过探测的强制已有源菜单；Weft 以 wheel 纯 Python 运行|避免 Nuitka 主程序与完整 Python 重复携带 Polars/Arrow；应用 helper 共用应用 venv，工作流仍用独立 venv 和托管 base Python；复用内网 pip 配置且不要求宿主 Python|Nuitka standalone/onefile、下载预建 `.venv`、为启动器引入 Rust 工具链|
 
 ## 12. 风险与缓解
 

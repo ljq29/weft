@@ -1,12 +1,12 @@
 [project]
 name = "weft"
-version = "0.5.3"
+version = "0.5.4"
 description = "Local-first visual workflow tool"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-  "weft-sdk==0.5.3",
-  "weft-worker==0.5.3",
+  "weft-sdk==0.5.4",
+  "weft-worker==0.5.4",
   "pydantic>=2.10",
   "jsonschema>=4.23",
   "polars>=1.0",

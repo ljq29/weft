@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## [0.5.4] - 2026-11-11
+
+### Changed
+
+- Publish only `weft-<version>-windows-x64.zip`, with `weft.cmd` as the only root entry instead of a wrapping directory.
+- Move documentation, licenses, bootstrap helpers, uv, application metadata, manifest and local wheels under `runtime/`, and align launcher and workflow-runtime path discovery with the new layout.
+
+### Verified
+
+- `poe check` and nine focused portable tests passed.
+- The versioned ZIP passed extraction into a path containing spaces, clean configured-index bootstrap, real workflows, forced-index repair, cached offline execution, authenticated service API and SPA checks without host Python or uv.
+- Real Excel/Sandboxie/pi and manual GUI acceptance were not rerun for this packaging-only change; earlier records remain the applicable baseline and T7.10 remains incomplete.
+
 ## [0.5.3] - 2026-11-11
 
 ### Added

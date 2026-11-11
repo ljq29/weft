@@ -8,7 +8,7 @@ Nuitka standalone 主程序和内置完整 Python 各自携带 Polars、Arrow �
 
 ## Decision
 
-`weft-windows-x64` 只包含 `weft.cmd`、`bootstrap-index.ps1`、内置 uv、三个同版本 wheel、生产 `pyproject.toml`/`uv.lock` 和带 SHA-256 的 manifest，不包含 Python、Nuitka 主程序或预建 venv。Weft 以普通 wheel 纯 Python 运行，不为启动器引入 Rust 或其他编译工具链；源选择只依赖 Windows 10/11 自带的 Windows PowerShell。
+发布物只提供 `weft-<version>-windows-x64.zip`，不保留无版本号兼容副本。ZIP 根目录只包含 `weft.cmd`；README、许可证、`bootstrap-index.ps1`、内置 uv、三个同版本 wheel、生产 `pyproject.toml`/`uv.lock` 和带 SHA-256 的 manifest 统一位于 `runtime/`，不包含 Python、Nuitka 主程序或预建 venv。构建目录仍使用 `dist/weft-windows-x64/`，但 ZIP 内不套这一外层目录。`weft.cmd` 与 `weft.portable` 均从 `runtime/` 定位 uv、wheel 和应用项目，避免启动与工作流环境使用不同路径契约。Weft 以普通 wheel 纯 Python 运行，不为启动器引入 Rust 或其他编译工具链；源选择只依赖 Windows 10/11 自带的 Windows PowerShell。
 
 `weft.cmd` 在首次执行应用命令时调用内置 uv，把托管 CPython 3.12、缓存和版本化应用环境安装到 `%LOCALAPPDATA%/Weft`。uv 使用 `only-managed`，不依赖宿主 Python、PATH 或注册表。生产项目把三个 Weft 包都声明为直接依赖，确保 `tool.uv.sources` 对本地 wheel 生效；业务环境不包含开发依赖。
 
@@ -37,7 +37,7 @@ Nuitka standalone 主程序和内置完整 Python 各自携带 Polars、Arrow �
 - `packages/weft/tests/test_portable.py` 覆盖应用 Python、托管 base Python、内置 uv、缓存和开发环境路径选择。
 - `packages/weft/tests/test_portable_bootstrap.py` 以本地 HTTP 服务覆盖可用 pip 配置源、探测 HTTP 错误、菜单与命令行强制源、官方与清华选择、HTTP 主机参数和 UTF-8 BOM；七项集成测试通过。
 - 构建烟测已确认目录约 60 MiB、Release ZIP 为 15,259,248 字节，`weft.cmd --version` 与 `--bootstrap-help` 可直接执行。
-- `scripts/verify_portable.py` 使用独立 `%LOCALAPPDATA%` 和仅 System32 的 PATH，校验 manifest 与脚本 BOM、首次托管 Python/依赖下载、真实 CSV、缓存离线重跑与 `--repair`、鉴权服务与前端，并清理 CMD/Python 进程树。0.5.2 验收通过真实菜单选择 `PIP_INDEX_URL` 中的清华源；后续强制源改动已通过 `--force-configured-index --repair` 无交互真实安装及后续离线工作流验收。
+- `scripts/verify_portable.py` 使用独立 `%LOCALAPPDATA%` 和仅 System32 的 PATH，校验版本化 ZIP 根目录、manifest 与脚本 BOM、首次托管 Python/依赖下载、真实 CSV、缓存离线重跑与 `--repair`、鉴权服务与前端，并清理 CMD/Python 进程树。0.5.2 验收通过真实菜单选择 `PIP_INDEX_URL` 中的清华源；后续强制源改动已通过 `--force-configured-index --repair` 无交互真实安装及后续离线工作流验收。`runtime/` 布局改动已用版本化 ZIP 在含空格路径下真实解压，并完成上述全部验收。
 - 184 项单元测试、36 项集成测试、23 项前端测试和 11 项 Playwright E2E 通过；12 项真实 Excel/Sandboxie `win_real` 测试通过，托管 Python 下 `doctor --json` 为 `fail_count=0`。
 - CI 与 Release 均执行同一启动器验收，不能只检查版本输出或 wheel import。
 

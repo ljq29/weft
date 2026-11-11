@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-`.github/workflows/release.yml` 在推送 `v*.*.*` 标签时运行。标签去掉首字母 `v` 后必须与 `weft.__version__` 完全一致；主服务、Worker 和 SDK 使用同一版本。Release 任务在 Windows 上依次执行 `poe check`、集成测试、前端构建、Playwright E2E、三个 wheel 构建以及 [CMD 启动器与托管 Python](../architecture/2026-11-04-cmd-bootstrap-python-runtime.md) 验收，全部成功后才使用 GitHub CLI 创建 Release 并上传 wheel 与 `weft-windows-x64.zip`。
+`.github/workflows/release.yml` 在推送 `v*.*.*` 标签时运行。标签去掉首字母 `v` 后必须与 `weft.__version__` 完全一致；主服务、Worker 和 SDK 使用同一版本。Release 任务在 Windows 上依次执行 `poe check`、集成测试、前端构建、Playwright E2E、三个 wheel 构建以及 [CMD 启动器与托管 Python](../architecture/2026-11-04-cmd-bootstrap-python-runtime.md) 验收，全部成功后才使用 GitHub CLI 创建 Release 并上传 wheel 与 `weft-<version>-windows-x64.zip`。
 
 Release 使用标签对应的提交和 `contents: write` 权限。真实 Excel/Sandboxie 的 `win_real` 仍在本机登录态验收，不伪装成 hosted runner 能力。版本发布不自动勾选 `T7.10`，完整 v1 的人工交接和采用指标独立追踪。
 
