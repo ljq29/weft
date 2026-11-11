@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import socket
 import subprocess
 import threading
 from collections.abc import Iterator
@@ -18,9 +17,16 @@ TSINGHUA_INDEX = "https://pypi.tuna.tsinghua.edu.cn/simple"
 pytestmark = pytest.mark.integration
 
 
+def test_bootstrap_script_has_windows_powershell_utf8_bom() -> None:
+    """US-SET-04/AC-4: Windows PowerShell 5.1 reads Chinese script text as UTF-8."""
+    assert BOOTSTRAP_INDEX.read_bytes().startswith(b"\xef\xbb\xbf")
+
+
 class IndexHandler(BaseHTTPRequestHandler):
+    status_code = 200
+
     def do_GET(self) -> None:
-        self.send_response(200)
+        self.send_response(self.status_code)
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -28,9 +34,12 @@ class IndexHandler(BaseHTTPRequestHandler):
         pass
 
 
-@pytest.fixture
-def available_index() -> Iterator[str]:
-    server = ThreadingHTTPServer(("127.0.0.1", 0), IndexHandler)
+class UnavailableIndexHandler(IndexHandler):
+    status_code = 503
+
+
+def serve_index(handler: type[BaseHTTPRequestHandler]) -> Iterator[str]:
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -41,6 +50,16 @@ def available_index() -> Iterator[str]:
         thread.join(timeout=5)
 
 
+@pytest.fixture
+def available_index() -> Iterator[str]:
+    yield from serve_index(IndexHandler)
+
+
+@pytest.fixture
+def unavailable_index() -> Iterator[str]:
+    yield from serve_index(UnavailableIndexHandler)
+
+
 def run_selector(
     tmp_path: Path,
     choice: str,
@@ -49,7 +68,12 @@ def run_selector(
     selection = tmp_path / "selection.txt"
     insecure_host = tmp_path / "insecure-host.txt"
     environment = os.environ.copy()
-    for name in ("PIP_INDEX_URL", "UV_INDEX_URL", "PIP_CONFIG_FILE"):
+    for name in (
+        "PIP_INDEX_URL",
+        "UV_INDEX_URL",
+        "PIP_CONFIG_FILE",
+        "WEFT_FORCE_CONFIGURED_INDEX",
+    ):
         environment.pop(name, None)
     environment["APPDATA"] = str(tmp_path / "appdata")
     environment["ProgramData"] = str(tmp_path / "program-data")
@@ -103,16 +127,48 @@ def test_bootstrap_uses_reachable_pip_config_index(tmp_path: Path, available_ind
     assert "2." in output
 
 
-def test_bootstrap_unavailable_pip_index_defaults_to_official(tmp_path: Path) -> None:
-    """US-SET-04/AC-4: an unreachable configured index cannot be selected."""
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        unavailable_index = f"http://127.0.0.1:{sock.getsockname()[1]}/simple"
-
-    selected, insecure_host, _ = run_selector(tmp_path, "", {"PIP_INDEX_URL": unavailable_index})
+def test_bootstrap_unavailable_pip_index_reports_reason_and_defaults_to_official(
+    tmp_path: Path, unavailable_index: str
+) -> None:
+    """US-SET-04/AC-4: a failed probe reports its HTTP status and defaults to official."""
+    selected, insecure_host, output = run_selector(
+        tmp_path, "", {"PIP_INDEX_URL": unavailable_index}
+    )
 
     assert selected == OFFICIAL_INDEX
     assert insecure_host is None
+    assert "HTTP 503" in output
+
+
+def test_bootstrap_menu_can_force_unavailable_pip_index(
+    tmp_path: Path, unavailable_index: str
+) -> None:
+    """US-SET-04/AC-4: menu choice four forces the configured index after a failed probe."""
+    selected, insecure_host, output = run_selector(
+        tmp_path, "4", {"PIP_INDEX_URL": unavailable_index}
+    )
+
+    assert selected == unavailable_index
+    assert insecure_host is not None
+    assert "HTTP 503" in output
+
+
+def test_bootstrap_flag_forces_pip_index_without_probe(
+    tmp_path: Path, unavailable_index: str
+) -> None:
+    """US-SET-04/AC-4: the force flag selects the configured index without any probe."""
+    selected, insecure_host, output = run_selector(
+        tmp_path,
+        "",
+        {
+            "PIP_INDEX_URL": unavailable_index,
+            "WEFT_FORCE_CONFIGURED_INDEX": "1",
+        },
+    )
+
+    assert selected == unavailable_index
+    assert insecure_host is not None
+    assert "HTTP 503" not in output
 
 
 @pytest.mark.parametrize(

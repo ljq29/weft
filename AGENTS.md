@@ -6,7 +6,7 @@
 
 Weft 是**本地优先、仅支持 Windows** 的可视化工作流工具：用 KNIME 式节点图编排表格与文件处理，联动本机 Excel COM，并在受控沙箱中运行 AI agent 工具。产品形态是本机 Python 服务加同源 Web UI，可由浏览器或 WebView2 桌面窗口承载，不是多用户服务端平台。
 
-- 当前三个 Python 包与前端版本均为 `0.5.1`；版本分散在各包 `pyproject.toml`、`__init__.py` 和 `frontend/package.json` 中，发布时必须同步。
+- 当前三个 Python 包与前端版本均为 `0.5.3`；版本分散在各包 `pyproject.toml`、`__init__.py` 和 `frontend/package.json` 中，发布时必须同步。
 - 主要能力包括 DAG/循环/Metanode、分类缓存、独立 Worker pool、表格/文件/Excel 节点、LLM 与 Agent Loop、授权 NodeTool、五类触发器、沙箱变更审批、运行历史和工作流打包。
 - 工作流是 `<name>.weft/` 自包含目录；运行数据和配置以文件保存，**没有 ORM 或数据库**。
 - M1–M7 的大多数任务卡已完成，`T7.10` 仍未完成；完整 v1 的双机交接、人工体验和采用门禁以 `docs/07-roadmap.md` 为准，不要把“已有发布”理解成所有人工验收均已完成。
@@ -237,17 +237,18 @@ uv run python scripts/build_portable.py --skip-frontend-build --skip-wheel-build
 uv run python scripts/verify_portable.py
 ```
 
-产物为 `dist/*.whl`、`dist/weft-windows-x64/` 和 `dist/weft-windows-x64.zip`。便携目录只携带 CMD 启动器、PowerShell 源选择助手、uv、生产锁、manifest 和同版本 wheel，不携带 Python 或 Nuitka 主程序。首次运行通过内置 uv 在 `%LOCALAPPDATA%/Weft` 安装托管 CPython 3.12 和版本化应用环境；未显式指定包源时提示选择官方、已配置且可用的 pip 源或清华源。
+产物为 `dist/*.whl`、`dist/weft-windows-x64/` 和 `dist/weft-windows-x64.zip`。便携目录只携带 CMD 启动器、PowerShell 源选择助手、uv、生产锁、manifest 和同版本 wheel，不携带 Python 或 Nuitka 主程序。首次运行通过内置 uv 在 `%LOCALAPPDATA%/Weft` 安装托管 CPython 3.12 和版本化应用环境；未显式指定包源时提示选择官方、已配置 pip 源、清华源或强制已有源，探测失败须显示详细原因。`bootstrap-index.ps1` 必须保留 UTF-8 BOM 以兼容 Windows PowerShell 5.1。
 
 ```bat
 weft.cmd serve
 weft.cmd --china serve
+weft.cmd --force-configured-index serve
 weft.cmd --offline serve
 weft.cmd --repair serve
 weft.cmd --bootstrap-help
 ```
 
-`verify_portable.py` 使用隔离的 PATH、`LOCALAPPDATA` 和配置目录，验证 manifest、无宿主 Python/uv 的已配置 pip 源交互下载、真实 CSV、缓存离线执行/repair、认证服务 API 和 SPA；首次验收需要网络。
+`verify_portable.py` 使用隔离的 PATH、`LOCALAPPDATA` 和配置目录，验证 manifest、无宿主 Python/uv 的已配置 pip 源交互下载、强制源修复、真实 CSV、缓存离线执行/repair、认证服务 API 和 SPA；首次验收需要网络。
 
 ### 自动化与发布流程
 

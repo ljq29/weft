@@ -288,7 +288,7 @@
 |F-SET-03|结构化日志（服务日志 + 每个 Run 的日志），保留策略可配|P0|
 |F-SET-04|CLI：`weft serve` / `weft run` / `weft pack` / `weft unpack` / `weft doctor`（环境检测：Python、uv、Excel、Sandboxie、WebView2）|P0|
 |F-SET-05|系统托盘图标（显示状态、打开 UI、退出）|P2|
-|F-SET-06|提供 Windows 轻量目录版：内置 CMD 启动器、uv、生产依赖锁与同版本本地 wheel；首次启动自动下载托管 CPython 和锁定依赖，无需宿主 Python/uv，支持官方、已配置内网源与国内镜像选择及缓存离线运行|P1|
+|F-SET-06|提供 Windows 轻量目录版：内置 CMD 启动器、uv、生产依赖锁与同版本本地 wheel；首次启动自动下载托管 CPython 和锁定依赖，无需宿主 Python/uv，支持官方、已配置内网源与国内镜像选择、强制已有源及缓存离线运行|P1|
 
 ---
 

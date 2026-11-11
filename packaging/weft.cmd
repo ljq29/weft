@@ -58,6 +58,11 @@ if "%~1"=="--index-url" (
     shift
     goto options
 )
+if "%~1"=="--force-configured-index" (
+    set "WEFT_FORCE_CONFIGURED_INDEX=1"
+    shift
+    goto options
+)
 if "%~1"=="--python-mirror" (
     if "%~2"=="" goto missing_option_value
     set "UV_PYTHON_INSTALL_MIRROR=%~2"
@@ -140,9 +145,10 @@ exit /b 0
 
 :bootstrap_help
 echo Weft bootstrap options (place before the application command):
-echo   First setup prompts for official, available configured, or Tsinghua packages.
+echo   First setup prompts for official, configured, Tsinghua, or forced packages.
 echo   --china                 Use China mirrors for Python and packages without prompting
 echo   --index-url URL         Use a custom Python package index without prompting
+echo   --force-configured-index Use the configured pip index without probing or prompting
 echo   --python-mirror URL     Use a custom uv Python download mirror
 echo   --offline               Use only cached Python and packages
 echo   --repair                Reinstall the application environment

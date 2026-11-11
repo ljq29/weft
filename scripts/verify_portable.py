@@ -57,6 +57,7 @@ def verify_manifest() -> None:
     assert manifest["version"] == __version__
     assert manifest["entrypoint"] == "weft.cmd"
     assert manifest["first_run_download"] is True
+    assert (BUNDLE / "bootstrap-index.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
     expected = manifest["files"]
     actual = {
         str(path.relative_to(BUNDLE)): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -242,6 +243,7 @@ def main() -> None:
     )
     assert "--china" in help_result.stdout and "--offline" in help_result.stdout
     assert "configured" in help_result.stdout
+    assert "--force-configured-index" in help_result.stdout
     workflow = WORK / "csv.weft"
     write_workflow(workflow)
     run_workflow(
@@ -254,10 +256,12 @@ def main() -> None:
     )
     run_workflow(executable, environment, workflow, "--offline")
     run_workflow(executable, environment, workflow, "--offline", "--repair")
+    run_workflow(executable, environment, workflow, "--force-configured-index", "--repair")
+    run_workflow(executable, environment, workflow, "--offline")
     verify_service(executable, environment)
     print(
-        "Portable configured-index bootstrap, cached offline repair/workflow, service API and "
-        "frontend passed without host Python or uv"
+        "Portable configured-index bootstrap, forced-index repair, cached offline workflow, "
+        "service API and frontend passed without host Python or uv"
     )
 
 

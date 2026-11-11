@@ -12,14 +12,16 @@ Weft 是本地优先的可视化工作流工具：以 KNIME 式表格数据流�
 weft.cmd serve
 weft.cmd serve --gui
 weft.cmd --china serve
+weft.cmd --force-configured-index serve
 weft.cmd --offline serve
 weft.cmd --repair serve
 weft.cmd --bootstrap-help
 ```
 
-- 首次安装或 `--repair` 且未显式指定包源时，启动器提示选择：1）PyPI 官方源；2）已配置且连通性检测可用的 pip 源；3）清华大学镜像源。已有源可用时默认选择它，否则默认官方源。
-- 已有源从 `PIP_INDEX_URL`、`UV_INDEX_URL`、`PIP_CONFIG_FILE` 及标准 pip 配置文件读取；显示地址时隐藏凭据。内网 HTTP 源会为主机启用 uv 的显式允许配置，TLS 使用 Windows 证书存储。
+- 首次安装或 `--repair` 且未显式指定包源时，启动器提示选择：1）PyPI 官方源；2）已配置且连通性检测可用的 pip 源；3）清华大学镜像源；4）强制使用已有 pip 源。已有源可用时默认选择它，否则默认官方源；探测失败会显示 HTTP 状态或异常原因，第 4 项允许跳过探测结果。
+- 已有源从 `PIP_INDEX_URL`、`UV_INDEX_URL`、`PIP_CONFIG_FILE` 及标准 pip 配置文件读取；显示地址和诊断时隐藏凭据。内网 HTTP 源会为主机启用 uv 的显式允许配置，TLS 使用 Windows 证书存储。
 - `--china` 使用清华 PyPI 源，并通过 `gh-proxy.com` 下载 python-build-standalone；`--index-url` 和 `--python-mirror` 可分别自定义包与 Python 下载镜像。`--china` 和 `--index-url` 跳过源选择，适用于无人值守安装。
+- `--force-configured-index` 不探测、不提示，直接使用已有 pip 配置；未找到配置时会报错。强制选择只跳过可用性判断，uv 实际下载失败时仍会安装失败并显示 uv 错误。
 - `--offline` 只使用已缓存的 Python 和包，不显示源选择；首次从未安装过的机器不能离线 bootstrap。
 - 应用环境按版本隔离，升级不会覆盖旧环境；`--repair` 强制重装当前版本。
 - pip 源选择只影响 Python 包下载；托管 CPython 仍使用 uv 默认地址或 `--python-mirror` 指定的镜像。
@@ -91,7 +93,7 @@ uv run python scripts/verify_portable.py
 - 项目仅支持 Windows，不支持 WSL/Linux；Fake 结果不能替代真实 Excel、Sandboxie 或真实模型验收。
 - Sandboxie 独立 box、网络拒绝、进程归属和真实 Excel 宏已成功通过 `win_real` 验证。
 - 跨机交接要求兼容 Weft/uv、锁定依赖及声明的外部资源在目标机可用。
-- 当前发布版本为 `0.5.2`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
+- 当前发布版本为 `0.5.3`；完整 v1 的人工交接与采用门禁仍在 roadmap 的 `T7.10` 跟踪。
 
 ## License
 

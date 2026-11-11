@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## [0.5.3] - 2026-11-11
+
+### Added
+
+- Add menu choice 4 and `--force-configured-index` to use the existing pip index without probing or prompting, including unattended repair.
+- Report HTTP status or the underlying exception when a configured-index probe fails, and enforce the UTF-8 BOM required by Windows PowerShell 5.1 for the Chinese bootstrap script.
+
+### Verified
+
+- Seven focused bootstrap integration tests and `poe check` passed, including 245 backend and 65 frontend default tests.
+- Real portable acceptance passed configured-index setup, unattended forced-index repair, cached offline workflows, authenticated service API and SPA checks without host Python or uv.
+- Real Excel/Sandboxie/pi and manual GUI acceptance were not rerun for this bootstrap-only change; earlier records remain the applicable baseline and T7.10 remains incomplete.
+
 ## [0.5.2] - 2026-11-11
 
 ### Added

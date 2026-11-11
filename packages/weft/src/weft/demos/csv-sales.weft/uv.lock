@@ -100,22 +100,22 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "weft-sdk", path = "vendor/weft_sdk-0.5.2-py3-none-any.whl" },
-    { name = "weft-worker", path = "vendor/weft_worker-0.5.2-py3-none-any.whl" },
+    { name = "weft-sdk", path = "vendor/weft_sdk-0.5.3-py3-none-any.whl" },
+    { name = "weft-worker", path = "vendor/weft_worker-0.5.3-py3-none-any.whl" },
 ]
 
 [[package]]
 name = "weft-sdk"
-version = "0.5.2"
-source = { path = "vendor/weft_sdk-0.5.2-py3-none-any.whl" }
+version = "0.5.3"
+source = { path = "vendor/weft_sdk-0.5.3-py3-none-any.whl" }
 wheels = [
-    { filename = "weft_sdk-0.5.2-py3-none-any.whl", hash = "sha256:dfc6d7fc11ade050b5d35a40b6cdff4cde8d7d043f6cf7bed33217fa02a7d148" },
+    { filename = "weft_sdk-0.5.3-py3-none-any.whl", hash = "sha256:c063c2adf669a8f32a1174966fedbf6f68b79971da94029396d3bccb8f2c587f" },
 ]
 
 [[package]]
 name = "weft-worker"
-version = "0.5.2"
-source = { path = "vendor/weft_worker-0.5.2-py3-none-any.whl" }
+version = "0.5.3"
+source = { path = "vendor/weft_worker-0.5.3-py3-none-any.whl" }
 dependencies = [
     { name = "polars" },
     { name = "pyarrow" },
@@ -123,7 +123,7 @@ dependencies = [
     { name = "weft-sdk" },
 ]
 wheels = [
-    { filename = "weft_worker-0.5.2-py3-none-any.whl", hash = "sha256:e1eaa58835ddfbe80d3af0a5f2421a2c02af2e5c078c259c6fde4aedb8bb475a" },
+    { filename = "weft_worker-0.5.3-py3-none-any.whl", hash = "sha256:035bdd478779083c087d844d656aa14a5fb61888bc0dcfeba8b227397bae220d" },
 ]
 
 [package.metadata]
@@ -131,5 +131,5 @@ requires-dist = [
     { name = "polars", specifier = ">=1.0" },
     { name = "pyarrow", specifier = ">=15" },
     { name = "send2trash", specifier = ">=1.8" },
-    { name = "weft-sdk", specifier = "==0.5.2" },
+    { name = "weft-sdk", specifier = "==0.5.3" },
 ]
