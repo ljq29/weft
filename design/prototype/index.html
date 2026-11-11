@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weft · 本地可视化工作流</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <svg class="icon-sprite" aria-hidden="true">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-flow" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="15" width="6" height="6" rx="1.5"/><path d="M9 6h4a4 4 0 0 1 4 4v5M14 12l3 3 3-3"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3v-6a3 3 0 0 1-1-2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3z"/><path d="M8 9h8M8 13h5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v5c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6z"/><path d="m9 12 2 2 4-5"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.3 2.3 0 1 1 3.3 2.1c-.8.4-1.1.9-1.1 1.9M12 17h.01"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+    <symbol id="i-package" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-trigger" viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 9-12h-7z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-excel" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12M14 12l4 5M18 12l-4 5"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 9v11M15 9v11"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></symbol>
+    <symbol id="i-group" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/><circle cx="8" cy="5" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="10" cy="19" r="2"/></symbol>
+    <symbol id="i-agent" viewBox="0 0 24 24"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M7 21h10a2 2 0 0 0 2-2v-6a7 7 0 0 0-14 0v6a2 2 0 0 0 2 2z"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 6-6 6 6 6M16 6l6 6-6 6M14 3l-4 18"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-variable" viewBox="0 0 24 24"><path d="M7 4H5a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2M17 4h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2M9 9l6 6M15 9l-6 6"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3 2 21h20z"/><path d="M12 9v5M12 18h.01"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4zM22 2 11 13"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+  </svg>
+
+  <div class="app">
+    <aside class="app-rail" aria-label="主导航">
+      <button class="brand" data-view="home" aria-label="Weft 首页"><span></span><span></span><span></span></button>
+      <nav class="rail-nav">
+        <button class="rail-button" data-view="home" aria-label="工作流" data-tooltip="工作流"><svg><use href="#i-grid"/></svg></button>
+        <button class="rail-button active" data-view="editor" aria-label="画布设计" data-tooltip="画布设计"><svg><use href="#i-flow"/></svg></button>
+        <button class="rail-button" data-view="runs" aria-label="运行记录" data-tooltip="运行记录"><svg><use href="#i-history"/></svg></button>
+        <button class="rail-button" data-view="chat" aria-label="聊天" data-tooltip="聊天"><svg><use href="#i-chat"/></svg></button>
+        <button class="rail-button" data-view="changes" aria-label="变更审批" data-tooltip="变更审批"><span class="rail-badge">4</span><svg><use href="#i-shield"/></svg></button>
+      </nav>
+      <div class="rail-bottom">
+        <button class="rail-button" data-view="settings" aria-label="设置" data-tooltip="设置"><svg><use href="#i-settings"/></svg></button>
+        <button class="avatar" aria-label="本机用户">L</button>
+      </div>
+    </aside>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="breadcrumb"><span>工作流</span><svg><use href="#i-chevron"/></svg><strong id="topbar-title">周报汇总.weft</strong><span id="dirty-mark" class="dirty-mark" hidden>*</span></div>
+        <div class="topbar-right">
+          <span class="local-status"><span class="status-dot success"></span>本地服务已连接</span>
+          <span class="topbar-divider"></span>
+          <span class="save-state" id="save-state"><svg><use href="#i-check"/></svg>所有更改已保存</span>
+          <button class="icon-button" aria-label="帮助"><svg><use href="#i-help"/></svg></button>
+        </div>
+      </header>
+
+      <main class="main-content">
+        <section class="view active" id="view-home" aria-label="工作流首页">
+          <div class="page-container home-page">
+            <div class="home-hero">
+              <div><span class="eyebrow">LOCAL WORKSPACE</span><h1>把数据、Excel 与 AI 编织在一起</h1><p>你的所有工作流都保存在本机，可设计、运行并打包交接。</p></div>
+              <div class="hero-pattern" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
+            <div class="page-actions"><button class="button secondary" id="import-button"><svg><use href="#i-import"/></svg>导入工作流</button><button class="button primary" id="new-workflow-button"><svg><use href="#i-plus"/></svg>新建工作流</button></div>
+            <div class="section-heading"><div><h2>最近打开</h2><span>4 个工作流</span></div><div class="search-field compact"><svg><use href="#i-search"/></svg><input placeholder="搜索工作流" aria-label="搜索工作流"></div></div>
+            <div class="workflow-grid">
+              <button class="workflow-card featured" data-open-editor>
+                <div class="workflow-card-top"><span class="workflow-icon violet"><svg><use href="#i-flow"/></svg></span><span class="tag success">就绪</span></div>
+                <h3>周报汇总</h3><p>合并区域报表，清洗并写回本周汇总工作簿。</p>
+                <div class="mini-flow"><span>Excel</span><i></i><span>清洗</span><i></i><span>写回</span></div>
+                <footer><span>今天 14:32</span><span>6 个节点</span></footer>
+              </button>
+              <button class="workflow-card" data-open-editor>
+                <div class="workflow-card-top"><span class="workflow-icon blue"><svg><use href="#i-table"/></svg></span><span class="tag success">就绪</span></div>
+                <h3>销售数据归档</h3><p>按部门拆分销售明细并导出 Parquet 文件。</p>
+                <div class="mini-flow"><span>CSV</span><i></i><span>分组</span><i></i><span>导出</span></div>
+                <footer><span>昨天 18:07</span><span>9 个节点</span></footer>
+              </button>
+              <button class="workflow-card" data-open-editor>
+                <div class="workflow-card-top"><span class="workflow-icon green"><svg><use href="#i-agent"/></svg></span><span class="tag warning">待配置</span></div>
+                <h3>备注智能分类</h3><p>使用 Agent 将自由文本备注归类到五个标准类别。</p>
+                <div class="mini-flow"><span>Prompt</span><i></i><span>Agent</span><i></i><span>表格</span></div>
+                <footer><span>周一 10:21</span><span>7 个节点</span></footer>
+              </button>
+              <button class="workflow-card" data-open-editor>
+                <div class="workflow-card-top"><span class="workflow-icon amber"><svg><use href="#i-folder"/></svg></span><span class="tag neutral">已关闭</span></div>
+                <h3>收件箱整理</h3><p>监听下载目录，按文件类型和日期自动归档。</p>
+                <div class="mini-flow"><span>监听</span><i></i><span>规则</span><i></i><span>移动</span></div>
+                <footer><span>10 月 28 日</span><span>5 个节点</span></footer>
+              </button>
+            </div>
+            <div class="workspace-note"><svg><use href="#i-shield"/></svg><div><strong>本地优先，默认安全</strong><p>服务仅监听 127.0.0.1。密钥保存在用户级配置中，不会随工作流打包。</p></div><button class="text-button" data-view="settings">查看设置<svg><use href="#i-arrow"/></svg></button></div>
+          </div>
+        </section>
+
+        <section class="view active-editor" id="view-editor" aria-label="工作流画布">
+          <div class="workflow-toolbar">
+            <div class="workflow-name"><span class="workflow-icon small violet"><svg><use href="#i-flow"/></svg></span><div><strong>周报汇总</strong><span>D:\flows\weekly-report.weft</span></div></div>
+            <div class="environment-chip"><span class="status-dot success"></span>环境已同步<span>Python 3.12</span></div>
+            <div class="toolbar-actions">
+              <button class="button ghost" data-view="runs"><svg><use href="#i-history"/></svg>历史</button>
+              <button class="button secondary" id="package-button"><svg><use href="#i-package"/></svg>打包</button>
+              <button class="button primary run-button" id="run-button"><svg><use href="#i-play"/></svg><span>运行</span><kbd>Ctrl ↵</kbd></button>
+            </div>
+          </div>
+          <div class="editor-workspace">
+            <aside class="node-panel">
+              <div class="panel-title"><div><h2>节点</h2><span>内置 48</span></div><button class="icon-button" aria-label="节点面板选项"><svg><use href="#i-more"/></svg></button></div>
+              <div class="search-field node-search"><svg><use href="#i-search"/></svg><input id="node-search" placeholder="搜索节点…" aria-label="搜索节点"><kbd>/</kbd></div>
+              <div class="node-categories" id="node-categories">
+                <section class="node-category" data-category="常用"><button class="category-title"><span>常用</span><span>6</span><svg><use href="#i-down"/></svg></button><div class="category-nodes">
+                  <button class="palette-node" data-node-type="Excel Read Range" data-keywords="excel read range 读取"><span class="palette-icon excel"><svg><use href="#i-excel"/></svg></span><span>Excel Read Range</span><svg class="add-icon"><use href="#i-plus"/></svg></button>
+                  <button class="palette-node" data-node-type="Excel Write Table" data-keywords="excel write table 写入"><span class="palette-icon excel"><svg><use href="#i-excel"/></svg></span><span>Excel Write Table</span><svg class="add-icon"><use href="#i-plus"/></svg></button>
+                  <button class="palette-node" data-node-type="Read CSV" data-keywords="read csv 读取"><span class="palette-icon table"><svg><use href="#i-table"/></svg></span><span>Read CSV</span><svg class="add-icon"><use href="#i-plus"/></svg></button>
+                  <button class="palette-node" data-node-type="Row Filter" data-keywords="row filter 行筛选"><span class="palette-icon table"><svg><use href="#i-filter"/></svg></span><span>Row Filter</span><svg class="add-icon"><use href="#i-plus"/></svg></button>
+                  <button class="palette-node" data-node-type="GroupBy" data-keywords="groupby 分组聚合"><span class="palette-icon table"><svg><use href="#i-group"/></svg></span><span>GroupBy</span><svg class="add-icon"><use href="#i-plus"/></svg></button>
+                  <button class="palette-node" data-node-type="Agent Loop" data-keywords="agent loop 智能体"><span class="palette-icon agent"><svg><use href="#i-agent"/></svg></span><span>Agent Loop</span><svg class="add-icon"><use href="#i-plus"/></svg></button>
+                </div></section>
+                <section class="node-category" data-category="Excel"><button class="category-title"><span>Excel</span><span>10</span><svg><use href="#i-down"/></svg></button><div class="category-nodes">
+                  <button class="palette-node" data-node-type="Excel Connect" data-keywords="excel connect 连接"><span class="palette-icon excel"><svg><use href="#i-excel"/></svg></span><span>Excel Connect</span><svg class="add-icon"><use href="#i-plus"/></svg></button>
+                  <button class="palette-node" data-node-type="Excel Workbook" data-keywords="excel workbook 工作簿"><span class="palette-icon excel"><svg><use href="#i-file"/></svg></span><span>Excel Workbook</span><svg class="add-icon"><use href="#i-plus"/></svg></button>
+                  <button class="palette-node" data-node-type="Excel Cell Update" data-keywords="excel cell update 单元格"><span class="palette-icon excel"><svg><use href="#i-grid"/></svg></span><span>Excel Cell Update</span><svg class="add-icon"><use href="#i-plus"/></svg></button>
+                </div></section>
+                <section class="node-category" data-category="表格"><button class="category-title"><span>表格</span><span>18</span><svg><use href="#i-down"/></svg></button><div class="category-nodes">
+                  <button class="palette-node" data-node-type="Sorter" data-keywords="sorter 排序"><span class="palette-icon table"><svg><use href="#i-table"/></svg></span><span>Sorter</span><svg class="add-icon"><use href="#i-plus"/></svg></button>
+                  <button class="palette-node" data-node-type="Joiner" data-keywords="joiner 关联"><span class="palette-icon table"><svg><use href="#i-table"/></svg></span><span>Joiner</span><svg class="add-icon"><use href="#i-plus"/></svg></button>
+                </div></section>
+                <section class="node-category collapsed" data-category="流程"><button class="category-title"><span>流程</span><span>12</span><svg><use href="#i-down"/></svg></button><div class="category-nodes"><button class="palette-node" data-node-type="If" data-keywords="if 条件"><span class="palette-icon flow"><svg><use href="#i-flow"/></svg></span><span>If</span></button></div></section>
+                <section class="node-category collapsed" data-category="Agent"><button class="category-title"><span>Agent</span><span>8</span><svg><use href="#i-down"/></svg></button><div class="category-nodes"><button class="palette-node" data-node-type="LLM Call" data-keywords="llm call 模型"><span class="palette-icon agent"><svg><use href="#i-agent"/></svg></span><span>LLM Call</span></button></div></section>
+                <section class="node-category collapsed" data-category="文件"><button class="category-title"><span>文件</span><span>9</span><svg><use href="#i-down"/></svg></button><div class="category-nodes"><button class="palette-node" data-node-type="List Files" data-keywords="list files 文件"><span class="palette-icon file"><svg><use href="#i-folder"/></svg></span><span>List Files</span></button></div></section>
+              </div>
+              <div class="palette-empty" id="palette-empty" hidden><svg><use href="#i-search"/></svg><p>没有匹配的节点</p><span>试试其他关键词</span></div>
+              <div class="node-panel-footer"><svg><use href="#i-info"/></svg><span>双击节点添加到画布中心</span></div>
+            </aside>
+
+            <div class="canvas-column">
+              <div class="canvas-wrap" id="canvas-wrap">
+                <div class="canvas-top-controls"><div class="canvas-mode"><button class="active">设计</button><button>依赖</button></div><span class="canvas-hint">空格 + 拖拽平移</span></div>
+                <div class="canvas-viewport" id="canvas-viewport">
+                  <div class="canvas-world" id="canvas-world">
+                    <svg class="edge-layer" id="edge-layer" width="760" height="520" viewBox="0 0 760 520" aria-hidden="true">
+                      <defs><marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#a4a2b2"/></marker></defs>
+                      <path d="M224 131 C245 131 254 131 275 131"/><path d="M449 131 C470 131 479 131 500 131"/><path d="M587 187 C587 225 587 262 587 300"/><path d="M500 361 C479 361 470 361 449 361"/><path d="M275 361 C254 361 245 361 224 361"/>
+                    </svg>
+                    <div id="node-layer"></div>
+                    <div class="canvas-note" style="left:42px;top:450px"><span class="note-pin"></span>每周五更新报表后运行；Excel 保持打开即可。</div>
+                  </div>
+                </div>
+                <div class="zoom-controls"><button id="zoom-out" aria-label="缩小">−</button><button id="zoom-value">100%</button><button id="zoom-in" aria-label="放大">+</button><span></span><button id="zoom-fit" aria-label="适应视图"><svg><use href="#i-grid"/></svg></button></div>
+                <div class="minimap"><div class="minimap-world"><i style="left:9px;top:12px"></i><i style="left:48px;top:12px"></i><i style="left:87px;top:12px"></i><i style="left:87px;top:52px"></i><i style="left:48px;top:52px"></i><i style="left:9px;top:52px"></i></div><span></span></div>
+                <div class="port-legend"><span><i class="port table"></i>Table</span><span><i class="port excel"></i>Excel</span><span><i class="port variable"></i>Variable</span><span><i class="port message"></i>Message</span></div>
+              </div>
+              <section class="log-panel" id="log-panel">
+                <header><div><button class="log-tab active">运行日志</button><span class="log-count" id="log-count">5</span></div><div class="log-actions"><select id="log-level" aria-label="日志级别"><option value="ALL">全部级别</option><option value="INFO">INFO</option><option value="WARN">WARN</option><option value="ERROR">ERROR</option></select><button class="icon-button" id="clear-logs" aria-label="清空日志"><svg><use href="#i-trash"/></svg></button><button class="icon-button" id="toggle-logs" aria-label="收起日志"><svg><use href="#i-down"/></svg></button></div></header>
+                <div class="log-list" id="log-list">
+                  <div class="log-entry" data-level="INFO"><time>14:32:08</time><span class="log-level info">INFO</span><span class="log-node">GroupBy</span><p>聚合完成：6 个分组，输出 6 行 × 3 列</p></div>
+                  <div class="log-entry" data-level="INFO"><time>14:32:08</time><span class="log-level info">INFO</span><span class="log-node">Row Filter</span><p>筛选 amount &gt; 100：保留 842 / 1,000 行</p></div>
+                  <div class="log-entry" data-level="INFO"><time>14:32:07</time><span class="log-level info">INFO</span><span class="log-node">Excel Read Range</span><p>从 汇总.xlsx / 原始数据 / A1:E1001 读取 1,000 行</p></div>
+                  <div class="log-entry" data-level="WARN"><time>14:32:07</time><span class="log-level warn">WARN</span><span class="log-node">Excel Write Table</span><p>检测到可见 Excel 实例，fast_mode 已保持关闭</p></div>
+                  <div class="log-entry" data-level="INFO"><time>14:32:06</time><span class="log-level info">INFO</span><span class="log-node">Trigger</span><p>手动运行已启动 · run_01J9W8K2M4</p></div>
+                </div>
+              </section>
+            </div>
+
+            <aside class="inspector" id="inspector">
+              <div class="inspector-heading"><div><span class="palette-icon table" id="inspector-icon"><svg><use href="#i-table"/></svg></span><div><h2 id="inspector-title">Row Filter</h2><span id="inspector-type">table.row_filter · v1</span></div></div><button class="icon-button" aria-label="节点更多操作"><svg><use href="#i-more"/></svg></button></div>
+              <div class="inspector-tabs"><button class="active" data-inspector-tab="params">参数</button><button data-inspector-tab="note">注释</button><button data-inspector-tab="trace">轨迹</button></div>
+              <div class="inspector-content" id="inspector-params">
+                <div class="node-state-summary"><span class="status-dot success" id="inspector-status-dot"></span><span id="inspector-status-text">上次执行成功</span><span id="inspector-duration">128 ms</span></div>
+                <div class="form-section"><h3>筛选条件</h3>
+                  <label class="form-field"><span>列名 <b>*</b></span><div class="input-with-action"><select id="param-column"><option>amount</option><option>region</option><option>product</option><option>date</option><option>note</option></select><button title="绑定流变量"><svg><use href="#i-variable"/></svg></button></div><small>来自上游表格的 5 个可用列</small></label>
+                  <label class="form-field"><span>运算符 <b>*</b></span><select id="param-operator"><option value=">">大于 &gt;</option><option value=">=">大于等于 ≥</option><option value="==">等于 =</option><option value="!=">不等于 ≠</option><option value="contains">包含</option></select></label>
+                  <label class="form-field"><span>比较值 <b>*</b></span><div class="input-with-action"><input id="param-value" value="100"><button title="绑定流变量"><svg><use href="#i-variable"/></svg></button></div></label>
+                </div>
+                <div class="form-section port-section"><h3>端口</h3><button class="port-row" data-preview="input"><span><i class="port table"></i>输入</span><code>in · Table</code><svg><use href="#i-eye"/></svg></button><button class="port-row" data-preview="output"><span><i class="port table"></i>输出</span><code>out · Table</code><svg><use href="#i-eye"/></svg></button></div>
+                <div class="cache-note"><svg><use href="#i-info"/></svg><div><strong>Pure 节点</strong><p>输入或参数变化时重新执行；结果可安全复用。</p></div></div>
+              </div>
+              <div class="inspector-content" id="inspector-note" hidden><label class="form-field"><span>节点注释</span><textarea id="node-note" rows="6" placeholder="记录这个节点的用途…">仅保留有效订单金额，供后续按区域汇总。</textarea><small>注释会显示在节点下方，并随工作流保存。</small></label></div>
+              <div class="inspector-content" id="inspector-trace" hidden><div class="empty-state small"><svg><use href="#i-history"/></svg><h3>暂无 Agent 轨迹</h3><p>轨迹用于展示 LLM 调用、工具执行和 token 用量。</p></div></div>
+              <footer class="inspector-footer"><button class="button secondary" id="execute-to-button"><svg><use href="#i-play"/></svg>执行到此</button><button class="button ghost" id="reset-node-button">重置</button></footer>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="view-runs" aria-label="运行记录">
+          <div class="page-container runs-page">
+            <div class="page-header"><div><span class="eyebrow">RUN HISTORY</span><h1>运行记录</h1><p>每次运行都有冻结的工作流快照、日志与端口输出。</p></div><button class="button primary" data-view="editor"><svg><use href="#i-play"/></svg>新建运行</button></div>
+            <div class="run-summary-grid"><div class="summary-card"><span>最近运行</span><strong class="text-success">成功</strong><small>今天 14:32 · 2.4 秒</small></div><div class="summary-card"><span>本周运行</span><strong>28</strong><small>24 次手动 · 4 次定时</small></div><div class="summary-card"><span>成功率</span><strong>92.8%</strong><small>26 成功 / 2 失败</small></div><div class="summary-card"><span>缓存命中</span><strong>64%</strong><small>仅 Pure 节点参与复用</small></div></div>
+            <div class="runs-layout">
+              <section class="run-list-card"><header><div class="filter-pills"><button class="active">全部</button><button>成功</button><button>失败</button><button>已取消</button></div><button class="icon-button"><svg><use href="#i-settings"/></svg></button></header><div class="run-list" id="run-list">
+                <button class="run-item active" data-run="success"><span class="run-status-icon success"><svg><use href="#i-check"/></svg></span><div><strong>run_01J9W8K2M4</strong><span>手动 · 今天 14:32</span></div><div class="run-item-meta"><span class="tag success">成功</span><small>2.4 s</small></div></button>
+                <button class="run-item" data-run="failed"><span class="run-status-icon failed"><svg><use href="#i-close"/></svg></span><div><strong>run_01J9W71FQ8</strong><span>定时 · 今天 09:00</span></div><div class="run-item-meta"><span class="tag danger">失败</span><small>1.1 s</small></div></button>
+                <button class="run-item" data-run="success"><span class="run-status-icon success"><svg><use href="#i-check"/></svg></span><div><strong>run_01J9VNY3XA</strong><span>手动 · 昨天 17:46</span></div><div class="run-item-meta"><span class="tag success">成功</span><small>2.2 s</small></div></button>
+                <button class="run-item" data-run="cancelled"><span class="run-status-icon cancelled"><svg><use href="#i-stop"/></svg></span><div><strong>run_01J9VJ6PD2</strong><span>聊天 · 昨天 16:20</span></div><div class="run-item-meta"><span class="tag neutral">已取消</span><small>8.7 s</small></div></button>
+              </div></section>
+              <section class="run-detail-card" id="run-detail"><header><div><span class="tag success" id="run-detail-tag">成功</span><h2 id="run-detail-id">run_01J9W8K2M4</h2><p id="run-detail-meta">手动触发 · 2026/11/03 14:32:06 · revision 18</p></div><button class="button secondary" data-preview="output"><svg><use href="#i-table"/></svg>查看输出</button></header><div class="run-detail-stats"><div><span>耗时</span><strong>2.4 s</strong></div><div><span>节点</span><strong>6 / 6</strong></div><div><span>输出行数</span><strong>6</strong></div><div><span>缓存命中</span><strong>2</strong></div></div><h3 class="detail-section-title">节点执行</h3><div class="execution-timeline" id="execution-timeline">
+                <div><span class="timeline-node success"><svg><use href="#i-trigger"/></svg></span><section><strong>Trigger</strong><small>手动事件已接收</small></section><time>3 ms</time></div>
+                <div><span class="timeline-node success"><svg><use href="#i-folder"/></svg></span><section><strong>List Files</strong><small>发现 4 个待处理工作簿</small></section><time>18 ms</time></div>
+                <div><span class="timeline-node success"><svg><use href="#i-excel"/></svg></span><section><strong>Excel Read Range</strong><small>读取 1,000 行 × 5 列</small></section><time>684 ms</time></div>
+                <div><span class="timeline-node success"><svg><use href="#i-filter"/></svg></span><section><strong>Row Filter</strong><small>保留 842 行</small></section><time>128 ms</time></div>
+                <div><span class="timeline-node success"><svg><use href="#i-group"/></svg></span><section><strong>GroupBy</strong><small>生成 6 个区域分组</small></section><time>84 ms</time></div>
+                <div><span class="timeline-node success"><svg><use href="#i-excel"/></svg></span><section><strong>Excel Write Table</strong><small>写回 汇总.xlsx / 本周 / A1</small></section><time>1.4 s</time></div>
+              </div></section>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-chat" aria-label="聊天面板">
+          <div class="chat-layout">
+            <aside class="chat-sidebar"><div class="panel-title"><h2>对话</h2><button class="icon-button" id="new-chat" aria-label="新会话"><svg><use href="#i-plus"/></svg></button></div><div class="search-field compact"><svg><use href="#i-search"/></svg><input placeholder="搜索对话" aria-label="搜索对话"></div><div class="chat-sessions"><button class="active"><span class="session-icon"><svg><use href="#i-chat"/></svg></span><div><strong>拆分本周销售报表</strong><p>已按部门生成 6 个工作表</p><time>14:20</time></div></button><button><span class="session-icon"><svg><use href="#i-chat"/></svg></span><div><strong>备注分类规则</strong><p>请将售后相关备注单独归类</p><time>昨天</time></div></button></div><div class="chat-workflow"><span>当前工作流</span><strong><span class="status-dot success"></span>周报汇总</strong><small>聊天触发已启用</small></div></aside>
+            <section class="chat-main"><header><div><h2>拆分本周销售报表</h2><span><span class="status-dot success"></span>Chat Trigger 已连接</span></div><button class="button ghost" data-view="editor"><svg><use href="#i-flow"/></svg>打开画布</button></header><div class="chat-messages" id="chat-messages"><div class="message user"><div class="message-avatar">L</div><div><span>你 · 14:20</span><p>把本周销售表按部门拆成不同的工作表，保留原始数据。</p></div></div><div class="message assistant"><div class="message-avatar"><span class="brand mini"><span></span><span></span><span></span></span></div><div><span>Weft · 周报汇总</span><p>我会读取当前打开的 <code>汇总.xlsx</code>，按“部门”列拆分，并保留“原始数据”工作表。</p><div class="tool-call"><button><svg><use href="#i-excel"/></svg><strong>Excel Read Range</strong><span>汇总.xlsx / 本周</span><svg><use href="#i-down"/></svg></button><div><span>1,000 行 × 5 列</span><span>684 ms</span></div></div><div class="tool-call"><button><svg><use href="#i-excel"/></svg><strong>Excel Write Table</strong><span>6 次调用</span><svg><use href="#i-down"/></svg></button></div><p>已完成：新增 <strong>华东、华南、华北、西南、华中、西北</strong> 6 个工作表，共写入 1,000 行。原始数据未修改。</p><footer><button><svg><use href="#i-copy"/></svg>复制</button><span>Run run_01J9W8K2M4 · 2.8 s</span></footer></div></div></div><div class="chat-composer"><div class="composer-box"><textarea id="chat-input" rows="2" placeholder="描述你想要这个工作流完成的事…"></textarea><div><span><svg><use href="#i-shield"/></svg>Agent 无法修改工作流图</span><button class="send-button" id="send-chat" aria-label="发送"><svg><use href="#i-send"/></svg></button></div></div><small>Enter 发送 · Shift + Enter 换行</small></div></section>
+          </div>
+        </section>
+
+        <section class="view" id="view-changes" aria-label="沙箱变更审批">
+          <div class="changes-page">
+            <header class="changes-header"><div><span class="eyebrow">SANDBOX REVIEW</span><h1>审批文件变更</h1><p><code>run_01J9W8K2M4</code> · Pi Agent · 真实目录尚未修改</p></div><div><button class="button secondary" id="discard-changes"><svg><use href="#i-trash"/></svg>全部丢弃</button><button class="button primary" id="apply-changes"><svg><use href="#i-check"/></svg>应用所选 <span id="selected-change-count">3</span> 项</button></div></header>
+            <div class="audit-banner"><svg><use href="#i-shield"/></svg><div><strong>沙箱审计完整</strong><p>所有变更均位于工作流 Root 内。应用前会重新检查文件哈希，覆盖或删除前自动备份。</p></div><span class="tag success">WeftBox-01J9W8K2M4</span></div>
+            <div class="changes-layout">
+              <aside class="change-tree"><div class="change-tree-title"><h3>变更文件</h3><span>4 项</span></div><label class="select-all"><input type="checkbox" id="select-all-changes" checked><span>选择全部可应用项</span></label><div class="tree-root"><svg><use href="#i-folder"/></svg>raw/</div>
+                <label class="change-file selected"><input type="checkbox" class="change-checkbox" checked><span class="file-change-icon renamed">R</span><div><strong>2026_Q4_华东.xlsx</strong><small>原 最终版2.xlsx</small></div><span>84 KB</span></label>
+                <label class="change-file"><input type="checkbox" class="change-checkbox" checked><span class="file-change-icon renamed">R</span><div><strong>2026_Q4_华南.xlsx</strong><small>原 报表-新.xlsx</small></div><span>76 KB</span></label>
+                <label class="change-file"><input type="checkbox" class="change-checkbox" checked><span class="file-change-icon created">A</span><div><strong>归档说明.md</strong><small>新建文件</small></div><span>2 KB</span></label>
+                <div class="tree-root nested"><svg><use href="#i-folder"/></svg>archive/</div>
+                <label class="change-file protected"><input type="checkbox" disabled><span class="file-change-icon modified">M</span><div><strong>workflow.json</strong><small>受保护文件，不可应用</small></div><svg><use href="#i-shield"/></svg></label>
+              </aside>
+              <section class="diff-view"><header><div><span class="file-change-icon renamed">R</span><div><h2>2026_Q4_华东.xlsx</h2><p>raw/最终版2.xlsx → raw/2026_Q4_华东.xlsx</p></div></div><span class="tag neutral">二进制文件</span></header><div class="binary-diff"><div><span>原文件</span><strong>最终版2.xlsx</strong><dl><dt>大小</dt><dd>84,216 bytes</dd><dt>SHA-256</dt><dd><code>8d3a…9c21</code></dd><dt>状态</dt><dd>将从原路径移除</dd></dl></div><svg><use href="#i-arrow"/></svg><div><span>新文件</span><strong>2026_Q4_华东.xlsx</strong><dl><dt>大小</dt><dd>84,216 bytes</dd><dt>SHA-256</dt><dd><code>8d3a…9c21</code></dd><dt>状态</dt><dd>内容未改变</dd></dl></div></div><div class="rename-proof"><svg><use href="#i-info"/></svg><p>通过删除项与新增项的内容哈希匹配识别为重命名，不是复制。</p></div><h3 class="detail-section-title">应用前检查</h3><div class="preflight-list"><div><svg><use href="#i-check"/></svg><span>目标路径位于授权目录内</span></div><div><svg><use href="#i-check"/></svg><span>原文件哈希与运行前基线一致</span></div><div><svg><use href="#i-check"/></svg><span>目标路径不存在，不会覆盖现有文件</span></div></div></section>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-settings" aria-label="设置">
+          <div class="settings-layout">
+            <aside class="settings-nav"><span class="eyebrow">SETTINGS</span><h1>设置</h1><nav><button class="active"><svg><use href="#i-agent"/></svg>LLM 配置<span>2</span></button><button><svg><use href="#i-excel"/></svg>Excel</button><button><svg><use href="#i-shield"/></svg>沙箱与安全</button><button><svg><use href="#i-trigger"/></svg>触发器</button><button><svg><use href="#i-history"/></svg>日志与缓存</button><button><svg><use href="#i-settings"/></svg>服务</button></nav><div class="config-path"><span>用户级配置</span><code>%APPDATA%\weft\config.toml</code></div></aside>
+            <div class="settings-content"><div class="settings-heading"><div><h2>LLM 配置</h2><p>管理 OpenAI 兼容端点。节点只引用配置名，原始密钥不会进入工作流。</p></div><button class="button primary" id="add-llm"><svg><use href="#i-plus"/></svg>添加配置</button></div><div class="security-inline"><svg><use href="#i-shield"/></svg><span>密钥仅由沙箱外的 LLMProxy 读取，不会写入日志、轨迹或打包产物。</span></div>
+              <section class="llm-card"><header><div><span class="llm-provider">O</span><div><h3>default</h3><p>OpenAI 兼容 · 默认配置</p></div></div><span class="tag success"><span class="status-dot success"></span>连接正常</span></header><div class="settings-form-grid"><label class="form-field wide"><span>Base URL</span><input value="https://api.openai.com/v1"></label><label class="form-field"><span>模型</span><input value="gpt-4o-mini"></label><label class="form-field"><span>API Key</span><div class="input-with-action"><input type="password" value="sk-prototype-secret"><button aria-label="显示密钥"><svg><use href="#i-eye"/></svg></button></div></label><label class="form-field"><span>超时（秒）</span><input type="number" value="60"></label></div><footer><button class="button secondary" id="test-llm"><svg><use href="#i-trigger"/></svg>测试连接</button><span id="llm-test-result" hidden><svg><use href="#i-check"/></svg>连接成功 · 42 个模型可用</span><button class="text-button danger-text">删除配置</button></footer></section>
+              <section class="llm-card"><header><div><span class="llm-provider local">N</span><div><h3>local-gateway</h3><p>NewAPI · 内网网关</p></div></div><span class="tag neutral">未测试</span></header><div class="settings-form-grid"><label class="form-field wide"><span>Base URL</span><input value="http://127.0.0.1:3000/v1"></label><label class="form-field"><span>模型</span><input value="qwen2.5-32b-instruct"></label><label class="form-field"><span>API Key</span><input type="password" value="another-secret"></label></div><footer><button class="button secondary test-connection"><svg><use href="#i-trigger"/></svg>测试连接</button><button class="text-button danger-text">删除配置</button></footer></section>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="preview-modal" hidden>
+    <section class="modal preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-title"><header><div><span class="workflow-icon small blue"><svg><use href="#i-table"/></svg></span><div><h2 id="preview-title">Row Filter · out</h2><p>Run run_01J9W8K2M4 · Table · 只读快照</p></div></div><button class="icon-button modal-close" aria-label="关闭"><svg><use href="#i-close"/></svg></button></header><div class="table-meta"><span><strong>842</strong> 行</span><span><strong>5</strong> 列</span><span>每页 100 行</span><div class="search-field compact"><svg><use href="#i-search"/></svg><input placeholder="筛选当前预览" aria-label="筛选预览"></div></div><div class="table-scroll"><table class="data-table"><thead><tr><th>#</th><th>date <small>Date</small></th><th>region <small>Utf8</small></th><th>product <small>Utf8</small></th><th>amount <small>Float64</small></th><th>note <small>Utf8</small></th></tr></thead><tbody>
+      <tr><td>1</td><td>2026-10-26</td><td>华东</td><td>Weft Pro</td><td>1,280.00</td><td>企业续费</td></tr><tr><td>2</td><td>2026-10-26</td><td>华南</td><td>Weft Team</td><td>860.00</td><td>年度订阅</td></tr><tr><td>3</td><td>2026-10-27</td><td>华北</td><td>Weft Pro</td><td>1,280.00</td><td>—</td></tr><tr><td>4</td><td>2026-10-27</td><td>西南</td><td>Weft Basic</td><td>320.00</td><td>新用户</td></tr><tr><td>5</td><td>2026-10-28</td><td>华东</td><td>Weft Team</td><td>860.00</td><td>增购席位</td></tr><tr><td>6</td><td>2026-10-29</td><td>华中</td><td>Weft Pro</td><td>1,280.00</td><td>企业续费</td></tr><tr><td>7</td><td>2026-10-30</td><td>西北</td><td>Weft Basic</td><td>320.00</td><td>—</td></tr>
+    </tbody></table></div><footer><span>显示 1–7，共 842 行（原型示例数据）</span><div><button class="button secondary" disabled>上一页</button><button class="button secondary">下一页</button></div></footer></section>
+  </div>
+
+  <div class="modal-backdrop" id="package-modal" hidden>
+    <section class="modal package-modal" role="dialog" aria-modal="true" aria-labelledby="package-title"><header><div><span class="workflow-icon small violet"><svg><use href="#i-package"/></svg></span><div><h2 id="package-title">打包工作流</h2><p>生成可分发给同事的单个 zip 文件</p></div></div><button class="icon-button modal-close" aria-label="关闭"><svg><use href="#i-close"/></svg></button></header><div class="package-body"><div class="package-file"><svg><use href="#i-package"/></svg><div><strong>weekly-report-20261103.weft.zip</strong><span>预计 2.8 MB</span></div><span class="tag success">可打包</span></div><h3>包含内容</h3><div class="package-checks"><label><input type="checkbox" checked disabled><span><strong>工作流与依赖锁</strong><small>workflow.json、pyproject.toml、uv.lock</small></span></label><label><input type="checkbox" checked disabled><span><strong>用户节点与 Prompt</strong><small>nodes/、prompts/</small></span></label><label><input type="checkbox" checked><span><strong>包含 data/ 数据目录</strong><small>1.9 MB · 4 个 Excel 文件</small></span></label></div><div class="package-excluded"><span>始终排除</span><code>.runs/</code><code>.venv/</code><code>密钥与用户配置</code></div><div class="security-inline"><svg><use href="#i-shield"/></svg><span>密钥扫描通过，未检测到绝对路径警告。</span></div></div><footer><button class="button secondary modal-close">取消</button><button class="button primary" id="confirm-package"><svg><use href="#i-package"/></svg>导出 zip</button></footer></section>
+  </div>
+
+  <div class="modal-backdrop" id="new-workflow-modal" hidden>
+    <section class="modal new-workflow-modal" role="dialog" aria-modal="true" aria-labelledby="new-workflow-title"><header><div><span class="workflow-icon small violet"><svg><use href="#i-plus"/></svg></span><div><h2 id="new-workflow-title">新建工作流</h2><p>创建自包含的 .weft 工作流目录</p></div></div><button class="icon-button modal-close" aria-label="关闭"><svg><use href="#i-close"/></svg></button></header><div class="package-body"><label class="form-field"><span>工作流名称 <b>*</b></span><input id="new-workflow-name" value="untitled"></label><label class="form-field"><span>父目录 <b>*</b></span><div class="input-with-action"><input value="D:\flows"><button><svg><use href="#i-folder"/></svg></button></div><small>将创建 D:\flows\untitled.weft\，包含默认 Trigger 节点。</small></label><div class="template-choice"><span>起始模板</span><div><button class="active"><svg><use href="#i-flow"/></svg><strong>空白工作流</strong><small>仅含 Trigger</small></button><button><svg><use href="#i-excel"/></svg><strong>Excel 处理</strong><small>读取 → 清洗 → 写回</small></button></div></div></div><footer><button class="button secondary modal-close">取消</button><button class="button primary" id="create-workflow">创建并打开</button></footer></section>
+  </div>
+
+  <div class="toast-region" id="toast-region" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
